@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useConnection } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Runtime } from "./config";
 import { useGlobal, useToken, useVerification } from "./data";
 import { errorText, units } from "./model";
+import { mood, useStatus, useWindowPasses } from "./live";
+import { reducedMotion, useClickRun, useKonami } from "./meme";
 import { WalletControl, WalletProvider } from "./Wallet";
 import { TransactionProvider } from "./transactions";
 import { Bet } from "./Bet";
@@ -43,21 +45,64 @@ function Game({ r }: { r: Runtime }) {
   const fresh = !!g && !global.isError && clock - global.dataUpdatedAt < 45000;
   const ready = fresh && verification.data === true && !verification.isError;
   const props = { r, g, ready, now };
+  // Meme layer: wheel status for the mood, stream state for the page dim,
+  // ten logo clicks for sunglasses and the Konami code for one full spin.
+  const status = useStatus();
+  const windowPasses = useWindowPasses(status.data, g?.currentWindow);
+  const currentMood = mood(status.data, g?.currentLine, windowPasses);
+  const [sleeping, setSleeping] = useState<boolean>();
+  const onLiveChange = useCallback(
+    (live: boolean | undefined) => setSleeping(live === false),
+    [],
+  );
+  const shades = useClickRun(10);
+  const spins = useKonami();
+  const [spinning, setSpinning] = useState(false);
+  useEffect(() => {
+    if (!spins || reducedMotion()) return;
+    setSpinning(true);
+    const id = setTimeout(() => setSpinning(false), 1400);
+    return () => clearTimeout(id);
+  }, [spins]);
   return (
     <>
       <a className="skip-link" href="#main">
         Skip to game
       </a>
-      <div className="app-shell">
+      <div
+        className={`app-shell${sleeping ? " page-sleeping" : ""}${spinning ? " spin" : ""}`}
+      >
         <header className="header">
           <a
             className="brand"
             href="#bet"
-            onClick={() => setTab("Bet")}
+            onClick={() => {
+              setTab("Bet");
+              shades.click();
+            }}
             aria-label="Hamster Hour home"
           >
-            <img src="./favicon.svg" width="42" height="42" alt="" />
-            <h1>HAMSTER HOUR</h1>
+            <span className={`brand-mark${shades.done ? " deal-with-it" : ""}`}>
+              <img src="./favicon.svg" width="42" height="42" alt="" />
+              {shades.done && (
+                <span className="shades" aria-hidden="true">
+                  <i />
+                  <i />
+                </span>
+              )}
+            </span>
+            <span className="brand-text">
+              <h1>HAMSTER HOUR</h1>
+              <span className="mood" role="status">
+                {shades.done
+                  ? "deal with it"
+                  : currentMood
+                    ? `mood: ${currentMood}`
+                    : status.isError
+                      ? "mood: unknown"
+                      : "mood: reading…"}
+              </span>
+            </span>
           </a>
           <div className="header-actions">
             <a
@@ -126,7 +171,7 @@ function Game({ r }: { r: Runtime }) {
         </nav>
         <main id="main">
           {tab === "Bet" ? (
-            <Bet {...props} />
+            <Bet {...props} onLiveChange={onLiveChange} />
           ) : (
             <div className="secondary-page">
               <div className="section-title">

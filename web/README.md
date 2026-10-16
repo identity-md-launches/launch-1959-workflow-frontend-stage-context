@@ -38,15 +38,21 @@ The body contains `v:1`, `chainId:1`, `window:{hours:24}`, `answerType:"uint256"
 
 The payment hash is remembered locally. The UI polls the Intake status to obtain the oracle UUID, shows the panel on `explorer.imd.fun`, polls the signed answer every 15 seconds, verifies it and fills the manual JSON field. “Settle” submits the actual deployed ABI tuple. Anyone can still paste a separately acquired signed response. The successful caller may claim 0.5 IMD from a funded reserve on a fee-bearing window; reimbursement and panel delivery are not guaranteed. The 48-hour refund action and reserve donation remain available.
 
-## Cam, intro and art
+## Live or sleeping, chat and the meme layer
 
-`Stream.tsx` immediately renders the requested YouTube ID with autoplay, mute, lazy loading and 16:9 sizing. It tries `current.json` in the background and accepts only a valid publicId. A blocked feed does not replace the player with an unavailable state. The live source is outside this app’s control: its current CORS denial appears in the browser’s network console even though the player works; failed discovery is not retried continuously.
+The site never calls squeekchain.com directly. `live.ts` polls the project proxy `https://hamster-hour.hamsterhour562.workers.dev`: `GET /live` (mirror of `media.squeekchain.com/live/current.json`) every 20 s and `GET /status` (mirror of `api.squeekchain.com/v1/status`) every 20 s. `Stream.tsx` embeds `https://www.youtube.com/embed/<publicId>?autoplay=1&mute=1` when `state` is `live` and `playback.kind` is `youtube`, switching when the id changes; otherwise it shows the SLEEPING screen in the same 16:9 slot with the last known `measurement.speedMmPerSecond` and `cumulativeWorkUnits`. If the proxy fails it embeds the last live id remembered in this browser, falling back to the channel's last known stream `6K_uF2s-LSw`. The proxy's CORS allowlist covers the production origin and `http://localhost:5173`; from other origins the page degrades to the fallback embed and logs CORS errors it cannot suppress.
+
+`Chat.tsx` polls `GET /chat?since=<ms>` every 5 s, keeps the last 200 messages and autoscrolls unless the reader scrolled up. Posting signs `"Hamster Hour chat\n" + ts + "\n" + message` with `personal_sign` through the connected wallet (no gas) and sends `{address, message, signature, ts}`. Client rules: 200 characters, no links, one message per 5 s; server rejections are shown in plain words. Messages are plain text, escaped by React. A "bet" tag marks senders whose `position(k, address)` is non-zero in the current or next window.
+
+`meme.tsx` holds the synthesized squeak, poke counter (localStorage), Konami listener, logo click run, `SlotNumber` digit reels, seed confetti and X share intents. Moods come from `/status` against the line pace (line × 21 cm / 3600 s): sleeping, stretching (< 30 %), cruising, zoomies (> line), villain era (window passes or speed above 2× the line). Everything honours `prefers-reduced-motion`.
+
+Note: the EXACT sheet shows the requested sentence about a 2 % jackpot condition; the deployed contract has no such condition (see `docs/frontend/VALIDATION.md`).
 
 The first visit opens a native full-screen dialog with the supplied video stored in `public/assets/hamster-chewing.mp4`. Start playing, Escape, close and outside taps dismiss it; localStorage remembers dismissal. The video is muted, loops, plays inline, can be paused, and starts paused for reduced-motion preferences. The supplied clip is bundled verbatim. The goggle hamster, happy/asleep variants, wheel runner, favicon and share image are original SVG artwork. IBM Plex Mono is bundled locally with its font license.
 
 ## Repeatable checks
 
-`npm test` runs model/protocol tests. Browser tests use a real Chromium browser with intercepted RPC, wallet and oracle fixtures; they do not broadcast Ethereum transactions or claim that a production panel ran. The production bundle itself has no test mode.
+`npm test` runs model/protocol tests plus live-feed parsing, mood and chat rules (15 tests). Browser tests (17 scenarios) use a real Chromium browser with intercepted RPC, wallet, proxy (`/live`, `/status`, `/chat`), YouTube and oracle fixtures; they do not broadcast Ethereum transactions, sign with a real key or claim that a production panel ran. The production bundle itself has no test mode. To check against the real proxy, serve `dist/` at `http://localhost:5173` (an allowed origin).
 
 Install Playwright outside the repository and provide its module path:
 

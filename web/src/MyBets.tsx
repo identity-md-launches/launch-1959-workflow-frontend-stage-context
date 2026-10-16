@@ -11,7 +11,9 @@ import {
 import { units, type Position } from "./model";
 import { Action } from "./ui";
 import { useTransactions } from "./transactions";
+import { SeedConfetti, reducedMotion, shareIntent } from "./meme";
 import type { PageProps } from "./Bet";
+export const SITE = "https://hamster-hour-bet-on-the-wheel.sites.imd.fun";
 function positionLabels(p: Position) {
   return [
     ["OVER", p.over[1]],
@@ -174,26 +176,51 @@ export function ResultCard({ r, g, ready, now, k }: PageProps & { k: bigint }) {
     ((!w.marketVoided[0] && p.over[w.result > w.line ? 1 : 0] > 0n) ||
       (!w.marketVoided[2] && p.sleep[w.result === 0n ? 1 : 0] > 0n) ||
       exactRank(w, p) >= 0);
+  const lost = !!p && !!address && !refunded && !won && positionTotal(p) > 0n;
+  const share = (outcome: "W" | "L") =>
+    shareIntent(
+      outcome === "W"
+        ? `W. The hamster ran ${w.result} passes in window ${k} and I called it. ${SITE}`
+        : `L. The hamster ran ${w.result} passes in window ${k} and I fed it. ${SITE}`,
+    );
   return (
-    <article className="result-card">
-      <img
-        src={
-          w.result === 0n && !refunded
-            ? "./assets/hamster-asleep.svg"
-            : won
-              ? "./assets/hamster-happy.svg"
-              : "./favicon.svg"
-        }
-        width="76"
-        height="76"
-        alt={
-          w.result === 0n && !refunded
-            ? "Sleeping hamster"
-            : won
-              ? "Happy hamster"
-              : "Goggle hamster"
-        }
-      />
+    <article
+      className={`result-card${won ? " won" : ""}${lost ? " lost" : ""}`}
+    >
+      {won && <SeedConfetti />}
+      {lost ? (
+        <video
+          className="result-video"
+          src="./assets/hamster-chewing.mp4"
+          poster="./favicon.svg"
+          width="76"
+          height="76"
+          muted
+          loop
+          playsInline
+          autoPlay={!reducedMotion()}
+          aria-label="The hamster chewing your bet"
+        />
+      ) : (
+        <img
+          src={
+            won
+              ? "./assets/hamster-thumbs.svg"
+              : w.result === 0n && !refunded
+                ? "./assets/hamster-asleep.svg"
+                : "./favicon.svg"
+          }
+          width="76"
+          height="76"
+          alt={
+            won
+              ? "Goggle hamster giving a thumbs up"
+              : w.result === 0n && !refunded
+                ? "Sleeping hamster"
+                : "Goggle hamster"
+          }
+        />
+      )}
       <div className="result-body">
         <span className="small muted">
           Window {k.toString()} ·{" "}
@@ -207,6 +234,22 @@ export function ResultCard({ r, g, ready, now, k }: PageProps & { k: bigint }) {
         </p>
         {w.status === 2 && (w.marketVoided[0] || w.marketVoided[2]) && (
           <p className="small muted">Uncontested pools are refunded.</p>
+        )}
+        {lost && (
+          <>
+            <p className="fed">you fed the hamster</p>
+            <p className="small coming-soon">$HAMSTER mining coming soon</p>
+          </>
+        )}
+        {(won || lost) && (
+          <a
+            className="button share-button"
+            href={share(won ? "W" : "L")}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {won ? "share my W" : "share my L"} ↗
+          </a>
         )}
         {value && (
           <p className="payout">

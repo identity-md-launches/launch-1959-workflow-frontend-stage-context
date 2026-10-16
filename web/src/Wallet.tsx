@@ -40,7 +40,13 @@ const WalletContext = createContext<{
   open: () => void;
   switchChain: () => Promise<void>;
   switching: boolean;
-}>({ open: () => {}, switchChain: async () => {}, switching: false });
+  connecting: boolean;
+}>({
+  open: () => {},
+  switchChain: async () => {},
+  switching: false,
+  connecting: false,
+});
 export const useWalletControl = () => useContext(WalletContext);
 export function WalletProvider({
   r,
@@ -75,6 +81,19 @@ export function WalletProvider({
   function show() {
     trigger.current = document.activeElement as HTMLElement;
     setError("");
+    // One detected wallet: connect in one tap instead of showing a one-row picker.
+    const detected = listed.filter(
+      (c) => c.type === "injected" && c.id !== "injected",
+    );
+    const only = detected.length === 1 && !mobile ? detected[0] : undefined;
+    if (only) {
+      setPending(only.uid);
+      connect
+        .mutateAsync({ connector: only })
+        .catch((e) => setError(errorText(e)))
+        .finally(() => setPending(""));
+      return;
+    }
     setOpen(true);
   }
   function close() {
@@ -134,7 +153,14 @@ export function WalletProvider({
     }
   }
   return (
-    <WalletContext.Provider value={{ open: show, switchChain, switching }}>
+    <WalletContext.Provider
+      value={{
+        open: show,
+        switchChain,
+        switching,
+        connecting: !!pending && !open,
+      }}
+    >
       {children}
       {error && !open && (
         <div className="wallet-error" role="alert">
@@ -233,7 +259,7 @@ export function WalletControl({ r }: { r: Runtime }) {
   const [copyLabel, setCopyLabel] = useState("Copy address");
   const { address, isConnected, chainId } = useConnection();
   const { disconnect } = useDisconnect();
-  const { open, switchChain, switching } = useWalletControl();
+  const { open, switchChain, switching, connecting } = useWalletControl();
   if (isConnected && chainId !== r.chain.id)
     return (
       <button
@@ -277,8 +303,9 @@ export function WalletControl({ r }: { r: Runtime }) {
       </details>
     );
   return (
-    <button className="wallet-button" onClick={open}>
-      Connect wallet <span aria-hidden="true">↗</span>
+    <button className="wallet-button" onClick={open} disabled={connecting}>
+      {connecting ? "Connecting…" : "Connect wallet"}{" "}
+      <span aria-hidden="true">↗</span>
     </button>
   );
 }

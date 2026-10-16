@@ -35,7 +35,8 @@ export function OraclePurchase({
   onAnswer: (text: string) => void;
 }) {
   const { address } = useConnection(),
-    { send, busy } = useTransactions();
+    { send, busy, states } = useTransactions();
+  const [failed, setFailed] = useState<Hex>();
   const [phase, setPhase] = useState(""),
     [error, setError] = useState("");
   const [saved, setSaved] = useState<Saved>();
@@ -61,12 +62,27 @@ export function OraclePurchase({
   }, [storageKey]);
   function remember(value: Saved) {
     setSaved(value);
+    setFailed(undefined);
     try {
       localStorage.setItem(storageKey, JSON.stringify(value));
     } catch {
       /* still track this visit */
     }
   }
+  // A reverted or cancelled payment is not a purchase: drop it, show the failed
+  // receipt and bring the Buy button back.
+  const payment = states["oracle-buy"];
+  useEffect(() => {
+    if (saved && payment?.phase === "error" && payment.hash === saved.tx) {
+      setSaved(undefined);
+      setFailed(payment.hash);
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        /* nothing saved */
+      }
+    }
+  }, [saved, payment, storageKey]);
   const progress = useQuery({
     queryKey: ["oracle-purchase", saved?.tx],
     enabled: !!saved,
@@ -211,14 +227,31 @@ export function OraclePurchase({
         must agree.
       </p>
       {!saved ? (
-        <Action
-          r={r}
-          id="oracle-buy"
-          label="Buy oracle answer · 0.5 IMD"
-          disabled={!canBuy || !ready || !question || !!phase}
-          reason="Only ended windows with bets, within the 48-hour deadline, can buy an answer."
-          onClick={() => void buy()}
-        />
+        <>
+          {failed && (
+            <div className="notice error" role="status">
+              <p>
+                The oracle payment did not go through: the transaction reverted
+                or was cancelled, so nothing was paid. You can buy again.
+              </p>
+              <a
+                href={`${r.deployment.network.explorer}/tx/${failed}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View failed receipt ↗
+              </a>
+            </div>
+          )}
+          <Action
+            r={r}
+            id="oracle-buy"
+            label="Buy oracle answer · 0.5 IMD"
+            disabled={!canBuy || !ready || !question || !!phase}
+            reason="Only ended windows with bets, within the 48-hour deadline, can buy an answer."
+            onClick={() => void buy()}
+          />
+        </>
       ) : (
         <div className="notice">
           <p role="status">

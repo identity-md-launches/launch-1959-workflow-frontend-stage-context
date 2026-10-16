@@ -2,7 +2,7 @@
 
 ## Overview
 
-A mobile-first betting terminal for a live hamster wheel. The first visit has a full-screen meme-video introduction; after dismissal, the cam, countdown, line and three betting choices are the main interface. The desktop version places the game controls beside the cam and adds an original pixel hamster running in a wheel. More contains the secondary contract tools.
+A mobile-first betting terminal for a live hamster wheel. The first visit has a full-screen meme-video introduction; after dismissal, the player (live YouTube embed or the SLEEPING screen), countdown, line and three betting choices are the main interface, with the wallet-signed Wheel chat beneath them. The desktop version places the game controls and chat beside the player and adds an original pixel hamster running in a wheel. More contains the secondary contract tools. A meme layer (poke, mood, result cards, easter eggs) sits on top without changing the game.
 
 The visual idea is a dark grid terminal lit by neon green, with one orange-and-cream goggle hamster. This document describes `web/src/` and the shipped `dist/`, not the earlier frontend. The deployed contracts and economics are unchanged.
 
@@ -27,6 +27,8 @@ Computed solid-token contrast against `--bg`: foreground text 17.07:1, accent 14
 
 Pixel-art oranges and creams are local illustration colors, not additional interface status colors. Wallet marks retain their official brand colors. The design is intentionally dark-only.
 
+Buttons: `.primary` is a dark fill (`--bg`) with a 1px `--green` border and bold green text; hover adds `--glow` and a faint inset glow. `.secondary` uses `--dim` text and border. Selected amount chips use `--raised` with an inset green ring. The LIVE badge is green on near-black with a text glow; SLEEPING uses `--dim`. Chat identicons use `hsl(hue 75% 62%)` derived from the address, decorative only. Confetti seeds are `#2a2420` / `#f2e2b7`.
+
 ## Typography
 
 IBM Plex Mono is bundled as regular 400 and bold 700 Latin WOFF2 in `web/src/assets/`. The fallback is `monospace`. `font-display: swap` and `font-synthesis: none` are set; both used weights are supplied. There is no external font request from the app.
@@ -39,9 +41,9 @@ Body line height is 1.6, headings 1.25 and countdown 1.2. Headings balance their
 
 `app-shell` has a 1248px maximum width and 24px inline gutters, reduced to 20px at 900px, 16px at 600px and 12px at 350px. Spacing follows 4/8/12/16/20/24/32/40px steps. The grid extends across the whole page using an SVG pattern rather than a gradient.
 
-Above 900px, `play-layout` has 1.65fr and 1fr columns separated by 32px; above 1100px the gap becomes 40px and the betting column may stick 16px from the top while the page scrolls. At 900px and below it becomes one column and the decorative wheel hero is hidden. The cam fills its region at exactly 16:9. Its source link remains next to the cam label.
+Above 900px, `play-layout` has 1.65fr and 1fr columns separated by 32px; above 1100px the gap becomes 40px. The right column holds the betting panel, How it works and the Wheel chat (280px scrolling log). At 900px and below it becomes one column and the decorative wheel hero is hidden. The `.player` slot is exactly 16:9 whether it holds the YouTube iframe or the absolutely positioned SLEEPING screen; the badge sits in its top-left corner and the 3 s "HE'S RUNNING" banner is centred low. The poke row sits directly under the player.
 
-On phones, the reading order is header, Bet/More utilities, cam, countdown/line, three buttons, short explanation, exact-guess link and personal bets. The three main choices remain one row. Wallet balance can wrap; forms and results use fluid widths. No marketing content appears before the game. The main choices were observed within the first viewport at 375×812 and 390×844 after dismissal.
+On phones, the reading order is header (brand + mood), Bet/More utilities, player, poke row, countdown/line with the passes tooltip, the window line, three buttons, short explanation, exact-guess link, How it works, Wheel chat (240px log) and personal bets. The three main choices remain one row. No marketing content appears before the game. The main choices were measured within the first viewport at 375×812 (bottom 661px) and 390×844 (670px).
 
 The secondary pages are at most 900px wide. `work-grid` and personal positions use two columns on wide screens and one on phones. History and settings wrap long data. Wallet and amount dialogs become full-width bottom sheets below 600px, with safe-area bottom padding and a scrollable maximum height of 92dvh.
 
@@ -53,14 +55,16 @@ Native modal dialogs use the browser top layer, a dark translucent backdrop and 
 
 ## Shapes
 
-Controls have zero border radius. The mascot’s circular neon ring and stepped pixel goggles are art, not rounded UI containers. The front-view hamster has orange fur, cream cheeks and round pixel goggles. `favicon.svg` is the default face; `hamster-happy.svg` smiles; `hamster-asleep.svg` closes its eyes. `hamster-wheel.svg` is the desktop runner. `share.svg` and its 1200×630 PNG include the mascot.
+Controls have zero border radius. The mascot’s circular neon ring and stepped pixel goggles are art, not rounded UI containers. The front-view hamster has orange fur, cream cheeks and round pixel goggles. `favicon.svg` is the default face; `hamster-happy.svg` smiles; `hamster-asleep.svg` closes its eyes; `hamster-curled.svg` is the curled-up sleeper on the SLEEPING screen; `hamster-thumbs.svg` gives the thumbs up on a winning card. `hamster-wheel.svg` is the desktop runner. Sunglasses are two black CSS pixels overlaid on the logo after ten clicks. `share.svg` and its 1200×630 PNG include the mascot.
 
 ## Components
 
 | Component | Source | Behavior |
 | --- | --- | --- |
 | `Intro` | `web/src/Intro.tsx` | Full-screen local video; Start playing, Escape, close and backdrop dismissal; one-time localStorage memory; pause control and reduced-motion start state |
-| `Stream` | `web/src/Stream.tsx` | Immediate hardcoded YouTube player, background publicId discovery, no unavailable screen on discovery failure |
+| `Stream` | `web/src/Stream.tsx`, `live.ts` | `/live` every 20 s through the proxy: live YouTube embed (switches on publicId change), SLEEPING screen (curled mascot, zzz, last known mm/s and passes from `/status`), fallback embed of the last known stream when the proxy fails; LIVE/SLEEPING badge; one-time green pulse and banner on going live |
+| `Chat` / `Identicon` | `web/src/Chat.tsx` | 5 s polling log (200 kept, autoscroll unless scrolled up), EIP-191 signed posts, 200-char/no-link/5 s client rules, plain-word server errors, address + pixel identicon + "bet" tag, read-only with "Connect to chat" |
+| Meme layer | `web/src/meme.tsx`, `App.tsx`, `Bet.tsx`, `MyBets.tsx` | Poke button with synthesized squeak, hop and local counter; header mood; `SlotNumber` digit reels; `SeedConfetti`; winning/losing result cards with share intents; logo-click sunglasses; Konami spin; page dim while sleeping |
 | `Bet` / `Sheet` | `web/src/Bet.tsx`, `Sheet.tsx` | Three primary choices; secondary EXACT/RUNNING; amount chips and custom input; checking/approval/placing/success/error states; exact-amount approval followed by one bet |
 | `MyBets` / `ResultCard` | `web/src/MyBets.tsx` | Current/next positions, pending results, real outcome and payout, one Claim, optional separate jackpot transfer |
 | `Action`, `Field`, `ErrorNote` | `web/src/ui.tsx` | Shared connect/switch/action gate, persistent input labels, disabled reasons and announced feedback |
@@ -72,7 +76,7 @@ Controls have zero border radius. The mascot’s circular neon ring and stepped 
 
 Most actions are at least 44px high; wallet rows are at least 52px. Compact utility links and the video control retain sufficient size/spacing. Focus is a 2px off-white outline with 4px offset. Controls have hover, press, disabled and focus-visible states; selection also has `aria-pressed`. The native dialogs contain focus and restore it on dismissal. During the approval/bet flow, closing its sheet is disabled so the transaction state remains visible.
 
-The only UI transition is 120ms on named properties; pressed buttons scale to 0.96. Reduced motion removes transitions and transforms. The video starts paused under reduced motion and provides a play button. The external YouTube player controls its own video behavior.
+UI transitions are 120ms on named properties; pressed buttons scale to 0.96. Motion in the meme layer: zzz drift (3.6s loop, only while sleeping), 480ms hop, 700ms digit reels, 1.2s green pulse, 1.3s page spin, falling seeds on a winning card. `prefers-reduced-motion` removes every animation and transition, renders zzz static, hides the seeds, cancels the spin and stops the chewing video from autoplaying. The external YouTube player controls its own video behavior. The tooltip under the line opens on hover, focus or tap of its 24px "?" control.
 
 ## Do’s and don’ts
 

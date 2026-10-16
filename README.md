@@ -1,6 +1,6 @@
 # Hamster Hour
 
-The live hamster betting app runs entirely from the committed static export in [`dist/`](dist/). This revision adds a direct live cam, a three-choice Bet screen, wallet amount sheets, automatic results/claims, a paid oracle flow, public TEAM settings and a first-visit video intro. The existing Ethereum contracts and their economics are unchanged.
+The live hamster betting app runs entirely from the committed static export in [`dist/`](dist/). This revision (v2) routes the wheel's live and status feeds through the project proxy, shows a SLEEPING screen when the stream is off, adds the wallet-signed Wheel chat, a meme layer (poke, moods, result cards, easter eggs, slot-machine jackpot digits), the requested copy, and closes the design critic's four findings. Earlier revisions added the three-choice Bet screen, wallet amount sheets, automatic results/claims, the paid oracle flow, public TEAM settings and the first-visit video intro. The existing Ethereum contracts and their economics are unchanged.
 
 ## Run the website
 

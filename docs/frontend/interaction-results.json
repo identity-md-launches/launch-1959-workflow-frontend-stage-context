@@ -2,59 +2,9 @@
   "fixtureOnly": true,
   "reports": [
     {
-      "name": "intro video, dismissal, return visit and responsive first screen",
+      "name": "an invalid window lookup shows the error and a way back",
       "passed": true,
-      "durationMs": 1908
-    },
-    {
-      "name": "stream publicId switches only to a valid video",
-      "passed": true,
-      "durationMs": 520
-    },
-    {
-      "name": "one click approval then exactly one OVER bet; chips and success",
-      "passed": true,
-      "durationMs": 1765
-    },
-    {
-      "name": "existing allowance uses one transaction; UNDER, SLEEPING and hidden EXACT",
-      "passed": true,
-      "durationMs": 3229
-    },
-    {
-      "name": "rejection, amount validation and wrong-chain recovery",
-      "passed": true,
-      "durationMs": 1092
-    },
-    {
-      "name": "mobile wallet paths, focus return, low balance and no-TEAM controls",
-      "passed": true,
-      "durationMs": 1393
-    },
-    {
-      "name": "TEAM schedule shows decoded pending value and execute date publicly",
-      "passed": true,
-      "durationMs": 1119
-    },
-    {
-      "name": "automatic wallet result discovery and one claim",
-      "passed": true,
-      "durationMs": 2087
-    },
-    {
-      "name": "oracle approve + paid request, persistence, signed prefill and settle encoding",
-      "passed": true,
-      "durationMs": 3223
-    },
-    {
-      "name": "oracle purchase is disabled for future or unfunded windows",
-      "passed": true,
-      "durationMs": 1482
-    },
-    {
-      "name": "staking, unstaking and reward claims remain available",
-      "passed": true,
-      "durationMs": 2297
+      "durationMs": 1603
     }
   ]
 }

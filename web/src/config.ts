@@ -37,7 +37,8 @@ export interface Deployment {
   walletAddChain?: Record<string, unknown>;
 }
 export const services = {
-  stream: "https://media.squeekchain.com/live/current.json",
+  /** Same-origin-friendly mirror of Squeekchain's live/status feeds and the wheel chat. */
+  proxy: "https://hamster-hour.hamsterhour562.workers.dev",
   source: "https://sepolia.squeekchain.com",
   oracleAPI: "https://api.imd.fun",
   oracleExplorer: "https://explorer.imd.fun",

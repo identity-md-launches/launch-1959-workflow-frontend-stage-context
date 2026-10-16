@@ -25,6 +25,8 @@ import { Action, Field, ErrorNote } from "./ui";
 import { Stream } from "./Stream";
 import { Sheet } from "./Sheet";
 import { MyBets } from "./MyBets";
+import { Chat } from "./Chat";
+import { SlotNumber, usePokes } from "./meme";
 export type PageProps = {
   r: Runtime;
   g?: GlobalState;
@@ -32,7 +34,14 @@ export type PageProps = {
   now: number;
 };
 type Choice = "OVER" | "UNDER" | "SLEEPING" | "RUNNING" | "EXACT";
-export function Bet({ r, g, ready, now }: PageProps) {
+export function Bet({
+  r,
+  g,
+  ready,
+  now,
+  onLiveChange,
+}: PageProps & { onLiveChange?: (live: boolean | undefined) => void }) {
+  const pokes = usePokes();
   const { address } = useConnection();
   const [customWindow, setCustomWindow] = useState<bigint>();
   const k = customWindow ?? g?.candidate;
@@ -86,8 +95,9 @@ export function Bet({ r, g, ready, now }: PageProps) {
     full ||
     token.data?.balance === undefined ||
     token.data?.allowance === undefined;
-  const reason =
-    !ready || !fresh
+  const reason = w.isError
+    ? errorText(w.error)
+    : !ready || !fresh
       ? "Reading the latest game and wallet balance…"
       : !open
         ? "Betting closed. Choose the next window below."
@@ -206,6 +216,7 @@ export function Bet({ r, g, ready, now }: PageProps) {
     }
   }
   function pays(c: Choice) {
+    if (w.isError) return "Pool unavailable";
     if (!w.data) return "Reading pool…";
     const pair =
       c === "SLEEPING" || c === "RUNNING"
@@ -221,7 +232,23 @@ export function Bet({ r, g, ready, now }: PageProps) {
     <>
       <div className="play-layout">
         <div className="watch-zone">
-          <Stream />
+          <Stream hop={pokes.hop} onLiveChange={onLiveChange} />
+          <div className="poke-row">
+            <button className="poke-button" onClick={pokes.poke}>
+              <img
+                className={pokes.hop ? "poke-mascot" : "poke-mascot still"}
+                key={pokes.hop}
+                src="./favicon.svg"
+                width="28"
+                height="28"
+                alt=""
+              />
+              Poke the hamster
+            </button>
+            <span className="small muted" role="status">
+              poked {pokes.count} {pokes.count === 1 ? "time" : "times"}
+            </span>
+          </div>
           <div className="desktop-hero">
             <img
               src="./assets/hamster-wheel.svg"
@@ -241,9 +268,15 @@ export function Bet({ r, g, ready, now }: PageProps) {
                 Pick your side.
               </p>
               <span className="pool-number">
-                {w.data
-                  ? units(w.data.window.pools.reduce((a, b) => a + b, 0n))
-                  : "…"}{" "}
+                {w.data ? (
+                  <SlotNumber
+                    value={units(
+                      w.data.window.pools.reduce((a, b) => a + b, 0n),
+                    )}
+                  />
+                ) : (
+                  "…"
+                )}{" "}
                 IMD
               </span>
               <p className="small muted">in this window’s pools</p>
@@ -267,9 +300,27 @@ export function Bet({ r, g, ready, now }: PageProps) {
             <div className="line-value">
               <span className="small muted">The line</span>
               <strong>{line?.toString() ?? "…"}</strong>
-              <span className="small muted">wheel passes</span>
+              <span className="small muted line-unit">
+                wheel passes
+                <button
+                  type="button"
+                  className="tip-trigger"
+                  aria-label="What is a pass?"
+                  aria-describedby="passes-tip"
+                >
+                  ?
+                </button>
+                <span role="tooltip" id="passes-tip" className="tip">
+                  passes = wheel turns, about 21 cm each
+                </span>
+              </span>
             </div>
           </div>
+          <p className="window-line small muted">
+            Betting on window {k?.toString() ?? "…"} · starts in{" "}
+            {countdown(closes, now).replace(/^00:/, "")} · result about 1 h
+            after start
+          </p>
           <div className="market-buttons">
             {(["OVER", "UNDER", "SLEEPING"] as Choice[]).map((c) => (
               <div className="market-choice" key={c}>
@@ -303,6 +354,22 @@ export function Bet({ r, g, ready, now }: PageProps) {
           {w.data && w.data.window.pools.every((p) => p === 0n) && (
             <p className="empty-line">No bets yet, be first</p>
           )}
+          {w.isError && (
+            <p className="notice error" role="status">
+              {customWindow !== undefined
+                ? `Window ${customWindow} could not load: ${errorText(w.error)}`
+                : errorText(w.error)}{" "}
+              <button
+                className="text-button"
+                onClick={() => {
+                  setCustomWindow(undefined);
+                  setWindowInput("");
+                }}
+              >
+                Back to next open window
+              </button>
+            </p>
+          )}
           {w.data && !open && (
             <p className="notice">
               Betting closed, next window opens in{" "}
@@ -335,11 +402,9 @@ export function Bet({ r, g, ready, now }: PageProps) {
             </p>
             <p>
               One-sided binary markets and a result equal to the line are
-              refunded. SLEEPING has its own pool, separate from OVER and UNDER.
+              refunded. SLEEPING has its own pool, separate from OVER and UNDER;
+              its other side, RUNNING, is offered inside the SLEEPING sheet.
             </p>
-            <button className="text-button" onClick={() => choose("RUNNING")}>
-              Bet RUNNING: at least one pass
-            </button>
             <p>
               EXACT pays the three nearest distinct distances, with ties split
               by ticket. One guess per wallet; it cannot be changed. An
@@ -352,11 +417,23 @@ export function Bet({ r, g, ready, now }: PageProps) {
             </p>
             <p>
               Available jackpot:{" "}
-              {g?.jackpotToken && !/^0x0+$/.test(g.jackpotToken)
-                ? jackpot.data
-                  ? `${units(jackpot.data.available, jackpot.data.decimals)} ${jackpot.data.symbol}`
-                  : "Reading token…"
-                : "Not enabled yet"}
+              {g?.jackpotToken && !/^0x0+$/.test(g.jackpotToken) ? (
+                jackpot.data ? (
+                  <>
+                    <SlotNumber
+                      value={units(
+                        jackpot.data.available,
+                        jackpot.data.decimals,
+                      )}
+                    />{" "}
+                    {jackpot.data.symbol}
+                  </>
+                ) : (
+                  "Reading token…"
+                )
+              ) : (
+                "Not enabled yet"
+              )}
               .
             </p>
             <dl className="key-values">
@@ -396,6 +473,7 @@ export function Bet({ r, g, ready, now }: PageProps) {
             </div>
             <ErrorNote message={windowError} />
           </details>
+          <Chat r={r} g={g} />
         </section>
       </div>
       <MyBets r={r} g={g} ready={ready} now={now} />
@@ -436,6 +514,25 @@ export function Bet({ r, g, ready, now }: PageProps) {
                       ? "At least one wheel pass"
                       : `${choice === "OVER" ? "More" : "Fewer"} than ${line?.toString() ?? "…"} passes`}
               </p>
+              {choice === "EXACT" && (
+                <p className="exact-rule">
+                  Closest three guesses share the pool. The jackpot pays only if
+                  the closest guess is within 2% of the result.
+                </p>
+              )}
+              {(choice === "SLEEPING" || choice === "RUNNING") && (
+                <button
+                  className="text-button side-switch"
+                  disabled={!!phase}
+                  onClick={() =>
+                    setChoice(choice === "SLEEPING" ? "RUNNING" : "SLEEPING")
+                  }
+                >
+                  {choice === "SLEEPING"
+                    ? "Bet RUNNING instead: at least one pass"
+                    : "Bet SLEEPING instead: zero passes"}
+                </button>
+              )}
               {choice === "EXACT" && (
                 <Field
                   label="Your guess · total passes"

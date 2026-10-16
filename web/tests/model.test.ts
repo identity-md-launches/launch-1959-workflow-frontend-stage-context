@@ -291,3 +291,94 @@ test("oracle body is exact and Intake calldata encodes the explicit consumer wit
   });
   assert.equal(streamId({ publicId: "6K_uF2s-LSw" }), "6K_uF2s-LSw");
 });
+test("live feed parsing: youtube live, idle, and junk ids", async () => {
+  const { parseLive, parseStatus, mood, linePace } =
+    await import("../src/live");
+  const { playerState } = await import("../src/Stream");
+  const live = parseLive({
+    state: "live",
+    playback: { kind: "youtube", publicId: "abcdefghijk" },
+  });
+  assert.deepEqual(live, {
+    state: "live",
+    kind: "youtube",
+    publicId: "abcdefghijk",
+  });
+  assert.equal(playerState(live, false).mode, "live");
+  const idle = parseLive({
+    state: "idle",
+    playback: { kind: "canonical-hls" },
+  });
+  assert.equal(playerState(idle, false).mode, "sleeping");
+  assert.equal(
+    parseLive({
+      state: "live",
+      playback: { kind: "youtube", publicId: "../x" },
+    }).publicId,
+    undefined,
+  );
+  assert.equal(playerState(undefined, true).mode, "fallback");
+  assert.equal(playerState(undefined, true).id, "6K_uF2s-LSw");
+  const status = parseStatus({
+    measurement: { speedMmPerSecond: 0, cumulativeWorkUnits: "45200" },
+  });
+  assert.deepEqual(
+    [status.speedMmPerSecond, status.cumulativeWorkUnits],
+    [0, "45200"],
+  );
+  assert.equal(
+    parseStatus({
+      measurement: { speedMmPerSecond: "x", cumulativeWorkUnits: 12.7 },
+    }).cumulativeWorkUnits,
+    "12",
+  );
+  const pace = linePace(1000n)!;
+  assert.ok(Math.abs(pace - 58.33) < 0.01);
+  assert.equal(mood(status, 1000n), "sleeping");
+  assert.equal(mood({ ...status, speedMmPerSecond: 10 }, 1000n), "stretching");
+  assert.equal(mood({ ...status, speedMmPerSecond: 40 }, 1000n), "cruising");
+  assert.equal(mood({ ...status, speedMmPerSecond: 70 }, 1000n), "zoomies");
+  assert.equal(
+    mood({ ...status, speedMmPerSecond: 70 }, 1000n, 2001n),
+    "villain era",
+  );
+  assert.equal(
+    mood({ ...status, speedMmPerSecond: 200 }, 1000n),
+    "villain era",
+  );
+});
+test("chat: draft rules, server words, escaping-safe parsing and the 200 cap", async () => {
+  const { validateDraft, serverWords, parseMessages, mergeMessages, chatText } =
+    await import("../src/Chat");
+  assert.equal(validateDraft("  "), "Type a message first.");
+  assert.equal(validateDraft("x".repeat(201)), "Keep it under 200 characters.");
+  assert.equal(validateDraft("go to hamster.fun now"), "No links in chat.");
+  assert.equal(validateDraft("see https://x.com"), "No links in chat.");
+  assert.equal(validateDraft("0.5 IMD on OVER lol"), "");
+  assert.equal(serverWords(429, {}), "Slow down: one message every 5 seconds.");
+  assert.equal(serverWords(400, { error: "no links" }), "No links in chat.");
+  assert.equal(
+    chatText(1700000000000, "gm"),
+    "Hamster Hour chat\n1700000000000\ngm",
+  );
+  const a = "0x1111111111111111111111111111111111111111";
+  const parsed = parseMessages({
+    messages: [
+      { id: "1", address: a, message: "<img src=x onerror=1>", ts: 5 },
+      { id: "bad", address: "nope", message: "x", ts: 6 },
+    ],
+    now: 7,
+  });
+  assert.equal(parsed.messages.length, 1);
+  assert.equal(parsed.messages[0].message, "<img src=x onerror=1>");
+  const many = Array.from({ length: 250 }, (_, i) => ({
+    id: String(i),
+    address: a,
+    message: "m",
+    ts: i,
+  }));
+  const merged = mergeMessages([], many);
+  assert.equal(merged.length, 200);
+  assert.equal(merged[0].id, "50");
+  assert.equal(mergeMessages(merged, [many[249]]).length, 200);
+});

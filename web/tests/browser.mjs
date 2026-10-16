@@ -186,6 +186,19 @@ function fixture(options = {}) {
     receipts: new Map(),
     sent: [],
     walletCalls: [],
+    signed: [],
+    chat: [],
+    chatReject: "",
+    live: options.sleeping
+      ? { state: "idle", playback: { kind: "canonical-hls" } }
+      : {
+          state: "live",
+          playback: {
+            kind: "youtube",
+            publicId: options.stream ? "abcdefghijk" : "6K_uF2s-LSw",
+          },
+        },
+    proxyDown: !!options.proxyDown,
     allowance: options.allowance ?? 0n,
     oracleAllowance: 0n,
     oracleBody: null,
@@ -241,10 +254,12 @@ function fixture(options = {}) {
   }
   function position(k) {
     return {
-      over: [
-        0n,
-        k === next ? (state.hasBet ? parseEther("0.5") : 0n) : parseEther("1"),
-      ],
+      over:
+        k === next
+          ? [0n, state.hasBet ? parseEther("0.5") : 0n]
+          : options.lose
+            ? [parseEther("1"), 0n]
+            : [0n, parseEther("1")],
       sleep: [0n, 0n],
       exactAmount: state.hasExact && k === next ? parseEther("0.5") : 0n,
       guess: 1234n,
@@ -346,6 +361,16 @@ function fixture(options = {}) {
         pendingStaking: state.pending,
       };
       if (fn in globals) result = globals[fn];
+      else if (
+        args[0] !== undefined &&
+        typeof args[0] === "bigint" &&
+        args[0] > 10n ** 12n
+      )
+        throw {
+          code: 3,
+          message: "execution reverted",
+          data: encodeErrorResult({ abi, errorName: "InvalidWindow" }),
+        };
       else if (fn === "window") result = window(args[0]);
       else if (fn === "windowTimes")
         result = [genesis + args[0] * 3600n, genesis + (args[0] + 1n) * 3600n];
@@ -535,6 +560,10 @@ function fixture(options = {}) {
       state.added = true;
       return null;
     }
+    if (method === "personal_sign") {
+      state.signed.push(hexToString(params[0]));
+      return "0x" + "11".repeat(65);
+    }
     if (method === "eth_sendTransaction") {
       if (state.rejectSend) {
         state.rejectSend = false;
@@ -592,7 +621,7 @@ function fixture(options = {}) {
         contractAddress: null,
         logs: [],
         logsBloom: "0x" + "00".repeat(256),
-        status: "0x1",
+        status: state.failNext ? "0x0" : "0x1",
         effectiveGasPrice: "0x3b9aca00",
         type: "0x2",
       });
@@ -697,12 +726,52 @@ async function setup(options = {}) {
         headers: { "access-control-allow-origin": "*" },
       });
     });
-  await page.route("https://media.squeekchain.com/live/current.json", (route) =>
-    route.fulfill(
-      options.stream
-        ? { json: { publicId: "abcdefghijk" } }
-        : { json: { publicId: "6K_uF2s-LSw" } },
-    ),
+  await page.route(
+    "https://hamster-hour.hamsterhour562.workers.dev/**",
+    async (route) => {
+      const req = route.request(),
+        u = new URL(req.url());
+      if (f.state.proxyDown) return route.abort("failed");
+      const cors = { "access-control-allow-origin": "*" };
+      if (u.pathname === "/live")
+        return route.fulfill({ json: f.state.live, headers: cors });
+      if (u.pathname === "/status")
+        return route.fulfill({
+          headers: cors,
+          json: {
+            schemaVersion: 1,
+            measurement: {
+              freshness: "online",
+              cumulativeWorkUnits: "45200",
+              speedMmPerSecond: options.speed ?? 0,
+            },
+          },
+        });
+      if (u.pathname === "/chat" && req.method() === "GET") {
+        const since = Number(u.searchParams.get("since") ?? 0);
+        return route.fulfill({
+          headers: cors,
+          json: {
+            messages: f.state.chat.filter((m) => m.ts > since),
+            now: Date.now(),
+          },
+        });
+      }
+      if (u.pathname === "/chat" && req.method() === "POST") {
+        const body = req.postDataJSON();
+        if (f.state.chatReject)
+          return route.fulfill({
+            status: 400,
+            headers: cors,
+            json: { error: f.state.chatReject },
+          });
+        const m = { id: `m${f.state.chat.length + 1}`, ...body };
+        delete m.signature;
+        f.state.chat.push(m);
+        return route.fulfill({ headers: cors, json: { ok: true, message: m } });
+      }
+      return route.fulfill({ status: 404, headers: cors, json: {} });
+    },
   );
   await page.route("https://www.youtube.com/**", (route) =>
     route.fulfill({
@@ -780,13 +849,12 @@ async function setup(options = {}) {
       .waitFor({ timeout: 20000 });
   return { page, context, f, errors };
 }
+/** One detected extension connects in one tap; the picker only lists several wallets. */
 async function connect(page) {
   await page
     .getByRole("button", { name: "Connect wallet", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Test browser wallet", exact: true })
-    .click();
+  assert.equal(await page.locator(".wallet-sheet[open]").count(), 0);
 }
 async function more(page, name) {
   await page.locator(".more-menu summary").click();
@@ -860,7 +928,9 @@ try {
       await page.reload();
       assert.equal(await page.locator(".intro-overlay").count(), 0);
       for (const width of [320, 375, 390, 768, 1440]) {
-        await page.setViewportSize({ width, height: 844 });
+        // Portrait tablets are 1024 tall; phones and desktops are checked at 844.
+        const height = width === 768 ? 1024 : 844;
+        await page.setViewportSize({ width, height });
         assert.equal(
           await page.evaluate(
             () => document.documentElement.scrollWidth <= innerWidth,
@@ -870,7 +940,10 @@ try {
         const box = await page
           .getByRole("button", { name: "Bet OVER", exact: true })
           .boundingBox();
-        assert(box.y + box.height < 844);
+        assert(
+          box.y + box.height < height,
+          `Bet OVER below the fold at ${width}`,
+        );
         if ([390, 1440].includes(width))
           await page.screenshot({ path: resolve(out, `bet-${width}.png`) });
       }
@@ -883,6 +956,137 @@ try {
     await page.waitForFunction(() =>
       document.querySelector("iframe")?.src.includes("abcdefghijk"),
     );
+    assert.equal(await page.locator(".live-badge").innerText(), "LIVE");
+    await context.close();
+  });
+  await check(
+    "idle feed shows SLEEPING at 375 and 1440; proxy failure falls back to the last stream",
+    async () => {
+      const { page, context, errors } = await setup({ sleeping: true });
+      for (const width of [375, 1440]) {
+        await page.setViewportSize({
+          width,
+          height: width === 1440 ? 1000 : 812,
+        });
+        await page.getByText("HAMSTER IS SLEEPING · stream is off").waitFor();
+        assert.equal(await page.locator("iframe").count(), 0);
+        assert.equal(await page.locator(".live-badge").innerText(), "SLEEPING");
+        await page.getByText(/45,200 passes total/).waitFor();
+        const box = await page.locator(".player").boundingBox();
+        assert(Math.abs(box.width / box.height - 16 / 9) < 0.02);
+        assert(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        );
+        assert(
+          (
+            await page
+              .locator(".app-shell")
+              .evaluate((el) => getComputedStyle(el).filter)
+          ).includes("brightness(0.9)"),
+        );
+        assert.equal(await page.locator(".mood").innerText(), "mood: sleeping");
+        await page.screenshot({ path: resolve(out, `sleeping-${width}.png`) });
+      }
+      await context.close();
+      const down = await setup({ proxyDown: true });
+      await down.page.locator("iframe").waitFor();
+      assert.match(
+        await down.page.locator("iframe").getAttribute("src"),
+        /6K_uF2s-LSw\?autoplay=1&mute=1/,
+      );
+      assert.equal(await down.page.locator(".sleep-screen").count(), 0);
+      assert.deepEqual(errors, []);
+      await down.context.close();
+    },
+  );
+  await check(
+    "wheel chat: read-only, then a signed post appears and server words surface",
+    async () => {
+      const { page, context, f, errors } = await setup();
+      f.state.chat.push({
+        id: "m0",
+        address: team,
+        message: "<b>wheel</b> go brr",
+        ts: Date.now() - 60000,
+      });
+      await page.getByRole("button", { name: "Connect to chat" }).waitFor();
+      await page.getByText("<b>wheel</b> go brr", { exact: true }).waitFor();
+      assert.equal(await page.locator(".chat-text b").count(), 0);
+      await connect(page);
+      await page.locator("#chat-draft").fill("see https://evil.example");
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+      await page.getByText("No links in chat.", { exact: true }).waitFor();
+      await page.locator("#chat-draft").fill("gm hamster");
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+      await page.getByText("gm hamster", { exact: true }).waitFor();
+      assert.equal(f.state.signed.length, 1);
+      assert.match(
+        f.state.signed[0],
+        /^Hamster Hour chat\n\d{13}\ngm hamster$/,
+      );
+      assert.equal(f.state.chat.at(-1).address.toLowerCase(), account);
+      await page
+        .locator(".chat-row")
+        .filter({ hasText: "0x1111…1111" })
+        .locator(".bet-tag")
+        .waitFor();
+      f.state.chatReject = "rate limited";
+      await page.locator("#chat-draft").fill("again");
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+      await page
+        .getByText("Slow down: one message every 5 seconds.", { exact: true })
+        .waitFor();
+      await context.close();
+      // A second visitor sees the posted message within one poll.
+      const second = await setup();
+      second.f.state.chat = f.state.chat;
+      await second.page
+        .getByText("gm hamster", { exact: true })
+        .waitFor({ timeout: 6000 });
+      assert.deepEqual(errors, []);
+      await second.context.close();
+    },
+  );
+  await check("poke counter, logo sunglasses and the Konami spin", async () => {
+    const { page, context, errors } = await setup({
+      fresh: true,
+      sleeping: true,
+    });
+    await page
+      .getByRole("button", { name: "Start playing", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Poke the hamster" }).click();
+    await page.getByText("poked 1 time", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Poke the hamster" }).click();
+    await page.getByText("poked 2 times", { exact: true }).waitFor();
+    await page.reload();
+    await page.getByText("poked 2 times", { exact: true }).waitFor();
+    for (let i = 0; i < 10; i++)
+      await page.getByRole("link", { name: "Hamster Hour home" }).click();
+    await page.locator(".shades").waitFor();
+    await page.getByText("deal with it", { exact: true }).waitFor();
+    for (const key of [
+      "ArrowUp",
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowLeft",
+      "ArrowRight",
+      "b",
+      "a",
+    ])
+      await page.keyboard.press(key);
+    await page.locator(".app-shell.spin").waitFor();
+    await page
+      .getByRole("button", { name: "Bet SLEEPING", exact: true })
+      .click();
+    await page.getByRole("button", { name: /Bet RUNNING instead/ }).click();
+    await page.getByRole("heading", { name: "Bet RUNNING" }).waitFor();
+    assert.deepEqual(errors, []);
     await context.close();
   });
   await check(
@@ -966,10 +1170,11 @@ try {
       });
       f.state.rejectConnect = true;
       await connect(page);
-      await page.getByText(/Request declined/).waitFor();
       await page
-        .getByRole("button", { name: "Test browser wallet", exact: true })
-        .click();
+        .locator(".wallet-error")
+        .getByText(/Request declined/)
+        .waitFor();
+      await connect(page);
       await page
         .getByRole("button", { name: "Switch to Ethereum", exact: true })
         .click();
@@ -1069,9 +1274,46 @@ try {
       .getByRole("button", { name: "Claim", exact: true })
       .waitFor({ timeout: 20000 });
     assert(await page.getByText("1470 passes", { exact: true }).isVisible());
+    // Winning card: confetti, thumbs-up mascot and the share link.
+    await page.locator(".result-card.won .confetti").waitFor();
+    assert.match(
+      await page.locator(".result-card.won img").getAttribute("src"),
+      /hamster-thumbs\.svg/,
+    );
+    const share = page.getByRole("link", { name: /share my W/ });
+    assert.match(
+      await share.getAttribute("href"),
+      /^https:\/\/x\.com\/intent\/post\?text=.*1470.*/,
+    );
+    await page.screenshot({ path: resolve(out, "result-win-390.png") });
     await page.getByRole("button", { name: "Claim", exact: true }).click();
     await page.getByText("Confirmed on Ethereum.", { exact: true }).waitFor();
     assert.deepEqual(f.state.sent.at(-1).args, [current - 1n, true]);
+    await context.close();
+  });
+  await check("losing card feeds the hamster and shares the L", async () => {
+    const { page, context, errors } = await setup({
+      portfolio: true,
+      lose: true,
+    });
+    await connect(page);
+    await page
+      .getByText("you fed the hamster", { exact: true })
+      .waitFor({ timeout: 20000 });
+    await page
+      .getByText("$HAMSTER mining coming soon", { exact: true })
+      .waitFor();
+    assert.match(
+      await page.locator(".result-card.lost video").getAttribute("src"),
+      /hamster-chewing\.mp4/,
+    );
+    assert.match(
+      await page.getByRole("link", { name: /share my L/ }).getAttribute("href"),
+      /^https:\/\/x\.com\/intent\/post\?text=.*1470/,
+    );
+    assert.equal(await page.locator(".confetti").count(), 0);
+    await page.screenshot({ path: resolve(out, "result-loss-390.png") });
+    assert.deepEqual(errors, []);
     await context.close();
   });
   await check(
@@ -1171,6 +1413,79 @@ try {
       assert.equal(call.args[1].panelSize, 20);
       assert.equal(call.args[1].questionHash, hash);
       assert.equal(call.args[2], signature);
+      assert.deepEqual(errors, []);
+      await context.close();
+    },
+  );
+  await check(
+    "a reverted oracle payment shows the failed receipt and restores Buy",
+    async () => {
+      const { page, context, f, errors } = await setup({
+        allowance: parseEther("10"),
+      });
+      await connect(page);
+      await more(page, "Settle");
+      await page.locator("#keeper-window").fill(String(current - 2n));
+      await page.getByRole("button", { name: "Load settlement" }).click();
+      f.state.oracleAllowance = parseEther("1");
+      f.state.failNext = true;
+      await page
+        .getByRole("button", {
+          name: "Buy oracle answer · 0.5 IMD",
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("link", { name: "View failed receipt ↗" })
+        .waitFor({ timeout: 20000 });
+      await page.getByText(/The oracle payment did not go through/).waitFor();
+      await page
+        .getByRole("button", {
+          name: "Buy oracle answer · 0.5 IMD",
+          exact: true,
+        })
+        .waitFor();
+      assert.equal(
+        await page
+          .getByRole("link", { name: "View payment", exact: true })
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page.evaluate(
+          (k) => localStorage.getItem(k),
+          `hamster-hour:oracle:${game.address}:${current - 2n}`,
+        ),
+        null,
+      );
+      await page.screenshot({ path: resolve(out, "oracle-failed-390.png") });
+      assert.deepEqual(errors, []);
+      await context.close();
+    },
+  );
+  await check(
+    "an invalid window lookup shows the error and a way back",
+    async () => {
+      const { page, context, errors } = await setup();
+      await page.locator(".how-it-works summary").click();
+      await page.locator("#bet-window").fill("99999999999999");
+      await page
+        .getByRole("button", { name: "Load window", exact: true })
+        .click();
+      await page
+        .getByText(/could not load: This window does not exist/)
+        .waitFor({ timeout: 20000 });
+      assert.equal(await page.getByText("Reading pool…").count(), 0);
+      await page.getByText("Pool unavailable").first().waitFor();
+      await page
+        .getByRole("button", { name: "Back to next open window", exact: true })
+        .click();
+      await page
+        .locator(".play-heading")
+        .getByText(`#${next}`, { exact: true })
+        .waitFor();
+      await page.getByText("pays x1.36", { exact: true }).waitFor();
+      assert.equal(await page.locator(".notice.error").count(), 0);
       assert.deepEqual(errors, []);
       await context.close();
     },
