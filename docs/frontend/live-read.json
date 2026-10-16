@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-10-16T10:22:39.947Z",
+  "source": "https://ethereum-rpc.publicnode.com",
+  "chainId": 1,
+  "blockNumber": "26204468",
+  "blockTimestamp": "1792146155",
+  "code": [
+    {
+      "name": "OracleVerifier",
+      "address": "0xdcd7a7dee31d589f9df8113780050c18e7ea1f7d",
+      "codeBytes": 2978
+    },
+    {
+      "name": "HamsterHour",
+      "address": "0xc5217f129da200a8e86229de4eabf3686eef64b1",
+      "codeBytes": 20755
+    }
+  ],
+  "state": {
+    "TEAM": "0x6CBA4751742F6989fA224B2dC5d5d52fCef98a34",
+    "oracleVerifier": "0xDcd7a7dee31D589f9Df8113780050C18e7EA1F7D",
+    "IMD": "0xD34a99Bc0f67aE1bbd63C660e6d0b0dd03E263B7",
+    "stakingToken": "0x0000000000000000000000000000000000000000",
+    "jackpotToken": "0x0000000000000000000000000000000000000000",
+    "currentWindow": "82",
+    "currentRound": "497",
+    "currentLine": "1000",
+    "settledWindows": "0",
+    "totalStaked": "0",
+    "preStakingReserve": "0",
+    "oracleReserve": "0",
+    "sourceUrl": "https://sepolia.squeekchain.com",
+    "genesisTimestamp": "1791847800"
+  },
+  "transactionsBroadcast": 0
+}

@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-10-16T10:42:21.058672+00:00",
+  "candidateFileCount": 138,
+  "candidateBytesBeforeThisReport": 2718106,
+  "maxBytes": 8388608,
+  "includesExistingTrackedTree": true,
+  "excludesScratchAndPinnedInputs": true,
+  "newPathViolations": [],
+  "dependencyOrArchivePaths": [],
+  "submodules": [],
+  "protectedTrackedFilesChanged": false,
+  "exportAssets": 15,
+  "exportBytesExcludingManifest": 847161,
+  "allAssetHashesMatch": true,
+  "gitStaging": "blocked: .git/index.lock could not be created because the Git directory is read-only; worker must stage and commit"
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "view": "Bet",
+    "violations": []
+  },
+  {
+    "view": "Stake",
+    "violations": []
+  },
+  {
+    "view": "History",
+    "violations": []
+  },
+  {
+    "view": "Wallet picker",
+    "violations": []
+  },
+  {
+    "view": "200% text size at 390",
+    "horizontalOverflow": false
+  }
+]

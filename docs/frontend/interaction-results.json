@@ -1,0 +1,75 @@
+{
+  "fixtureOnly": true,
+  "reports": [
+    {
+      "name": "mobile disconnected state, primary action, picker and keyboard",
+      "passed": true,
+      "durationMs": 704
+    },
+    {
+      "name": "live stream remains above a visible primary action",
+      "passed": true,
+      "durationMs": 506
+    },
+    {
+      "name": "wallet rejection, unknown-chain add fallback and exact approval then bet",
+      "passed": true,
+      "durationMs": 1492
+    },
+    {
+      "name": "simulation rejection prevents signing and wallet rejection recovers",
+      "passed": true,
+      "durationMs": 1017
+    },
+    {
+      "name": "EXACT validation, ticket uniqueness and Sleep encoding",
+      "passed": true,
+      "durationMs": 1264
+    },
+    {
+      "name": "staking token uses its own decimals, approval, unstake and IMD reward claim",
+      "passed": true,
+      "durationMs": 1903
+    },
+    {
+      "name": "claim overload, history, oracle links, timeout and settlement",
+      "passed": true,
+      "durationMs": 2016
+    },
+    {
+      "name": "TEAM schedule gates all four settings and validates timelock values",
+      "passed": true,
+      "durationMs": 3513
+    },
+    {
+      "name": "mobile wallet links and Coinbase Smart Wallet without a provider",
+      "passed": true,
+      "durationMs": 478
+    },
+    {
+      "name": "existing allowance resets to zero, then approves only the requested amount",
+      "passed": true,
+      "durationMs": 1160
+    },
+    {
+      "name": "oracle reserve donation uses explicit approval and game funding function",
+      "passed": true,
+      "durationMs": 1217
+    },
+    {
+      "name": "pending transaction survives reload and blocks duplicate submission",
+      "passed": true,
+      "durationMs": 1262
+    },
+    {
+      "name": "runtime rejects an ABI that differs from its attested hash",
+      "passed": true,
+      "durationMs": 180
+    },
+    {
+      "name": "missing contract code disables writes; long values reflow at 320",
+      "passed": true,
+      "durationMs": 2285
+    }
+  ]
+}
