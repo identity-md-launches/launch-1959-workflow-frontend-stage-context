@@ -2,6 +2,8 @@
 
 The live hamster betting app runs entirely from the committed static export in [`dist/`](dist/). This revision (v2) routes the wheel's live and status feeds through the project proxy, shows a SLEEPING screen when the stream is off, adds the wallet-signed Wheel chat, a meme layer (poke, moods, result cards, easter eggs, slot-machine jackpot digits), the requested copy, and closes the design critic's four findings. Earlier revisions added the three-choice Bet screen, wallet amount sheets, automatic results/claims, the paid oracle flow, public TEAM settings and the first-visit video intro. The existing Ethereum contracts and their economics are unchanged.
 
+The follow-up review fixes cached SLEEPING state after a failed refresh, one-tap connection for a legacy injected wallet, the villain-era threshold, and clipped slot digits. Build, typecheck, 15 unit tests, 21 Chromium interaction scenarios and the accessibility scan passed. The design probe retained its five documented exceptions; WebKit could not run because system libraries were missing. See the [revision checks and limitations](docs/frontend/REVISION.md) and [finding responses](.imd-responses.json).
+
 ## Run the website
 
 Use Node 24 (or a current version supported by Vite 8) and npm:

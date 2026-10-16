@@ -117,10 +117,9 @@ export function mood(
   const pace = linePace(line);
   if (pace === undefined || pace <= 0) return "cruising";
   if (
-    (windowPasses !== undefined &&
-      line !== undefined &&
-      windowPasses > 2n * line) ||
-    speed > 2 * pace
+    windowPasses !== undefined &&
+    line !== undefined &&
+    windowPasses > 2n * line
   )
     return "villain era";
   if (speed > pace) return "zoomies";

@@ -115,7 +115,7 @@ export function SlotNumber({ value }: { value: string }) {
             <span
               className="slot-reel"
               style={{
-                transform: `translateY(-${Number(c)}em)`,
+                transform: `translateY(calc(-${Number(c)} * var(--slot-row-height)))`,
                 transitionDelay: `${i * 60}ms`,
               }}
             >

@@ -37,6 +37,8 @@ The six sizes are 12, 14, 16, 20, 32 and 48px (`--s1` through `--s6`). Supportin
 
 Body line height is 1.6, headings 1.25 and countdown 1.2. Headings balance their lines. Changing digits use tabular numerals; the face itself is monospaced. The uppercase brand is bold with small display tracking; body copy has natural spacing. The countdown uses -0.04em and the desktop hero -0.035em tracking. Long numbers, addresses and URLs wrap rather than being clipped. Technical addresses remain available in full through the account menu and copy/explorer controls.
 
+`SlotNumber` shares `--slot-row-height: 1.2em` between its viewport, each digit row and its translation. A value's visible digits therefore align with its accessible label at every font size, including after updates and with reduced motion.
+
 ## Layout
 
 `app-shell` has a 1248px maximum width and 24px inline gutters, reduced to 20px at 900px, 16px at 600px and 12px at 350px. Spacing follows 4/8/12/16/20/24/32/40px steps. The grid extends across the whole page using an SVG pattern rather than a gradient.
@@ -62,13 +64,13 @@ Controls have zero border radius. The mascot’s circular neon ring and stepped 
 | Component | Source | Behavior |
 | --- | --- | --- |
 | `Intro` | `web/src/Intro.tsx` | Full-screen local video; Start playing, Escape, close and backdrop dismissal; one-time localStorage memory; pause control and reduced-motion start state |
-| `Stream` | `web/src/Stream.tsx`, `live.ts` | `/live` every 20 s through the proxy: live YouTube embed (switches on publicId change), SLEEPING screen (curled mascot, zzz, last known mm/s and passes from `/status`), fallback embed of the last known stream when the proxy fails; LIVE/SLEEPING badge; one-time green pulse and banner on going live |
+| `Stream` | `web/src/Stream.tsx`, `live.ts` | `/live` every 20 s through the proxy: live YouTube embed (switches on publicId change), SLEEPING screen (curled mascot, zzz, last known mm/s and passes from `/status`), fallback embed of the last known stream when the proxy fails, including after a cached idle response; successful polls restore the current state; LIVE/SLEEPING badge; one-time green pulse and banner on going live |
 | `Chat` / `Identicon` | `web/src/Chat.tsx` | 5 s polling log (200 kept, autoscroll unless scrolled up), EIP-191 signed posts, 200-char/no-link/5 s client rules, plain-word server errors, address + pixel identicon + "bet" tag, read-only with "Connect to chat" |
 | Meme layer | `web/src/meme.tsx`, `App.tsx`, `Bet.tsx`, `MyBets.tsx` | Poke button with synthesized squeak, hop and local counter; header mood; `SlotNumber` digit reels; `SeedConfetti`; winning/losing result cards with share intents; logo-click sunglasses; Konami spin; page dim while sleeping |
 | `Bet` / `Sheet` | `web/src/Bet.tsx`, `Sheet.tsx` | Three primary choices; secondary EXACT/RUNNING; amount chips and custom input; checking/approval/placing/success/error states; exact-amount approval followed by one bet |
 | `MyBets` / `ResultCard` | `web/src/MyBets.tsx` | Current/next positions, pending results, real outcome and payout, one Claim, optional separate jackpot transfer |
 | `Action`, `Field`, `ErrorNote` | `web/src/ui.tsx` | Shared connect/switch/action gate, persistent input labels, disabled reasons and announced feedback |
-| `WalletProvider` / `WalletControl` | `web/src/Wallet.tsx` | Named extension discovery, phone wallet links, Coinbase Smart Wallet, network switch, account menu and native modal |
+| `WalletProvider` / `WalletControl` | `web/src/Wallet.tsx` | Named extension discovery and legacy injected wallets connect directly when exactly one is detected; the generic duplicate is omitted when discovery names providers; multiple/no wallets retain the native picker, phone links and Coinbase Smart Wallet; network switch and account menu |
 | `TransactionProvider` | `web/src/transactions.tsx` | Simulation, wallet review, confirmation, replacement tracking and unresolved-receipt recovery |
 | `OraclePurchase` / `Keeper` | `web/src/OraclePurchase.tsx`, `Keeper.tsx` | Reviewable paid oracle request, polling/persistence, verified prefill, manual paste, settlement, timeout and reserve funding |
 | `Settings` | `web/src/Settings.tsx` | Everyone sees current/pending values and dates; only TEAM gets editable inputs and actions |
@@ -77,6 +79,8 @@ Controls have zero border radius. The mascot’s circular neon ring and stepped 
 Most actions are at least 44px high; wallet rows are at least 52px. Compact utility links and the video control retain sufficient size/spacing. Focus is a 2px off-white outline with 4px offset. Controls have hover, press, disabled and focus-visible states; selection also has `aria-pressed`. The native dialogs contain focus and restore it on dismissal. During the approval/bet flow, closing its sheet is disabled so the transaction state remains visible.
 
 UI transitions are 120ms on named properties; pressed buttons scale to 0.96. Motion in the meme layer: zzz drift (3.6s loop, only while sleeping), 480ms hop, 700ms digit reels, 1.2s green pulse, 1.3s page spin, falling seeds on a winning card. `prefers-reduced-motion` removes every animation and transition, renders zzz static, hides the seeds, cancels the spin and stops the chewing video from autoplaying. The external YouTube player controls its own video behavior. The tooltip under the line opens on hover, focus or tap of its 24px "?" control.
+
+The header mood uses speed for sleeping, stretching, cruising and zoomies. With nonzero speed, villain era requires tracked current-window passes strictly above twice the line. This existing local observation counter starts at the first status sample seen in the window; it is not the oracle's settled result.
 
 ## Do’s and don’ts
 
@@ -87,4 +91,4 @@ UI transitions are 120ms on named properties; pressed buttons scale to 0.96. Mot
 - Reuse the transaction and wallet gates. Never add a separate private signer, fake provider, relay dependency or alternate deployment.
 - Regenerate the full static export and manifest after a source/asset change. Keep the local video, fonts and license with it.
 
-The six-domain review, probe exceptions, interaction evidence and unperformed checks are in [validation report](docs/frontend/VALIDATION.md). Guidance attribution and licenses are retained in [docs/frontend/ATTRIBUTION.md](docs/frontend/ATTRIBUTION.md).
+The latest six-domain review, probe exceptions, interaction evidence and unperformed checks are in the [revision report](docs/frontend/REVISION.md), with the [original validation record](docs/frontend/VALIDATION.md) retained. Guidance attribution and licenses are retained in [docs/frontend/ATTRIBUTION.md](docs/frontend/ATTRIBUTION.md).

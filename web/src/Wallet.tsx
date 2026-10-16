@@ -82,8 +82,11 @@ export function WalletProvider({
     trigger.current = document.activeElement as HTMLElement;
     setError("");
     // One detected wallet: connect in one tap instead of showing a one-row picker.
+    // `listed` already removes the generic duplicate of EIP-6963 wallets.
     const detected = listed.filter(
-      (c) => c.type === "injected" && c.id !== "injected",
+      (c) =>
+        c.type === "injected" &&
+        (c.id !== "injected" || !!(window as any).ethereum),
     );
     const only = detected.length === 1 && !mobile ? detected[0] : undefined;
     if (only) {

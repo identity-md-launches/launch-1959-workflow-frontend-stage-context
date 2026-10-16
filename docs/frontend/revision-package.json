@@ -1,0 +1,13 @@
+{
+  "protectedFilesUnchanged": true,
+  "ignoreFilesChanged": false,
+  "gitSubmodules": 0,
+  "dependencyOrCacheArtifacts": [],
+  "exportMatchesTestedBuild": true,
+  "manifestAssets": 24,
+  "exportBytesIncludingManifest": 1668272,
+  "budgetBytes": 8388608,
+  "note": "Prospective submission tree includes tracked files, new deliverables and the required .imd-responses.json; excludes removed inputs and scratch. The archive is a file-tree package, not a rewritten Git history.",
+  "submissionFileBytes": 5117282,
+  "submissionFileCount": 181
+}

@@ -28,10 +28,10 @@ export function streamId(data: unknown): string {
   throw Error("The feed has no supported YouTube video ID.");
 }
 export function playerState(live: Live | undefined, failed: boolean) {
+  // A failed refresh can retain cached live/idle data; failure takes priority.
+  if (failed) return { mode: "fallback" as const, id: lastKnownStream() };
   if (live && live.state === "live" && live.kind === "youtube" && live.publicId)
     return { mode: "live" as const, id: live.publicId };
-  if (!live && failed)
-    return { mode: "fallback" as const, id: lastKnownStream() };
   if (!live) return { mode: "loading" as const, id: lastKnownStream() };
   return { mode: "sleeping" as const, id: undefined };
 }

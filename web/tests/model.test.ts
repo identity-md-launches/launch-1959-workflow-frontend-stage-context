@@ -310,6 +310,8 @@ test("live feed parsing: youtube live, idle, and junk ids", async () => {
     playback: { kind: "canonical-hls" },
   });
   assert.equal(playerState(idle, false).mode, "sleeping");
+  assert.equal(playerState(idle, true).mode, "fallback");
+  assert.equal(playerState(live, true).mode, "fallback");
   assert.equal(
     parseLive({
       state: "live",
@@ -344,6 +346,18 @@ test("live feed parsing: youtube live, idle, and junk ids", async () => {
   );
   assert.equal(
     mood({ ...status, speedMmPerSecond: 200 }, 1000n),
+    "zoomies",
+  );
+  assert.equal(
+    mood({ ...status, speedMmPerSecond: 200 }, 1000n, 0n),
+    "zoomies",
+  );
+  assert.equal(
+    mood({ ...status, speedMmPerSecond: 200 }, 1000n, 2000n),
+    "zoomies",
+  );
+  assert.equal(
+    mood({ ...status, speedMmPerSecond: 200 }, 1000n, 2001n),
     "villain era",
   );
 });

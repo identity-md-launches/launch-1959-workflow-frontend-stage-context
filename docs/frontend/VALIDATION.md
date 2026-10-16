@@ -1,5 +1,7 @@
 # Hamster Hour frontend validation (v2: live or sleeping, chat, meme layer)
 
+**Historical implementation record:** this report predates the four reopened findings. The current [revision report](REVISION.md) reproduces and resolves those findings, corrects the wallet and mood behavior described below, and records the rebuilt export's checks. Original observations and artifacts are retained here without presenting them as new verification.
+
 Reviewed on 2026-10-16 against the final source in `web/` and the production export in `dist/`. These are the worker's own observations, not independent certification. No mainnet approval, wager, chat signature from a real wallet, oracle purchase, settlement, deployment or publication was performed. The deployed contracts, ABIs, addresses, RPCs, wallet connectors and transaction code are unchanged.
 
 | Area | Result |

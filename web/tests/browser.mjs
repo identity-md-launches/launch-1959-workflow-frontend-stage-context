@@ -199,6 +199,12 @@ function fixture(options = {}) {
           },
         },
     proxyDown: !!options.proxyDown,
+    liveRequests: 0,
+    speed: options.speed ?? 0,
+    cumulativeWorkUnits: "45200",
+    pools: options.empty
+      ? [0n, 0n, 0n]
+      : [parseEther("12"), parseEther("10"), parseEther("2")],
     allowance: options.allowance ?? 0n,
     oracleAllowance: 0n,
     oracleBody: null,
@@ -242,9 +248,7 @@ function fixture(options = {}) {
       line: 1000n,
       source: "https://sepolia.squeekchain.com",
       result: k === current - 1n ? 1470n : 0n,
-      pools: options.empty
-        ? [0n, 0n, 0n]
-        : [parseEther("12"), parseEther("10"), parseEther("2")],
+      pools: state.pools,
       rewards: [parseEther("10.92"), parseEther("9.1"), parseEther("1.82")],
       over: [parseEther("4"), parseEther("8")],
       sleep: [parseEther("1"), parseEther("1")],
@@ -338,7 +342,7 @@ function fixture(options = {}) {
         currentLine: 1000n,
         settledWindows: 3n,
         stakingToken: state.stakeConfigured ? stakeToken : zeroAddress,
-        jackpotToken: zeroAddress,
+        jackpotToken: options.jackpot ? imd : zeroAddress,
         IMD: imd,
         TEAM: team,
         sourceUrl: "https://sepolia.squeekchain.com",
@@ -530,6 +534,11 @@ function fixture(options = {}) {
     if (method === "eth_accounts")
       return state.connected ? [state.account] : [];
     if (method === "wallet_requestPermissions") {
+      if (options.legacy)
+        throw {
+          code: -32601,
+          message: "Legacy wallet has no permissions method",
+        };
       if (state.rejectConnect) {
         state.rejectConnect = false;
         throw { code: 4001, message: "Rejected" };
@@ -644,7 +653,12 @@ async function setup(options = {}) {
       : {}),
   });
   const page = await context.newPage();
+  if (options.clock) await page.clock.install();
   const errors = [];
+  const consoleErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
   if (!options.fresh)
     await page.addInitScript(() =>
       localStorage.setItem("hamster-hour:intro-dismissed:v1", "yes"),
@@ -664,45 +678,67 @@ async function setup(options = {}) {
     }
   });
   if (!options.noProvider)
-    await page.addInitScript(() => {
-      const listeners = {};
-      const provider = {
-        on(event, fn) {
-          (listeners[event] ??= []).push(fn);
-        },
-        removeListener(event, fn) {
-          listeners[event] = (listeners[event] ?? []).filter((f) => f !== fn);
-        },
-        async request(args) {
-          const r = await window.__walletRequest(args);
-          if (r.error) throw r.error;
-          if (args.method === "wallet_switchEthereumChain")
-            for (const fn of listeners.chainChanged ?? [])
-              fn(args.params[0].chainId);
-          if (args.method === "eth_requestAccounts")
-            for (const fn of listeners.accountsChanged ?? []) fn(r.result);
-          return r.result;
-        },
-      };
-      window.ethereum = provider;
-      window.__provider = provider;
-      const announce = () =>
-        window.dispatchEvent(
-          new CustomEvent("eip6963:announceProvider", {
-            detail: {
-              info: {
-                uuid: "a55afc12-1027-4c47-8e56-6a5d1f44a232",
-                name: "Test browser wallet",
-                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
-                rdns: "test.hamster.wallet",
+    await page.addInitScript(
+      ({ legacy, multiple }) => {
+        const listeners = {};
+        const provider = {
+          on(event, fn) {
+            (listeners[event] ??= []).push(fn);
+          },
+          removeListener(event, fn) {
+            listeners[event] = (listeners[event] ?? []).filter((f) => f !== fn);
+          },
+          async request(args) {
+            const r = await window.__walletRequest(args);
+            if (r.error) throw r.error;
+            if (args.method === "wallet_switchEthereumChain")
+              for (const fn of listeners.chainChanged ?? [])
+                fn(args.params[0].chainId);
+            if (args.method === "eth_requestAccounts")
+              for (const fn of listeners.accountsChanged ?? []) fn(r.result);
+            return r.result;
+          },
+        };
+        window.ethereum = provider;
+        window.__provider = provider;
+        if (legacy) return;
+        const announce = () =>
+          window.dispatchEvent(
+            new CustomEvent("eip6963:announceProvider", {
+              detail: {
+                info: {
+                  uuid: "a55afc12-1027-4c47-8e56-6a5d1f44a232",
+                  name: "Test browser wallet",
+                  icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
+                  rdns: "test.hamster.wallet",
+                },
+                provider,
               },
-              provider,
-            },
-          }),
-        );
-      window.addEventListener("eip6963:requestProvider", announce);
-      announce();
-    });
+            }),
+          );
+        window.addEventListener("eip6963:requestProvider", announce);
+        announce();
+        if (multiple) {
+          const announceSecond = () =>
+            window.dispatchEvent(
+              new CustomEvent("eip6963:announceProvider", {
+                detail: {
+                  info: {
+                    uuid: "145afc12-1027-4c47-8e56-6a5d1f44a232",
+                    name: "Second test wallet",
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
+                    rdns: "test.hamster.second",
+                  },
+                  provider: { ...provider },
+                },
+              }),
+            );
+          window.addEventListener("eip6963:requestProvider", announceSecond);
+          announceSecond();
+        }
+      },
+      { legacy: !!options.legacy, multiple: !!options.multiple },
+    );
   for (const rpcURL of manifest.network.rpcUrls)
     await page.route(rpcURL, async (route) => {
       const data = route.request().postDataJSON();
@@ -731,6 +767,7 @@ async function setup(options = {}) {
     async (route) => {
       const req = route.request(),
         u = new URL(req.url());
+      if (u.pathname === "/live") f.state.liveRequests++;
       if (f.state.proxyDown) return route.abort("failed");
       const cors = { "access-control-allow-origin": "*" };
       if (u.pathname === "/live")
@@ -742,8 +779,8 @@ async function setup(options = {}) {
             schemaVersion: 1,
             measurement: {
               freshness: "online",
-              cumulativeWorkUnits: "45200",
-              speedMmPerSecond: options.speed ?? 0,
+              cumulativeWorkUnits: f.state.cumulativeWorkUnits,
+              speedMmPerSecond: f.state.speed,
             },
           },
         });
@@ -847,7 +884,7 @@ async function setup(options = {}) {
     await page
       .getByText(/Live from Ethereum · block/)
       .waitFor({ timeout: 20000 });
-  return { page, context, f, errors };
+  return { page, context, f, errors, consoleErrors };
 }
 /** One detected extension connects in one tap; the picker only lists several wallets. */
 async function connect(page) {
@@ -888,6 +925,218 @@ async function check(name, fn) {
 try {
   const engine = process.env.HH_BROWSER === "webkit" ? webkit : chromium;
   browser = await engine.launch({ headless: true });
+  await check(
+    "revision: failed idle refresh uses the fallback and recovers",
+    async () => {
+      for (const width of [375, 1440]) {
+        const { page, context, f, errors } = await setup({
+          sleeping: true,
+          clock: true,
+        });
+        await page.setViewportSize({
+          width,
+          height: width === 1440 ? 900 : 812,
+        });
+        await page.locator(".sleep-screen").waitFor();
+        const initialBox = await page.locator(".player").boundingBox();
+        const savedId = width === 1440 ? "abcdefghijk" : "6K_uF2s-LSw";
+        if (width === 1440)
+          await page.evaluate(
+            (id) => localStorage.setItem("hamster-hour:last-live-id", id),
+            savedId,
+          );
+        f.state.proxyDown = true;
+        const failed = () =>
+          page.waitForEvent("requestfailed", (r) => r.url().endsWith("/live"));
+        const firstFailure = failed();
+        await page.clock.fastForward(20100);
+        await firstFailure;
+        // Give the query's rejected promise time to schedule its one retry.
+        await page.waitForTimeout(100);
+        const retryFailure = failed();
+        await page.clock.fastForward(1500);
+        await retryFailure;
+        await page.locator(".player iframe").waitFor();
+        assert.equal(
+          await page.locator(".player iframe").getAttribute("src"),
+          `https://www.youtube.com/embed/${savedId}?autoplay=1&mute=1`,
+        );
+        assert.equal(await page.locator(".sleep-screen").count(), 0);
+        assert.equal(await page.locator(".live-badge").innerText(), "LIVE");
+        assert.equal(await page.locator(".page-sleeping").count(), 0);
+        assert.deepEqual(
+          await page.locator(".player").boundingBox(),
+          initialBox,
+        );
+        assert(f.state.liveRequests >= 3);
+        assert(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        );
+        await page.screenshot({
+          path: resolve(out, `revision-fallback-${width}.png`),
+        });
+
+        f.state.proxyDown = false;
+        const recovered = page.waitForResponse(
+          (r) => r.url().endsWith("/live") && r.ok(),
+        );
+        await page.clock.fastForward(20100);
+        await recovered;
+        await page.locator(".sleep-screen").waitFor();
+        assert.equal(await page.locator("iframe").count(), 0);
+        f.state.live = {
+          state: "live",
+          playback: { kind: "youtube", publicId: "abcdefghijk" },
+        };
+        await page.clock.fastForward(20100);
+        await page.locator('iframe[src*="abcdefghijk"]').waitFor();
+        assert.deepEqual(errors, []);
+        await context.close();
+      }
+    },
+  );
+  await check(
+    "revision: one legacy or discovered wallet connects directly; multiple wallets keep the picker",
+    async () => {
+      for (const legacy of [true, false]) {
+        const { page, context, f, errors, consoleErrors } = await setup({
+          legacy,
+        });
+        f.state.rejectConnect = true;
+        await page
+          .getByRole("button", { name: "Connect wallet", exact: true })
+          .click();
+        await page.locator(".wallet-error").waitFor();
+        assert.equal(await page.locator(".wallet-sheet[open]").count(), 0);
+        await page
+          .getByRole("button", { name: "Connect wallet", exact: true })
+          .click();
+        await page.locator(".account-menu").waitFor();
+        assert.equal(
+          f.state.walletCalls.filter(
+            (c) =>
+              c.method === "eth_requestAccounts" ||
+              (!legacy && c.method === "wallet_requestPermissions"),
+          ).length,
+          2,
+        );
+        assert.equal(await page.locator(".wallet-sheet[open]").count(), 0);
+        assert.deepEqual(errors, []);
+        assert.deepEqual(consoleErrors, []);
+        await context.close();
+      }
+      const { page, context, f, errors } = await setup({ multiple: true });
+      await page
+        .getByRole("button", { name: "Connect wallet", exact: true })
+        .click();
+      await page.locator(".wallet-sheet[open]").waitFor();
+      assert.equal(
+        f.state.walletCalls.filter((c) => c.method === "eth_requestAccounts")
+          .length,
+        0,
+      );
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Browser wallet", exact: true })
+          .count(),
+        0,
+      );
+      await page
+        .getByRole("button", { name: "Second test wallet", exact: true })
+        .click();
+      await page.locator(".account-menu").waitFor();
+      assert.deepEqual(errors, []);
+      await context.close();
+    },
+  );
+  await check(
+    "revision: fast speed means zoomies until current-window passes exceed twice the line",
+    async () => {
+      const { page, context, f, errors, consoleErrors } = await setup({
+        speed: 200,
+        clock: true,
+      });
+      await page.getByText("mood: zoomies", { exact: true }).waitFor();
+      assert.equal(
+        await page.evaluate(
+          (key) => localStorage.getItem(key),
+          `hamster-hour:window-start:${current}`,
+        ),
+        "45200",
+      );
+      f.state.cumulativeWorkUnits = "47200";
+      const statusUpdate = page.waitForResponse((r) =>
+        r.url().endsWith("/status"),
+      );
+      await page.clock.fastForward(20100);
+      await statusUpdate;
+      assert.equal(await page.locator(".mood").innerText(), "mood: zoomies");
+      f.state.cumulativeWorkUnits = "47201";
+      await page.clock.fastForward(20100);
+      await page.getByText("mood: villain era", { exact: true }).waitFor();
+      f.state.speed = 0;
+      await page.clock.fastForward(20100);
+      await page.getByText("mood: sleeping", { exact: true }).waitFor();
+      assert.deepEqual(errors, []);
+      assert.deepEqual(consoleErrors, []);
+      await context.close();
+    },
+  );
+  await check(
+    "revision: pool and jackpot reels show exact digits at rest and after updates",
+    async () => {
+      const { page, context, f, errors, consoleErrors } = await setup({
+        clock: true,
+        jackpot: true,
+      });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      async function aligned(value) {
+        const slot = page.locator(`.slot[aria-label="${value}"]`);
+        await slot.waitFor();
+        const digits = await slot.evaluate((el) => {
+          const expected = el.getAttribute("aria-label").replace(/\D/g, "");
+          return [...el.querySelectorAll(".slot-digit")].map((clip, i) => {
+            const row =
+              clip.querySelectorAll(".slot-reel > span")[Number(expected[i])];
+            const bounds = clip.getBoundingClientRect(),
+              actual = row.getBoundingClientRect();
+            return {
+              expected: expected[i],
+              top: actual.top - bounds.top,
+              height: actual.height,
+              clipHeight: bounds.height,
+            };
+          });
+        });
+        for (const digit of digits) {
+          assert(
+            Math.abs(digit.top) < 0.1,
+            `${value}: digit ${digit.expected} is not aligned (${digit.top}px)`,
+          );
+          assert(Math.abs(digit.height - digit.clipHeight) < 0.1);
+        }
+        return digits;
+      }
+      await aligned("24");
+      await page.screenshot({ path: resolve(out, "revision-reels-1440.png") });
+      await page.locator(".how-it-works summary").click();
+      await aligned("976");
+      f.state.pools = [parseEther("1009.08"), 0n, 0n];
+      await page.clock.fastForward(12100);
+      await aligned("1,009.08");
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      f.state.pools = [parseEther("24"), 0n, 0n];
+      await page.clock.fastForward(12100);
+      await page.locator('.slot[aria-label="24"]').waitFor();
+      await page.waitForTimeout(1000);
+      await aligned("24");
+      assert.deepEqual(errors, []);
+      assert.deepEqual(consoleErrors, []);
+      await context.close();
+    },
+  );
   await check(
     "intro video, dismissal, return visit and responsive first screen",
     async () => {

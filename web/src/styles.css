@@ -636,12 +636,13 @@ button.secondary {
   font-size: 12px;
 }
 .slot {
+  --slot-row-height: 1.2em;
   display: inline-flex;
   font-variant-numeric: tabular-nums;
 }
 .slot-digit {
   display: inline-block;
-  height: 1.2em;
+  height: var(--slot-row-height);
   line-height: 1.2;
   overflow: hidden;
   vertical-align: bottom;
@@ -652,7 +653,7 @@ button.secondary {
 }
 .slot-reel span {
   display: block;
-  height: 1.2em;
+  height: var(--slot-row-height);
   line-height: 1.2;
 }
 .result-card {
