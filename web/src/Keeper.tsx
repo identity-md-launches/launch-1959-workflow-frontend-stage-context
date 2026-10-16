@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { erc20Abi } from "viem";
@@ -13,6 +13,8 @@ import {
 } from "./model";
 import { useTransactions } from "./transactions";
 import { Action, Field, ErrorNote, Stat } from "./ui";
+import { OraclePurchase } from "./OraclePurchase";
+import { validateAttestation } from "./oracle";
 import type { PageProps } from "./Bet";
 export function Keeper({
   r,
@@ -28,6 +30,10 @@ export function Keeper({
     [fund, setFund] = useState(""),
     [error, setError] = useState("");
   const k = selected ?? initialWindow;
+  useEffect(() => {
+    setAttestation("");
+    setError("");
+  }, [k]);
   const w = useWindow(r, k, address);
   const token = useToken(r, g?.IMD, address);
   const { send } = useTransactions();
@@ -46,6 +52,7 @@ export function Keeper({
     w.data.window.status === 1;
   const canSettle =
     valid &&
+    w.data!.window.pools.some((p) => p > 0n) &&
     timestamp >= w.data!.times[1] &&
     !!g &&
     timestamp < w.data!.times[1] + g.TIMEOUT;
@@ -71,7 +78,7 @@ export function Keeper({
       setError("");
       if (!canSettle || k === undefined)
         throw Error("Load an ended window within its settlement period.");
-      const a = parseAttestation(attestation, r.chain.id, r.game.address);
+      const a = await validateAttestation(r, k, attestation, now);
       await send("settle", {
         functionName: "settle",
         args: [k, a.attestation, a.signature],
@@ -104,13 +111,12 @@ export function Keeper({
     }
   }
   return (
-    <details className="keeper section">
-      <summary>Settle a window & fund the oracle</summary>
+    <section className="keeper section">
       <h3>Permissionless settlement</h3>
       <p>
         Supply a signed IMD result after all six rounds end. The contract checks
-        the signature, question, panel, validity and replay protection. This
-        page does not purchase attestations.
+        the signature, question, panel, validity and replay protection. Buy an
+        answer below, or paste one you already have.
       </p>
       <div className="input-row">
         <Field label="Window to settle" id="keeper-window">
@@ -157,8 +163,22 @@ export function Keeper({
           )}
         </>
       )}
+      {k !== undefined && (
+        <OraclePurchase
+          key={String(k)}
+          r={r}
+          g={g}
+          ready={ready}
+          now={now}
+          k={k}
+          question={question.data}
+          canBuy={canSettle}
+          onAnswer={setAttestation}
+        />
+      )}
+      <h3>2. Settle with the signed result</h3>
       <Field
-        label="Signed attestation JSON"
+        label="Signed attestation JSON (manual fallback)"
         id="attestation"
         hint="Paste the public API response containing message (or attestation), domain and signature. Keep large integers as decimal strings."
       >
@@ -194,8 +214,8 @@ export function Keeper({
       <Action
         r={r}
         id="settle"
-        label="Verify and settle window"
-        disabled={!canSettle || !question.data || question.isError}
+        label="Settle"
+        disabled={!canSettle || !question.data || question.isError || !preview}
         reason="Load a funded, ended window before its 48-hour timeout."
         onClick={() => void settle()}
       />
@@ -254,6 +274,6 @@ export function Keeper({
         reason="Waiting for verified token state."
         onClick={() => void fundReserve()}
       />
-    </details>
+    </section>
   );
 }

@@ -19,6 +19,8 @@ const types = {
   ".json": "application/json",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".mp4": "video/mp4",
+  ".ttf": "font/ttf",
 };
 const server = createServer(async (req, res) => {
   try {
@@ -54,13 +56,13 @@ try {
   await page
     .getByRole("button", { name: "Connect wallet", exact: true })
     .waitFor();
-  for (const tab of ["Bet", "Stake", "History"]) {
-    await page.getByRole("tab", { name: tab, exact: true }).click();
+  const audit = async (view) => {
     const result = await new AxeBuilder({ page })
+      .exclude("iframe")
       .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
       .analyze();
     reports.push({
-      view: tab,
+      view,
       violations: result.violations.map((v) => ({
         id: v.id,
         impact: v.impact,
@@ -71,34 +73,50 @@ try {
         })),
       })),
     });
+  };
+  await page
+    .getByRole("button", { name: "Start playing", exact: true })
+    .waitFor();
+  await audit("Intro overlay, reduced motion");
+  reports.push({
+    view: "Reduced motion video",
+    paused: await page.locator("video").evaluate((v) => v.paused),
+  });
+  await page.keyboard.press("Escape");
+  for (const name of ["Bet", "Stake", "History", "Settle", "TEAM"]) {
+    if (name !== "Bet") {
+      await page.locator(".more-menu summary").click();
+      await page
+        .locator(".more-popover")
+        .getByRole("button", { name, exact: true })
+        .click();
+    }
+    await audit(name);
   }
+  await page.getByRole("button", { name: "Bet", exact: true }).click();
+  await page.getByRole("button", { name: "Bet OVER", exact: true }).click();
+  await audit("Amount sheet");
+  await page.keyboard.press("Escape");
+  reports.push({
+    view: "Amount sheet keyboard return",
+    focused: await page.evaluate(() =>
+      document.activeElement.getAttribute("aria-label"),
+    ),
+  });
   await page
     .getByRole("button", { name: "Connect wallet", exact: true })
     .click();
-  reports.push({
-    view: "Wallet picker",
-    violations: (
-      await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze()
-    ).violations,
-  });
+  await audit("Wallet picker");
   await page.screenshot({ path: resolve(out, "wallet-390.png") });
   await page.keyboard.press("Escape");
-  await page.getByRole("tab", { name: "Bet", exact: true }).click();
-  await page.evaluate(() => (document.documentElement.style.fontSize = "32px"));
-  reports.push({
-    view: "200% text size at 390",
-    horizontalOverflow: await page.evaluate(
-      () => document.documentElement.scrollWidth > innerWidth,
-    ),
-  });
-  await page.screenshot({ path: resolve(out, "text-200.png"), fullPage: true });
-  await page.evaluate(() => (document.documentElement.style.fontSize = "16px"));
-  if (process.argv.includes("--render-share")) {
-    await page.goto(url + "share.svg");
-    await page.setViewportSize({ width: 1200, height: 630 });
-    await page.screenshot({ path: resolve(root, "web/public/share.png") });
+  for (const width of [320, 375, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    reports.push({
+      view: `Reflow ${width}`,
+      horizontalOverflow: await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    });
   }
   console.log(JSON.stringify(reports));
   if (reports.some((r) => r.violations?.length || r.horizontalOverflow))

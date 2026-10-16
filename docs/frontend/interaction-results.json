@@ -2,74 +2,59 @@
   "fixtureOnly": true,
   "reports": [
     {
-      "name": "mobile disconnected state, primary action, picker and keyboard",
+      "name": "intro video, dismissal, return visit and responsive first screen",
       "passed": true,
-      "durationMs": 704
+      "durationMs": 1908
     },
     {
-      "name": "live stream remains above a visible primary action",
+      "name": "stream publicId switches only to a valid video",
       "passed": true,
-      "durationMs": 506
+      "durationMs": 520
     },
     {
-      "name": "wallet rejection, unknown-chain add fallback and exact approval then bet",
+      "name": "one click approval then exactly one OVER bet; chips and success",
       "passed": true,
-      "durationMs": 1492
+      "durationMs": 1765
     },
     {
-      "name": "simulation rejection prevents signing and wallet rejection recovers",
+      "name": "existing allowance uses one transaction; UNDER, SLEEPING and hidden EXACT",
       "passed": true,
-      "durationMs": 1017
+      "durationMs": 3229
     },
     {
-      "name": "EXACT validation, ticket uniqueness and Sleep encoding",
+      "name": "rejection, amount validation and wrong-chain recovery",
       "passed": true,
-      "durationMs": 1264
+      "durationMs": 1092
     },
     {
-      "name": "staking token uses its own decimals, approval, unstake and IMD reward claim",
+      "name": "mobile wallet paths, focus return, low balance and no-TEAM controls",
       "passed": true,
-      "durationMs": 1903
+      "durationMs": 1393
     },
     {
-      "name": "claim overload, history, oracle links, timeout and settlement",
+      "name": "TEAM schedule shows decoded pending value and execute date publicly",
       "passed": true,
-      "durationMs": 2016
+      "durationMs": 1119
     },
     {
-      "name": "TEAM schedule gates all four settings and validates timelock values",
+      "name": "automatic wallet result discovery and one claim",
       "passed": true,
-      "durationMs": 3513
+      "durationMs": 2087
     },
     {
-      "name": "mobile wallet links and Coinbase Smart Wallet without a provider",
+      "name": "oracle approve + paid request, persistence, signed prefill and settle encoding",
       "passed": true,
-      "durationMs": 478
+      "durationMs": 3223
     },
     {
-      "name": "existing allowance resets to zero, then approves only the requested amount",
+      "name": "oracle purchase is disabled for future or unfunded windows",
       "passed": true,
-      "durationMs": 1160
+      "durationMs": 1482
     },
     {
-      "name": "oracle reserve donation uses explicit approval and game funding function",
+      "name": "staking, unstaking and reward claims remain available",
       "passed": true,
-      "durationMs": 1217
-    },
-    {
-      "name": "pending transaction survives reload and blocks duplicate submission",
-      "passed": true,
-      "durationMs": 1262
-    },
-    {
-      "name": "runtime rejects an ABI that differs from its attested hash",
-      "passed": true,
-      "durationMs": 180
-    },
-    {
-      "name": "missing contract code disables writes; long values reflow at 320",
-      "passed": true,
-      "durationMs": 2285
+      "durationMs": 2297
     }
   ]
 }

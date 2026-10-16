@@ -127,3 +127,167 @@ test("wallet and ABI reverts map to useful messages", () => {
     /could not complete/,
   );
 });
+
+import { claimValue, positionTotal, exactRank } from "../src/portfolio";
+import { oracleBody, intakeCall, ORACLE_PRICE } from "../src/oracle";
+import {
+  zeroAddress,
+  stringToHex,
+  decodeFunctionData,
+  encodeFunctionData,
+} from "viem";
+import type { GameWindow, Position } from "../src/model";
+const position: Position = {
+  over: [0n, 4n],
+  sleep: [0n, 0n],
+  exactAmount: 0n,
+  guess: 0n,
+  imdClaimed: false,
+  jackpotClaimed: false,
+};
+const windowFixture: GameWindow = {
+  status: 2,
+  startsAt: 0n,
+  endsAt: 1n,
+  line: 1000n,
+  source: "https://sepolia.squeekchain.com",
+  result: 1200n,
+  pools: [11n, 0n, 0n],
+  over: [1n, 10n],
+  sleep: [0n, 0n],
+  rewards: [10n, 0n, 0n],
+  marketVoided: [false, false, false],
+  paid: [6n, 0n, 0n],
+  claimedWeight: [6n, 0n, 0n],
+  distances: [0n, 0n, 0n],
+  ties: [0n, 0n, 0n],
+  rankRewards: [0n, 0n, 0n],
+  rankClaimed: [0n, 0n, 0n],
+  rankPaid: [0n, 0n, 0n],
+  rankCount: 0,
+  settler: zeroAddress,
+  teamCredit: 0n,
+  reimbursement: 0n,
+  reimbursed: false,
+  jackpotAsset: zeroAddress,
+  jackpot: 0n,
+  jackpotPaid: 0n,
+  jackpotClaimed: 0n,
+  requestId: stringToHex("", { size: 32 }),
+};
+test("claim preview preserves rounding, refunds, prior claims and separate credits", () => {
+  const account = game as `0x${string}`,
+    team = handoff.contracts.find(
+      (c: { name: string }) => c.name === "OracleVerifier",
+    ).address;
+  assert.equal(claimValue(windowFixture, position, account, team, 0n).imd, 4n);
+  const last = { ...windowFixture, rewards: [11n, 0n, 0n] as const };
+  assert.equal(claimValue(last, position, account, team, 0n).imd, 5n);
+  assert.equal(
+    claimValue(
+      windowFixture,
+      { ...position, imdClaimed: true },
+      account,
+      team,
+      0n,
+    ).imd,
+    0n,
+  );
+  const all = {
+    ...position,
+    over: [3n, 4n] as const,
+    sleep: [1n, 2n] as const,
+    exactAmount: 5n,
+  };
+  assert.equal(positionTotal(all), 15n);
+  assert.equal(
+    claimValue({ ...windowFixture, status: 3 }, all, account, team, 0n).imd,
+    15n,
+  );
+  assert.equal(
+    claimValue({ ...windowFixture, status: 1 }, all, account, team, 0n, true)
+      .imd,
+    15n,
+  );
+  assert.equal(
+    claimValue(
+      { ...windowFixture, marketVoided: [true, false, true] },
+      all,
+      account,
+      team,
+      0n,
+    ).imd,
+    10n,
+  );
+  assert.equal(
+    claimValue(
+      { ...windowFixture, settler: account },
+      position,
+      account,
+      team,
+      ORACLE_PRICE,
+    ).imd,
+    4n + ORACLE_PRICE,
+  );
+});
+test("exact and jackpot last tickets collect rounding remainders, even zero shares", () => {
+  const p = {
+    ...position,
+    over: [0n, 0n] as const,
+    exactAmount: 1n,
+    guess: 1200n,
+  };
+  const w = {
+    ...windowFixture,
+    rankCount: 1,
+    ties: [3n, 0n, 0n] as const,
+    rankRewards: [10n, 0n, 0n] as const,
+    rankClaimed: [2n, 0n, 0n] as const,
+    rankPaid: [6n, 0n, 0n] as const,
+    jackpot: 1n,
+    jackpotPaid: 0n,
+    jackpotClaimed: 1n,
+  };
+  assert.equal(exactRank(w, p), 0);
+  const value = claimValue(w, p, game, zeroAddress, 0n);
+  assert.equal(value.imd, 4n);
+  assert.equal(value.jackpot, 0n);
+  assert.equal(value.jackpotEligible, true);
+  assert.equal(
+    claimValue({ ...w, jackpotClaimed: 2n }, p, game, zeroAddress, 0n).jackpot,
+    1n,
+  );
+});
+test("oracle body is exact and Intake calldata encodes the explicit consumer with no callback", () => {
+  const q = "Question from question(k)";
+  const body = oracleBody(q, game);
+  assert.deepEqual(body, {
+    v: 1,
+    question: q,
+    chainId: 1,
+    window: { hours: 24 },
+    answerType: "uint256",
+    evidence: "panel",
+    panelSize: 20,
+    quorum: 14,
+    validForSeconds: 86400,
+    consumer: { chainId: 1, verifyingContract: game },
+  });
+  const route = {
+    address: game,
+    actionId: stringToHex("oracle.request@oracle-1", { size: 32 }),
+    price: ORACLE_PRICE,
+  };
+  const call = intakeCall(route, game, body);
+  const decoded = decodeFunctionData({
+    abi: call.abi,
+    data: encodeFunctionData(call as any),
+  });
+  assert.equal(decoded.functionName, "request");
+  assert.equal(decoded.args?.[4], ORACLE_PRICE);
+  assert.deepEqual(decoded.args?.[2], {
+    target: zeroAddress,
+    selector: "0x00000000",
+  });
+  assert.equal(streamId({ publicId: "6K_uF2s-LSw" }), "6K_uF2s-LSw");
+});

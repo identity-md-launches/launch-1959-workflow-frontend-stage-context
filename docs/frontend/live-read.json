@@ -1,36 +1,101 @@
 {
-  "checkedAt": "2026-10-16T10:22:39.947Z",
   "source": "https://ethereum-rpc.publicnode.com",
+  "readAt": "2026-10-16T12:17:50.778Z",
   "chainId": 1,
-  "blockNumber": "26204468",
-  "blockTimestamp": "1792146155",
-  "code": [
-    {
-      "name": "OracleVerifier",
-      "address": "0xdcd7a7dee31d589f9df8113780050c18e7ea1f7d",
-      "codeBytes": 2978
-    },
-    {
-      "name": "HamsterHour",
-      "address": "0xc5217f129da200a8e86229de4eabf3686eef64b1",
-      "codeBytes": 20755
-    }
-  ],
+  "blockNumber": "26205042",
+  "gameCodeBytes": 20755,
+  "verifierCodeBytes": 2978,
   "state": {
+    "currentWindow": "84",
+    "currentLine": "1000",
+    "genesisTimestamp": "1791847800",
     "TEAM": "0x6CBA4751742F6989fA224B2dC5d5d52fCef98a34",
-    "oracleVerifier": "0xDcd7a7dee31D589f9Df8113780050C18e7EA1F7D",
     "IMD": "0xD34a99Bc0f67aE1bbd63C660e6d0b0dd03E263B7",
     "stakingToken": "0x0000000000000000000000000000000000000000",
     "jackpotToken": "0x0000000000000000000000000000000000000000",
-    "currentWindow": "82",
-    "currentRound": "497",
-    "currentLine": "1000",
-    "settledWindows": "0",
-    "totalStaked": "0",
-    "preStakingReserve": "0",
     "oracleReserve": "0",
-    "sourceUrl": "https://sepolia.squeekchain.com",
-    "genesisTimestamp": "1791847800"
+    "oracleVerifier": "0xDcd7a7dee31D589f9Df8113780050C18e7EA1F7D"
   },
-  "transactionsBroadcast": 0
+  "current": {
+    "status": 0,
+    "startsAt": "0",
+    "endsAt": "0",
+    "line": "0",
+    "source": "",
+    "result": "0",
+    "pools": [
+      "0",
+      "0",
+      "0"
+    ],
+    "over": [
+      "0",
+      "0"
+    ],
+    "sleep": [
+      "0",
+      "0"
+    ],
+    "rewards": [
+      "0",
+      "0",
+      "0"
+    ],
+    "marketVoided": [
+      false,
+      false,
+      false
+    ],
+    "paid": [
+      "0",
+      "0",
+      "0"
+    ],
+    "claimedWeight": [
+      "0",
+      "0",
+      "0"
+    ],
+    "distances": [
+      "0",
+      "0",
+      "0"
+    ],
+    "ties": [
+      "0",
+      "0",
+      "0"
+    ],
+    "rankRewards": [
+      "0",
+      "0",
+      "0"
+    ],
+    "rankClaimed": [
+      "0",
+      "0",
+      "0"
+    ],
+    "rankPaid": [
+      "0",
+      "0",
+      "0"
+    ],
+    "rankCount": 0,
+    "settler": "0x0000000000000000000000000000000000000000",
+    "teamCredit": "0",
+    "reimbursement": "0",
+    "reimbursed": false,
+    "jackpotAsset": "0x0000000000000000000000000000000000000000",
+    "jackpot": "0",
+    "jackpotPaid": "0",
+    "jackpotClaimed": "0",
+    "requestId": "0x0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "nextWindowTimes": [
+    "1792153800",
+    "1792157400"
+  ],
+  "bets": 0,
+  "windows": []
 }

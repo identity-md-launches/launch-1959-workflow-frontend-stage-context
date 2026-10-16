@@ -1,8 +1,32 @@
 # Hamster Hour
 
+The live hamster betting app runs entirely from the committed static export in [`dist/`](dist/). This revision adds a direct live cam, a three-choice Bet screen, wallet amount sheets, automatic results/claims, a paid oracle flow, public TEAM settings and a first-visit video intro. The existing Ethereum contracts and their economics are unchanged.
+
+## Run the website
+
+Use Node 24 (or a current version supported by Vite 8) and npm:
+
+```sh
+cd web
+npm ci --legacy-peer-deps
+npm run typecheck
+npm test
+npm run build
+npm run verify
+npm run preview -- --host 127.0.0.1
+```
+
+`--legacy-peer-deps` is required with the existing protected lockfile: plain `npm ci` reports a missing optional test peer, `playwright-core`. The manifest and lockfile have been preserved. The production build writes repository-root `dist/`, uses relative URLs, copies the pinned ABI exports, verifies their canonical hashes, and regenerates the asset manifest. Serve `dist/` through any HTTP static server or IPFS gateway; no application server, API key or wallet relay is required. `npm run dev` starts Vite after the first build.
+
+See [web/README.md](web/README.md) for architecture, wallet behavior, oracle payment details and repeatable browser checks; [DESIGN.md](DESIGN.md) for the implemented design system; and [validation report](docs/frontend/VALIDATION.md) for actual checks and limitations. Test wallet/API fixtures are confined to `web/tests/` and never enter the production export.
+
+The deployed game is [HamsterHour](https://etherscan.io/address/0xc5217f129da200a8e86229de4eabf3686eef64b1), with [OracleVerifier](https://etherscan.io/address/0xdcd7a7dee31d589f9df8113780050c18e7ea1f7d), on Ethereum chain 1. No contract was deployed or changed by this frontend revision.
+
+## Contract behavior
+
 No owner, no house: pari-mutuel only, with results only from the IMD oracle. The contract never owes more than it holds under the supported ERC-20 assumptions below. TEAM gets 1% of non-void bets and nothing else as a privileged beneficiary. It cannot withdraw deposits, reserves, stakes or jackpots. TEAM has only the four public, 48-hour-delayed configuration powers required by the brief. There is no upgrade, pause, token mint, ownership transfer or emergency withdrawal.
 
-This repository delivers the contract stage: `HamsterHour`, `OracleVerifier`, offline Foundry tests, and [ABI exports](docs/ABI.md). Independent review, `launch.json`, source publication, attestation, factory deployment and the website belong to subsequent workflow stages. No deployment has been broadcast.
+The original contract implementation, offline Foundry tests and [ABI exports](docs/ABI.md) remain in this repository. The sections below document those deployed contracts.
 
 ## Build and test
 

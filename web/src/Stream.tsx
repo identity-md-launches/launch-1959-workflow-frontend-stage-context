@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { services } from "./config";
 export function streamId(data: unknown): string {
@@ -6,6 +5,7 @@ export function streamId(data: unknown): string {
     throw Error("No live video is listed.");
   const d = data as Record<string, unknown>;
   for (const value of [
+    d.publicId,
     d.youtubeId,
     d.youtube_id,
     d.videoId,
@@ -38,7 +38,6 @@ export function streamId(data: unknown): string {
   throw Error("The feed has no supported YouTube video ID.");
 }
 export function Stream() {
-  const [playing, setPlaying] = useState(true);
   const q = useQuery({
     queryKey: ["stream"],
     queryFn: async () => {
@@ -46,10 +45,13 @@ export function Stream() {
         signal: AbortSignal.timeout(10000),
       });
       if (!r.ok) throw Error(`Stream feed returned ${r.status}.`);
-      return streamId(await r.json());
+      const data = await r.json();
+      return streamId({ publicId: data.publicId });
     },
     retry: false,
-    refetchInterval: 60000,
+    refetchOnWindowFocus: false,
+    refetchInterval: (query) =>
+      query.state.status === "error" ? false : 60000,
   });
   return (
     <section className="stream" aria-label="Squeekchain live stream">
@@ -62,50 +64,14 @@ export function Stream() {
           Open source ↗
         </a>
       </div>
-      {q.data && playing ? (
-        <iframe
-          title="Live Squeekchain hamster wheel"
-          src={`https://www.youtube-nocookie.com/embed/${q.data}?autoplay=0&rel=0`}
-          allow="encrypted-media; picture-in-picture; fullscreen"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allowFullScreen
-        />
-      ) : (
-        <div className="stream-empty">
-          <img src="./favicon.svg" width="54" height="54" alt="" />
-          <div>
-            <strong>
-              {q.isPending
-                ? "Finding the live wheel…"
-                : q.data
-                  ? "Wheel cam paused"
-                  : "Wheel cam unavailable"}
-            </strong>
-            <p>
-              {q.data
-                ? "Resume to watch the current feed."
-                : "Live video is not listed."}
-            </p>
-          </div>
-          {!q.isPending && (
-            <button
-              onClick={() => (q.data ? setPlaying(true) : void q.refetch())}
-              disabled={q.isFetching}
-            >
-              {q.isFetching
-                ? "Retrying…"
-                : q.data
-                  ? "Resume stream"
-                  : "Retry stream"}
-            </button>
-          )}
-        </div>
-      )}
-      {q.data && playing && (
-        <button className="stop-stream" onClick={() => setPlaying(false)}>
-          Hide stream
-        </button>
-      )}
+      <iframe
+        title="Live Squeekchain hamster wheel"
+        src={`https://www.youtube.com/embed/${q.data ?? "6K_uF2s-LSw"}?autoplay=1&mute=1`}
+        loading="lazy"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+      />
     </section>
   );
 }

@@ -15,11 +15,15 @@ import {
   zeroAddress,
   parseEther,
   toHex,
+  parseAbi,
+  hashTypedData,
+  hexToString,
+  encodeEventTopics,
 } from "viem";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const out = resolve(root, "test/scratch/interaction");
 await mkdir(out, { recursive: true });
-const { chromium } = await import(
+const { chromium, webkit } = await import(
   pathToFileURL(
     process.env.IMD_PLAYWRIGHT ??
       "/opt/imd-tools/playwright-mcp/node_modules/playwright/index.mjs",
@@ -45,10 +49,78 @@ const hash = "0x" + "ab".repeat(32),
   zeroHash = "0x" + "00".repeat(32);
 const uuid =
   "0x753b499634e7420a8768d784231195da00000000000000000000000000000000";
+const intake = "0xa43e6f75ee006411f79ac1c84120606c2330de82";
+const intakeABI = parseAbi([
+  "function priceOf(bytes32 action,address asset) view returns(uint256)",
+  "function request(bytes32 action,bytes body,(address target,bytes4 selector) callback,address asset,uint256 amount) payable returns(bytes32 requestId)",
+]);
+const { generatePrivateKey, privateKeyToAccount } =
+  await import("viem/accounts");
+// A fresh throwaway signer for intercepted RPC tests only. No key or mock response is exported.
+const signer = privateKeyToAccount(generatePrivateKey());
+const oracleTypes = {
+  OracleAttestation: [
+    ["requestId", "bytes32"],
+    ["chainId", "uint256"],
+    ["questionHash", "bytes32"],
+    ["answerType", "uint8"],
+    ["answer", "bytes"],
+    ["figure", "uint256"],
+    ["fromBlock", "uint64"],
+    ["toBlock", "uint64"],
+    ["blockHash", "bytes32"],
+    ["panelJobId", "bytes32"],
+    ["panelSize", "uint16"],
+    ["quorum", "uint16"],
+    ["agreed", "uint16"],
+    ["issuedAt", "uint64"],
+    ["expiresAt", "uint64"],
+  ].map(([name, type]) => ({ name, type })),
+};
+const oracleDomain = {
+  name: "IdentityMD Oracle",
+  version: "2",
+  chainId: 1,
+  verifyingContract: game.address,
+};
+const oracleUUID = "753b4996-34e7-420a-8768-d784231195da";
 const now = BigInt(Math.floor(Date.now() / 1000));
 const genesis = 1791847800n;
 const current = (now - genesis) / 3600n;
 const next = current + 1n;
+const message = {
+  requestId: uuid,
+  chainId: 1n,
+  questionHash: hash,
+  answerType: 3,
+  answer: toHex(1470n, { size: 32 }),
+  figure: 1470n,
+  fromBlock: 26204211n,
+  toBlock: 26205000n,
+  blockHash: hash,
+  panelJobId: uuid,
+  panelSize: 20,
+  quorum: 14,
+  agreed: 18,
+  issuedAt: now,
+  expiresAt: now + 86400n,
+};
+const signature = await signer.signTypedData({
+  domain: oracleDomain,
+  types: oracleTypes,
+  primaryType: "OracleAttestation",
+  message,
+});
+const signedJSON = JSON.stringify(
+  {
+    domain: oracleDomain,
+    types: oracleTypes,
+    message,
+    signature,
+    signer: signer.address,
+  },
+  (_, v) => (typeof v === "bigint" ? String(v) : v),
+);
 const reports = [];
 let browser;
 const mime = {
@@ -58,6 +130,8 @@ const mime = {
   ".json": "application/json",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".mp4": "video/mp4",
+  ".ttf": "font/ttf",
 };
 const server = createServer(async (req, res) => {
   try {
@@ -112,7 +186,11 @@ function fixture(options = {}) {
     receipts: new Map(),
     sent: [],
     walletCalls: [],
-    allowance: 0n,
+    allowance: options.allowance ?? 0n,
+    oracleAllowance: 0n,
+    oracleBody: null,
+    answerReady: false,
+    preflightBodies: [],
     stakeAllowance: 0n,
     staked: 0n,
     pending: parseEther("2"),
@@ -151,7 +229,10 @@ function fixture(options = {}) {
       line: 1000n,
       source: "https://sepolia.squeekchain.com",
       result: k === current - 1n ? 1470n : 0n,
-      pools: [parseEther("12"), parseEther("10"), parseEther("2")],
+      pools: options.empty
+        ? [0n, 0n, 0n]
+        : [parseEther("12"), parseEther("10"), parseEther("2")],
+      rewards: [parseEther("10.92"), parseEther("9.1"), parseEther("1.82")],
       over: [parseEther("4"), parseEther("8")],
       sleep: [parseEther("1"), parseEther("1")],
       settler: account,
@@ -172,6 +253,11 @@ function fixture(options = {}) {
     };
   }
   function decode(tx) {
+    if (tx.to.toLowerCase() === intake)
+      return {
+        ...decodeFunctionData({ abi: intakeABI, data: tx.data }),
+        abi: intakeABI,
+      };
     const token =
       tx.to.toLowerCase() === imd || tx.to.toLowerCase() === stakeToken;
     return {
@@ -194,7 +280,9 @@ function fixture(options = {}) {
     const { functionName: fn, args = [], abi: used } = decode(tx);
     const token = used === erc20Abi;
     let result;
-    if (token) {
+    if (used === intakeABI)
+      result = fn === "priceOf" ? parseEther("0.5") : hash;
+    else if (token) {
       const stake = tx.to.toLowerCase() === stakeToken;
       const values = {
         symbol: stake ? "STK" : "IMD",
@@ -203,12 +291,29 @@ function fixture(options = {}) {
           ? 2n ** 128n - 1n
           : stake
             ? 1000000000n
-            : parseEther("1000"),
-        allowance: stake ? state.stakeAllowance : state.allowance,
+            : options.lowBalance
+              ? parseEther("0.1")
+              : parseEther("1000"),
+        allowance: stake
+          ? state.stakeAllowance
+          : typeof args[1] === "string" && args[1].toLowerCase() === intake
+            ? state.oracleAllowance
+            : state.allowance,
         approve: true,
       };
       result = values[fn];
-    } else if (used === vabi) result = fn === "oracleSigner" ? team : false;
+    } else if (used === vabi)
+      result =
+        fn === "oracleSigner"
+          ? signer.address
+          : fn === "attestationDigest"
+            ? hashTypedData({
+                domain: { ...oracleDomain, verifyingContract: args[1] },
+                types: oracleTypes,
+                primaryType: "OracleAttestation",
+                message: args[0],
+              })
+            : false;
     else {
       const globals = {
         currentRound: (now - genesis) / 600n,
@@ -250,6 +355,7 @@ function fixture(options = {}) {
       else if (fn === "stakes") result = [state.staked, 0n, state.pending];
       else if (fn === "pendingConfig")
         result = state.settings[args[0]] ?? [zeroHash, 0n];
+      else if (fn === "questionHash") result = hash;
       else if (fn === "question")
         result = `What is the total number of wheel passes recorded by Squeekchain for rounds ${args[0] * 6n} through ${args[0] * 6n + 5n} inclusive, as published at https://sepolia.squeekchain.com? Answer as a single uint256.`;
       else if (state.revert)
@@ -263,7 +369,7 @@ function fixture(options = {}) {
     return encodeFunctionResult({ abi: used, functionName: fn, result });
   }
   const block = {
-    number: "0x18f0000",
+    number: toHex(26205000n),
     hash,
     parentHash: hash,
     nonce: "0x0000000000000000",
@@ -297,7 +403,66 @@ function fixture(options = {}) {
     if (method === "eth_getBalance") return "0x56bc75e2d63100000";
     if (method === "eth_call") return contractCall(params[0]);
     if (method === "eth_estimateGas") return "0x200000";
-    if (method === "eth_getLogs") return [];
+    if (method === "eth_getLogs") {
+      const event = abi.find((x) => x.type === "event" && x.name === "Bet");
+      const topics = encodeEventTopics({
+        abi: [event],
+        eventName: "Bet",
+        args: { windowId: current - 1n, bettor: state.account, market: 0 },
+      });
+      if (options.portfolio && params[0].topics?.[0] === topics[0])
+        return [
+          {
+            address: game.address,
+            blockHash: hash,
+            blockNumber: toHex(26204900n),
+            transactionHash: hash,
+            transactionIndex: "0x0",
+            logIndex: "0x0",
+            removed: false,
+            topics,
+            data: encodeAbiParameters(
+              [{ type: "uint256" }, { type: "uint256" }],
+              [1n, parseEther("1")],
+            ),
+          },
+        ];
+      const settingEvent = abi.find(
+        (x) => x.type === "event" && x.name === "ConfigScheduled",
+      );
+      const settingTopics = encodeEventTopics({
+        abi: [settingEvent],
+        eventName: "ConfigScheduled",
+        args: { setting: keccak256(stringToHex("sourceUrl")) },
+      });
+      if (
+        params[0].topics?.[0] === settingTopics[0] &&
+        state.settings[settingTopics[1]]
+      )
+        return [
+          {
+            address: game.address,
+            blockHash: hash,
+            blockNumber: toHex(26204900n),
+            transactionHash: hash,
+            transactionIndex: "0x0",
+            logIndex: "0x1",
+            removed: false,
+            topics: settingTopics,
+            data: encodeAbiParameters(
+              [{ type: "bytes" }, { type: "uint64" }],
+              [
+                encodeAbiParameters(
+                  [{ type: "string" }],
+                  ["https://sepolia.squeekchain.com"],
+                ),
+                now + 172800n,
+              ],
+            ),
+          },
+        ];
+      return [];
+    }
     if (method === "eth_gasPrice") return "0x3b9aca00";
     if (method === "eth_maxPriorityFeePerGas") return "0x3b9aca00";
     if (method === "eth_getTransactionCount") return "0x0";
@@ -379,9 +544,14 @@ function fixture(options = {}) {
         call = decode(tx);
       state.sent.push({ tx, ...call });
       if (call.functionName === "approve") {
-        if (tx.to.toLowerCase() === imd) state.allowance = call.args[1];
-        else state.stakeAllowance = call.args[1];
+        if (tx.to.toLowerCase() === imd) {
+          if (call.args[0].toLowerCase() === intake)
+            state.oracleAllowance = call.args[1];
+          else state.allowance = call.args[1];
+        } else state.stakeAllowance = call.args[1];
       }
+      if (call.functionName === "request")
+        state.oracleBody = JSON.parse(hexToString(call.args[1]));
       if (call.functionName === "betOverUnder") state.hasBet = true;
       if (call.functionName === "betExact") state.hasExact = true;
       if (call.functionName === "stake") state.staked += call.args[0];
@@ -436,7 +606,7 @@ async function setup(options = {}) {
   const f = fixture(options);
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
-    reducedMotion: "reduce",
+    reducedMotion: options.fresh ? "no-preference" : "reduce",
     ...(options.noProvider
       ? {
           userAgent:
@@ -446,11 +616,16 @@ async function setup(options = {}) {
   });
   const page = await context.newPage();
   const errors = [];
+  if (!options.fresh)
+    await page.addInitScript(() =>
+      localStorage.setItem("hamster-hour:intro-dismissed:v1", "yes"),
+    );
   page.on("pageerror", (e) => errors.push(e.message));
   await page.exposeFunction("__walletRequest", async (args) => {
     try {
       return { result: await f.wallet(args) };
     } catch (error) {
+      console.log("Wallet fixture error", args.method, error.message);
       return {
         error: {
           code: error.code ?? -32000,
@@ -510,6 +685,7 @@ async function setup(options = {}) {
             result: await f.rpc(req.method, req.params),
           };
         } catch (e) {
+          console.log("RPC fixture error", req.method, e.message);
           return { jsonrpc: "2.0", id: req.id, error: e };
         }
       };
@@ -524,25 +700,84 @@ async function setup(options = {}) {
   await page.route("https://media.squeekchain.com/live/current.json", (route) =>
     route.fulfill(
       options.stream
-        ? { json: { youtubeId: "abcdefghijk" } }
-        : { status: 404, body: "Not found" },
+        ? { json: { publicId: "abcdefghijk" } }
+        : { json: { publicId: "6K_uF2s-LSw" } },
     ),
   );
-  await page.route("https://www.youtube-nocookie.com/**", (route) =>
+  await page.route("https://www.youtube.com/**", (route) =>
     route.fulfill({
       body: '<html><body style="background:#101310;color:white">Fixture video frame</body></html>',
       contentType: "text/html",
     }),
   );
-  await page.route("https://api.imd.fun/oracle/requests/**", (route) =>
-    route.fulfill({ json: { jobId: "354a39ee-97cf-4e92-84a1-eaa3b55c90e2" } }),
-  );
+  await page.route("https://api.imd.fun/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/requests/capabilities")
+      return route.fulfill({
+        json: {
+          onchain: {
+            chains: [
+              {
+                chainId: 1,
+                intake,
+                asset: imd,
+                actions: [
+                  {
+                    action: "oracle.request",
+                    version: "oracle-1",
+                    actionId: stringToHex("oracle.request@oracle-1", {
+                      size: 32,
+                    }),
+                    amount: "500000000000000000",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+    if (path === "/requests/check") {
+      f.state.preflightBodies.push(route.request().postDataJSON());
+      return route.fulfill({ json: { blockers: [] } });
+    }
+    if (path.startsWith("/intake/"))
+      return route.fulfill({
+        json: {
+          entries: [
+            {
+              action: "oracle.request",
+              intake,
+              payer: f.state.account,
+              state: "admitted",
+              admission: {
+                result: {
+                  kind: "oracle",
+                  requestId: oracleUUID,
+                  jobId: "354a39ee-97cf-4e92-84a1-eaa3b55c90e2",
+                },
+              },
+            },
+          ],
+        },
+      });
+    if (path.endsWith("/attestation"))
+      return route.fulfill(
+        f.state.answerReady
+          ? { body: signedJSON, contentType: "application/json" }
+          : { status: 404, json: { error: "not_attested" } },
+      );
+    return route.fulfill({
+      json: { jobId: "354a39ee-97cf-4e92-84a1-eaa3b55c90e2" },
+    });
+  });
   await page.goto(url);
   await page
     .getByRole("button", { name: "Connect wallet", exact: true })
     .waitFor();
   if (!options.noCode)
-    await page.getByText(/Block .*synced/).waitFor({ timeout: 20000 });
+    await page
+      .getByText(/Live from Ethereum · block/)
+      .waitFor({ timeout: 20000 });
   return { page, context, f, errors };
 }
 async function connect(page) {
@@ -551,6 +786,13 @@ async function connect(page) {
     .click();
   await page
     .getByRole("button", { name: "Test browser wallet", exact: true })
+    .click();
+}
+async function more(page, name) {
+  await page.locator(".more-menu summary").click();
+  await page
+    .locator(".more-popover")
+    .getByRole("button", { name, exact: true })
     .click();
 }
 async function confirmed(page, id) {
@@ -562,7 +804,8 @@ async function confirmed(page, id) {
     .waitFor({ timeout: 20000 });
 }
 async function check(name, fn) {
-  if (process.argv[2] && !name.includes(process.argv[2])) return;
+  if (process.env.HH_TEST && !name.includes(process.env.HH_TEST)) return;
+
   const start = Date.now();
   try {
     await fn();
@@ -575,20 +818,48 @@ async function check(name, fn) {
   }
 }
 try {
-  browser = await chromium.launch({ headless: true });
+  const engine = process.env.HH_BROWSER === "webkit" ? webkit : chromium;
+  browser = await engine.launch({ headless: true });
   await check(
-    "mobile disconnected state, primary action, picker and keyboard",
+    "intro video, dismissal, return visit and responsive first screen",
     async () => {
-      const { page, context, errors } = await setup();
-      const button = page
-        .getByRole("button", { name: "Connect to continue" })
-        .first();
-      const box = await button.boundingBox();
-      assert(
-        box.y + box.height <= 844,
-        `Primary action below fold: ${box.y + box.height}`,
-      );
-      for (const width of [320, 390, 768, 1440]) {
+      const { page, context, errors } = await setup({ fresh: true });
+      for (const width of [375, 1440]) {
+        await page.setViewportSize({
+          width,
+          height: width === 1440 ? 1000 : 812,
+        });
+        if (width === 1440) {
+          await page.evaluate(() =>
+            localStorage.removeItem("hamster-hour:intro-dismissed:v1"),
+          );
+          await page.reload();
+        }
+        await page
+          .getByRole("button", { name: "Start playing", exact: true })
+          .waitFor();
+        await page.waitForFunction(
+          () => document.querySelector("video")?.readyState >= 2,
+        );
+        assert.equal(
+          await page.locator("video").getAttribute("src"),
+          "./assets/hamster-chewing.mp4",
+        );
+        await page.screenshot({ path: resolve(out, `intro-${width}.png`) });
+        const start = Date.now();
+        await page
+          .getByRole("button", { name: "Start playing", exact: true })
+          .click();
+        await page.locator("iframe").waitFor();
+        assert(Date.now() - start < 3000);
+        assert.match(
+          await page.locator("iframe").getAttribute("src"),
+          /6K_uF2s-LSw\?autoplay=1&mute=1/,
+        );
+      }
+      await page.reload();
+      assert.equal(await page.locator(".intro-overlay").count(), 0);
+      for (const width of [320, 375, 390, 768, 1440]) {
         await page.setViewportSize({ width, height: 844 });
         assert.equal(
           await page.evaluate(
@@ -596,62 +867,103 @@ try {
           ),
           true,
         );
+        const box = await page
+          .getByRole("button", { name: "Bet OVER", exact: true })
+          .boundingBox();
+        assert(box.y + box.height < 844);
+        if ([390, 1440].includes(width))
+          await page.screenshot({ path: resolve(out, `bet-${width}.png`) });
       }
-      await page.setViewportSize({ width: 390, height: 844 });
-      await page.screenshot({
-        path: resolve(out, "390-disconnected.png"),
-        fullPage: false,
-      });
-      await page
-        .getByRole("button", { name: "Connect wallet", exact: true })
-        .click();
-      assert.equal(
-        await page
-          .getByRole("button", { name: "Browser wallet", exact: true })
-          .count(),
-        0,
-      );
-      await page
-        .getByRole("button", { name: "Coinbase Wallet", exact: true })
-        .waitFor();
-      await page.keyboard.press("Escape");
-      assert.equal(
-        await page.evaluate(() =>
-          document.activeElement.textContent.includes("Connect wallet"),
-        ),
-        true,
-      );
-      await page.getByRole("tab", { name: "Bet" }).focus();
-      await page.keyboard.press("ArrowRight");
-      await page
-        .getByText("Staking opens with the token", { exact: true })
-        .waitFor();
       assert.deepEqual(errors, []);
       await context.close();
     },
   );
+  await check("stream publicId switches only to a valid video", async () => {
+    const { page, context } = await setup({ stream: true });
+    await page.waitForFunction(() =>
+      document.querySelector("iframe")?.src.includes("abcdefghijk"),
+    );
+    await context.close();
+  });
   await check(
-    "live stream remains above a visible primary action",
+    "one click approval then exactly one OVER bet; chips and success",
     async () => {
-      const { page, context } = await setup({ stream: true });
-      await page.locator("iframe").waitFor();
-      const box = await page
-        .getByRole("button", { name: "Connect to continue" })
-        .first()
-        .boundingBox();
-      assert(
-        box.y + box.height <= 844,
-        `With video action ends at ${box.y + box.height}`,
+      const { page, context, f, errors } = await setup();
+      await connect(page);
+      await page.getByRole("button", { name: "Bet OVER", exact: true }).click();
+      await page.getByRole("button", { name: "5 IMD", exact: true }).click();
+      assert.equal(await page.locator("#bet-amount").inputValue(), "5");
+      f.state.delayReceipt = true;
+      await page
+        .getByRole("button", { name: "Place bet", exact: true })
+        .click();
+      await page.getByText("Approving…", { exact: true }).waitFor();
+      await page.waitForFunction(() =>
+        document
+          .querySelector(".amount-sheet .tx-feedback")
+          ?.textContent.includes("Submitted"),
       );
-      await page.getByRole("button", { name: "Hide stream" }).click();
-      await page.getByRole("button", { name: "Resume stream" }).waitFor();
+      assert.equal(f.state.sent.length, 1);
+      assert.equal(f.state.sent[0].functionName, "approve");
+      assert.equal(f.state.sent[0].args[1], parseEther("5"));
+      f.state.delayReceipt = false;
+      await page
+        .getByText(/Bet placed. You win about/)
+        .waitFor({ timeout: 30000 });
+      assert.deepEqual(
+        f.state.sent.map((x) => x.functionName),
+        ["approve", "betOverUnder"],
+      );
+      assert.deepEqual(f.state.sent[1].args, [next, true, parseEther("5")]);
+      assert.deepEqual(errors, []);
+      await page.screenshot({ path: resolve(out, "bet-success-390.png") });
       await context.close();
     },
   );
   await check(
-    "wallet rejection, unknown-chain add fallback and exact approval then bet",
+    "existing allowance uses one transaction; UNDER, SLEEPING and hidden EXACT",
     async () => {
-      const { page, context, f, errors } = await setup({ wrongChain: true });
+      const { page, context, f } = await setup({
+        allowance: parseEther("100"),
+      });
+      await connect(page);
+      for (const [choice, fn, arg] of [
+        ["UNDER", "betOverUnder", false],
+        ["SLEEPING", "betSleep", true],
+      ]) {
+        await page
+          .getByRole("button", { name: `Bet ${choice}`, exact: true })
+          .click();
+        await page
+          .getByRole("button", { name: "Place bet", exact: true })
+          .click();
+        await page.getByText(/Bet placed/).waitFor({ timeout: 20000 });
+        assert.equal(f.state.sent.at(-1).functionName, fn);
+        assert.equal(f.state.sent.at(-1).args[1], arg);
+        await page.getByRole("button", { name: "Back to the wheel" }).click();
+      }
+      assert.equal(await page.locator(".market-button").count(), 3);
+      await page
+        .getByRole("button", { name: /Guess the exact number/ })
+        .click();
+      await page.locator("#exact-guess").fill("1234");
+      await page
+        .getByRole("button", { name: "Place bet", exact: true })
+        .click();
+      await page.getByText("Bet placed. Your exact guess is in.").waitFor();
+      assert.equal(f.state.sent.at(-1).functionName, "betExact");
+      assert.equal(f.state.sent.at(-1).args[1], 1234n);
+      assert.equal(f.state.sent.length, 3);
+      await context.close();
+    },
+  );
+  await check(
+    "rejection, amount validation and wrong-chain recovery",
+    async () => {
+      const { page, context, f } = await setup({
+        wrongChain: true,
+        allowance: parseEther("10"),
+      });
       f.state.rejectConnect = true;
       await connect(page);
       await page.getByText(/Request declined/).waitFor();
@@ -660,535 +972,298 @@ try {
         .click();
       await page
         .getByRole("button", { name: "Switch to Ethereum", exact: true })
-        .first()
         .click();
-      await page
-        .getByRole("button", { name: "Approve 0.5 IMD", exact: true })
-        .waitFor();
       assert.deepEqual(
         f.state.walletCalls.find((x) => x.method === "wallet_addEthereumChain")
           .params,
         [manifest.walletAddChain],
       );
+      await page.getByRole("button", { name: "Bet OVER", exact: true }).click();
       await page.locator("#bet-amount").fill("0.1");
       await page
-        .getByRole("button", { name: "Approve 0.1 IMD", exact: true })
-        .click();
-      await page.getByText("The minimum bet is 0.5 IMD.").waitFor();
-      assert.equal(f.state.sent.length, 0);
-      await page.locator("#bet-amount").fill("0.5");
-      f.state.delayReceipt = true;
-      await page
-        .getByRole("button", { name: "Approve 0.5 IMD", exact: true })
+        .getByRole("button", { name: "Place bet", exact: true })
         .click();
       await page
-        .getByRole("button", { name: "Confirming…", exact: true })
-        .waitFor();
-      assert.equal(f.state.sent.length, 1);
-      assert.equal(
-        await page
-          .getByRole("button", { name: "Confirming…", exact: true })
-          .isDisabled(),
-        true,
-      );
-      f.state.delayReceipt = false;
-      await page
-        .getByRole("button", { name: "Place over / under bet", exact: true })
-        .waitFor({ timeout: 20000 });
-      assert.equal(f.state.sent[0].functionName, "approve");
-      assert.equal(f.state.sent[0].args[0].toLowerCase(), game.address);
-      assert.equal(f.state.sent[0].args[1], parseEther("0.5"));
-      await page
-        .getByRole("button", { name: "Under", exact: false })
-        .filter({ has: page.locator(".side-name") })
-        .click();
-      await page
-        .getByRole("button", { name: "Place over / under bet", exact: true })
-        .click();
-      await page.waitForFunction(() =>
-        document
-          .querySelector(".bet-panel .tx-feedback")
-          ?.textContent.includes("Confirmed"),
-      );
-      await confirmed(page, ".bet-panel");
-      assert.equal(f.state.sent.at(-1).functionName, "betOverUnder");
-      assert.deepEqual(f.state.sent.at(-1).args, [
-        next,
-        false,
-        parseEther("0.5"),
-      ]);
-      assert.deepEqual(errors, []);
-      await context.close();
-    },
-  );
-  await check(
-    "simulation rejection prevents signing and wallet rejection recovers",
-    async () => {
-      const { page, context, f } = await setup();
-      f.state.allowance = parseEther("100");
-      await connect(page);
-      await page
-        .getByRole("button", { name: "Place over / under bet", exact: true })
-        .waitFor();
-      f.state.revert = true;
-      await page
-        .getByRole("button", { name: "Place over / under bet", exact: true })
-        .click();
-      await page
-        .getByText(
-          "Betting has closed for this window. Choose the next open window.",
-        )
+        .getByText("The minimum bet is 0.5 IMD.", { exact: true })
         .waitFor();
       assert.equal(f.state.sent.length, 0);
-      f.state.revert = false;
+      await page.locator("#bet-amount").fill("1");
       f.state.rejectSend = true;
       await page
-        .getByRole("button", { name: "Place over / under bet", exact: true })
+        .getByRole("button", { name: "Place bet", exact: true })
         .click();
       await page.getByText(/Request declined/).waitFor();
-      assert.equal(
+      assert.equal(f.state.sent.length, 0);
+      assert(
         await page
-          .getByRole("button", { name: "Place over / under bet", exact: true })
+          .getByRole("button", { name: "Place bet", exact: true })
           .isEnabled(),
-        true,
       );
       await context.close();
     },
   );
   await check(
-    "EXACT validation, ticket uniqueness and Sleep encoding",
-    async () => {
-      const { page, context, f } = await setup();
-      f.state.allowance = parseEther("100");
-      await connect(page);
-      await page.getByRole("button", { name: "Exact", exact: true }).click();
-      await page.locator("#exact-guess").fill("1.5");
-      await page
-        .getByRole("button", { name: "Place exact bet", exact: true })
-        .click();
-      await page.getByText(/Enter a whole number/).waitFor();
-      await page.locator("#exact-guess").fill("1234");
-      await page
-        .getByRole("button", { name: "Place exact bet", exact: true })
-        .click();
-      await confirmed(page, ".bet-panel");
-      assert.deepEqual(f.state.sent.at(-1).args, [
-        next,
-        1234n,
-        parseEther("0.5"),
-      ]);
-      assert.equal(
-        await page
-          .getByRole("button", { name: "Place exact bet", exact: true })
-          .isDisabled(),
-        true,
-      );
-      await page.getByRole("button", { name: "Sleep", exact: true }).click();
-      await page
-        .getByRole("button", { name: "No, running", exact: false })
-        .click();
-      await page
-        .getByRole("button", { name: "Place sleep bet", exact: true })
-        .click();
-      await confirmed(page, ".bet-panel");
-      assert.deepEqual(f.state.sent.at(-1).args, [
-        next,
-        false,
-        parseEther("0.5"),
-      ]);
-      await context.close();
-    },
-  );
-  await check(
-    "staking token uses its own decimals, approval, unstake and IMD reward claim",
-    async () => {
-      const { page, context, f } = await setup({ stake: true });
-      await connect(page);
-      await page.getByRole("tab", { name: "Stake", exact: true }).click();
-      await page.locator("#stake-amount").fill("1.25");
-      await page
-        .getByRole("button", { name: "Approve STK", exact: true })
-        .click();
-      await page
-        .getByRole("button", { name: "Stake tokens", exact: true })
-        .waitFor({ timeout: 20000 });
-      assert.equal(f.state.sent.at(-1).args[1], 1250000n);
-      await page
-        .getByRole("button", { name: "Stake tokens", exact: true })
-        .click();
-      await page.getByText("1.25 STK", { exact: true }).first().waitFor();
-      assert.equal(f.state.staked, 1250000n);
-      await page.locator("#unstake-amount").fill("0.25");
-      await page
-        .getByRole("button", { name: "Unstake tokens", exact: true })
-        .click();
-      await page.getByText("1 STK", { exact: true }).first().waitFor();
-      assert.equal(f.state.staked, 1000000n);
-      await page
-        .getByRole("button", { name: "Claim IMD rewards", exact: true })
-        .click();
-      await page.getByText("0 IMD", { exact: true }).waitFor();
-      assert.equal(f.state.sent.at(-1).functionName, "claimStaking");
-      await context.close();
-    },
-  );
-  await check(
-    "claim overload, history, oracle links, timeout and settlement",
-    async () => {
-      const { page, context, f } = await setup();
-      await connect(page);
-      await page.getByLabel("Include jackpot token").uncheck();
-      await page
-        .getByRole("button", { name: "Check and claim", exact: true })
-        .click();
-      await confirmed(page, ".claim-grid");
-      assert.deepEqual(f.state.sent.at(-1).args, [current - 1n, false]);
-      await page.getByRole("tab", { name: "History", exact: true }).click();
-      await page
-        .getByRole("link", { name: "Oracle evidence", exact: false })
-        .first()
-        .waitFor();
-      assert.match(
-        await page
-          .getByRole("link", { name: "Oracle evidence", exact: false })
-          .first()
-          .getAttribute("href"),
-        /explorer.imd.fun\/jobs\/354a39ee/,
-      );
-      await page
-        .getByText("Settle a window & fund the oracle", { exact: true })
-        .click();
-      await page.locator("#keeper-window").fill(String(current - 60n));
-      await page
-        .getByRole("button", { name: "Load settlement", exact: true })
-        .click();
-      await page
-        .getByRole("button", { name: "Void timed-out window", exact: true })
-        .click();
-      await page
-        .locator(".keeper")
-        .getByText("Confirmed on Ethereum.", {
-          exact: true,
-        })
-        .waitFor();
-      assert.equal(f.state.sent.at(-1).functionName, "voidWindow");
-      await page.locator("#keeper-window").fill(String(current - 2n));
-      await page
-        .getByRole("button", { name: "Load settlement", exact: true })
-        .click();
-      const att = JSON.parse(
-        await readFile(
-          resolve(root, "docs/references/squeekchain-attestation.json"),
-          "utf8",
-        ),
-      );
-      att.domain.verifyingContract = game.address;
-      await page.locator("#attestation").fill(JSON.stringify(att));
-      await page
-        .getByRole("button", { name: "Verify and settle window", exact: true })
-        .click();
-      await page
-        .locator(".keeper .action")
-        .filter({
-          has: page.getByRole("button", {
-            name: "Verify and settle window",
-            exact: true,
-          }),
-        })
-        .getByText("Confirmed on Ethereum.", {
-          exact: true,
-        })
-        .waitFor({ timeout: 20000 });
-      assert.equal(f.state.sent.at(-1).functionName, "settle");
-      assert.equal(f.state.sent.at(-1).args[0], current - 2n);
-      await context.close();
-    },
-  );
-  await check(
-    "TEAM schedule gates all four settings and validates timelock values",
-    async () => {
-      const { page, context, f } = await setup({ team: true });
-      await connect(page);
-      await page
-        .getByText("Public settings & TEAM controls", { exact: true })
-        .click();
-      await page.locator("#setting-stakingToken").fill(stakeToken);
-      const first = page.locator(".setting").first();
-      await first
-        .getByRole("button", { name: "Schedule 48-hour change", exact: true })
-        .click();
-      await confirmed(page, ".setting:first-of-type");
-      assert.equal(f.state.sent.at(-1).functionName, "scheduleStakingToken");
-      assert.equal(
-        await first
-          .getByRole("button", {
-            name: "Execute scheduled change",
-            exact: true,
-          })
-          .isDisabled(),
-        true,
-      );
-      assert.equal(
-        await page
-          .getByRole("button", { name: "Schedule 48-hour change", exact: true })
-          .count(),
-        4,
-      );
-      const values = [
-        ["stakingToken", "StakingToken", stakeToken],
-        ["jackpotToken", "JackpotToken", stakeToken],
-        ["sourceUrl", "SourceUrl", "https://sepolia.squeekchain.com/status"],
-        ["genesisTimestamp", "GenesisTimestamp", String(genesis + 600n)],
-      ];
-      for (let i = 0; i < values.length; i++) {
-        const [key, suffix, value] = values[i];
-        const section = page.locator(".setting").nth(i);
-        if (i > 0) {
-          await page.locator("#setting-" + key).fill(value);
-          await section
-            .getByRole("button", {
-              name: "Schedule 48-hour change",
-              exact: true,
-            })
-            .click();
-          await section
-            .locator(".action")
-            .first()
-            .getByText("Confirmed on Ethereum.", { exact: true })
-            .waitFor({ timeout: 20000 });
-          assert.equal(f.state.sent.at(-1).functionName, "schedule" + suffix);
-        }
-        // Move only the intercepted proposal timestamp; never wait 48 real hours or send a live transaction.
-        f.state.settings[keccak256(stringToHex(key))][1] = now - 1n;
-        await page
-          .getByRole("button", { name: "Refresh", exact: true })
-          .click();
-        await section
-          .getByRole("button", {
-            name: "Execute scheduled change",
-            exact: true,
-          })
-          .click();
-        await section
-          .locator(".action")
-          .last()
-          .getByText("Confirmed on Ethereum.", { exact: true })
-          .waitFor({ timeout: 20000 });
-        assert.equal(f.state.sent.at(-1).functionName, "set" + suffix);
-      }
-      await context.close();
-    },
-  );
-  await check(
-    "mobile wallet links and Coinbase Smart Wallet without a provider",
+    "mobile wallet paths, focus return, low balance and no-TEAM controls",
     async () => {
       const { page, context } = await setup({ noProvider: true });
       await page
         .getByRole("button", { name: "Connect wallet", exact: true })
         .click();
       for (const name of ["MetaMask", "Coinbase Wallet", "Rabby", "Phantom"])
+        assert(
+          await page
+            .getByRole("link", { name: `Open in ${name}`, exact: false })
+            .isVisible(),
+        );
+      assert(
         await page
-          .getByRole("link", { name: "Open in " + name, exact: true })
-          .waitFor();
-      const rabby = new URL(
-        await page
-          .getByRole("link", { name: "Open in Rabby", exact: true })
-          .getAttribute("href"),
+          .getByRole("button", { name: "Coinbase Smart Wallet" })
+          .isVisible(),
       );
-      assert.equal(rabby.searchParams.get("_cmd"), "open-dapp");
-      assert.equal(rabby.searchParams.get("dapp"), url);
-      await page
-        .getByRole("button", { name: "Coinbase Smart Wallet", exact: true })
+      await page.keyboard.press("Escape");
+      assert(
+        await page.evaluate(() =>
+          document.activeElement.textContent.includes("Connect wallet"),
+        ),
+      );
+      await context.close();
+      const x = await setup({ lowBalance: true });
+      await connect(x.page);
+      await x.page
+        .getByRole("link", { name: "Get IMD", exact: true })
         .waitFor();
-      assert.equal(
-        await page
-          .getByRole("button", { name: "Browser wallet", exact: true })
-          .count(),
-        0,
-      );
-      await page.screenshot({ path: resolve(out, "mobile-wallet-picker.png") });
-      await context.close();
+      await more(x.page, "TEAM");
+      assert.equal(await x.page.locator(".team-form").count(), 0);
+      assert.equal(await x.page.locator(".settings input").count(), 0);
+      assert.equal(await x.page.locator(".setting").count(), 4);
+      await x.context.close();
     },
   );
   await check(
-    "existing allowance resets to zero, then approves only the requested amount",
+    "TEAM schedule shows decoded pending value and execute date publicly",
     async () => {
-      const { page, context, f } = await setup();
-      f.state.allowance = parseEther("0.1");
+      const { page, context, f } = await setup({ team: true });
       await connect(page);
+      await more(page, "TEAM");
       await page
-        .getByRole("button", { name: "Reset IMD allowance", exact: true })
-        .click();
+        .locator("#setting-sourceUrl")
+        .fill("https://sepolia.squeekchain.com");
       await page
-        .getByRole("button", { name: "Approve 0.5 IMD", exact: true })
-        .waitFor({ timeout: 20000 });
-      assert.equal(f.state.sent.at(-1).args[1], 0n);
-      await page
-        .getByRole("button", { name: "Approve 0.5 IMD", exact: true })
-        .click();
-      await page
-        .getByRole("button", { name: "Place over / under bet", exact: true })
-        .waitFor({ timeout: 20000 });
-      assert.equal(f.state.sent.at(-1).args[1], parseEther("0.5"));
-      await context.close();
-    },
-  );
-  await check(
-    "oracle reserve donation uses explicit approval and game funding function",
-    async () => {
-      const { page, context, f } = await setup();
-      await connect(page);
-      await page.getByRole("tab", { name: "History", exact: true }).click();
-      await page
-        .getByText("Settle a window & fund the oracle", { exact: true })
-        .click();
-      await page.locator("#oracle-fund").fill("2");
-      await page
-        .getByRole("button", { name: "Approve donation", exact: true })
-        .click();
-      await page
-        .getByRole("button", { name: "Donate to oracle reserve", exact: true })
-        .waitFor({ timeout: 20000 });
-      assert.equal(f.state.sent.at(-1).args[1], parseEther("2"));
-      await page
-        .getByRole("button", { name: "Donate to oracle reserve", exact: true })
-        .click();
-      await page
-        .locator(".keeper .action")
+        .locator(".setting")
         .filter({
-          has: page.getByRole("button", {
-            name: "Donate to oracle reserve",
-            exact: true,
-          }),
+          has: page.getByRole("heading", { name: "Source URL", exact: true }),
         })
-        .getByText("Confirmed on Ethereum.", {
+        .getByRole("button", { name: "Schedule 48-hour change" })
+        .click();
+      await page.getByText("Confirmed on Ethereum.", { exact: true }).waitFor();
+      assert.equal(f.state.sent.at(-1).functionName, "scheduleSourceUrl");
+      await page.getByText("Scheduled value", { exact: true }).waitFor();
+      assert(await page.getByText(/Executable from/).isVisible());
+      await context.close();
+    },
+  );
+  await check("automatic wallet result discovery and one claim", async () => {
+    const { page, context, f } = await setup({ portfolio: true });
+    await connect(page);
+    await page
+      .getByRole("button", { name: "Claim", exact: true })
+      .waitFor({ timeout: 20000 });
+    assert(await page.getByText("1470 passes", { exact: true }).isVisible());
+    await page.getByRole("button", { name: "Claim", exact: true }).click();
+    await page.getByText("Confirmed on Ethereum.", { exact: true }).waitFor();
+    assert.deepEqual(f.state.sent.at(-1).args, [current - 1n, true]);
+    await context.close();
+  });
+  await check(
+    "oracle approve + paid request, persistence, signed prefill and settle encoding",
+    async () => {
+      const { page, context, f, errors } = await setup();
+      await connect(page);
+      await more(page, "Settle");
+      await page.locator("#keeper-window").fill(String(current - 2n));
+      await page.getByRole("button", { name: "Load settlement" }).click();
+      await page
+        .getByRole("button", {
+          name: "Buy oracle answer · 0.5 IMD",
           exact: true,
         })
-        .waitFor({ timeout: 20000 });
-      assert.equal(f.state.sent.at(-1).functionName, "fundOracleReserve");
-      assert.deepEqual(f.state.sent.at(-1).args, [parseEther("2")]);
-      await context.close();
-    },
-  );
-  await check(
-    "pending transaction survives reload and blocks duplicate submission",
-    async () => {
-      const { page, context, f } = await setup();
-      await connect(page);
-      f.state.delayReceipt = true;
-      await page
-        .getByRole("button", { name: "Approve 0.5 IMD", exact: true })
         .click();
       await page
-        .getByRole("button", { name: "Confirming…", exact: true })
-        .waitFor();
+        .getByRole("link", { name: "View oracle panel", exact: true })
+        .waitFor({ timeout: 30000 });
+      assert.deepEqual(
+        f.state.sent.map((x) => x.functionName),
+        ["approve", "request"],
+      );
+      assert.equal(f.state.sent[0].args[0].toLowerCase(), intake);
+      assert.equal(f.state.sent[0].args[1], parseEther("0.5"));
+      const body = f.state.oracleBody;
+      assert.deepEqual(Object.keys(body), [
+        "v",
+        "question",
+        "chainId",
+        "window",
+        "answerType",
+        "evidence",
+        "panelSize",
+        "quorum",
+        "validForSeconds",
+        "consumer",
+      ]);
+      assert.deepEqual(body.window, { hours: 24 });
+      assert.equal(body.panelSize, 20);
+      assert.equal(body.quorum, 14);
+      assert.equal(body.validForSeconds, 86400);
+      assert.deepEqual(body.consumer, {
+        chainId: 1,
+        verifyingContract: game.address,
+      });
+      assert.equal(
+        body.question,
+        `What is the total number of wheel passes recorded by Squeekchain for rounds ${(current - 2n) * 6n} through ${(current - 2n) * 6n + 5n} inclusive, as published at https://sepolia.squeekchain.com? Answer as a single uint256.`,
+      );
+      assert.deepEqual(f.state.preflightBodies[0], {
+        action: "oracle.request",
+        input: body,
+      });
+      assert(
+        await page
+          .getByRole("button", { name: "Settle", exact: true })
+          .isDisabled(),
+      );
       await page.reload();
+      await page.getByText(/Live from Ethereum/).waitFor();
+      await more(page, "Settle");
+      await page.locator("#keeper-window").fill(String(current - 2n));
+      await page.getByRole("button", { name: "Load settlement" }).click();
       await page
-        .getByRole("button", { name: "Check confirmation", exact: true })
+        .getByRole("link", { name: "View payment", exact: true })
         .waitFor();
-      assert.equal(f.state.sent.length, 1);
       assert.equal(
         await page
           .getByRole("button", {
-            name: "Check pending transaction",
+            name: "Buy oracle answer · 0.5 IMD",
             exact: true,
           })
-          .isDisabled(),
-        true,
-      );
-      f.state.delayReceipt = false;
-      await page
-        .getByRole("button", { name: "Check confirmation", exact: true })
-        .click();
-      await page
-        .getByRole("button", { name: "Place over / under bet", exact: true })
-        .waitFor({ timeout: 20000 });
-      assert.equal(f.state.sent.length, 1);
-      assert.equal(
-        await page.evaluate(
-          (key) => localStorage.getItem(key),
-          "hamster-hour:pending:" + manifest.launchId,
-        ),
-        null,
-      );
-      await context.close();
-    },
-  );
-  await check(
-    "runtime rejects an ABI that differs from its attested hash",
-    async () => {
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      await page.route(url + game.abiPath, (route) =>
-        route.fulfill({ json: abi.slice(1) }),
-      );
-      await page.goto(url);
-      await page
-        .getByText(
-          "Contract ABI verification failed. Transactions are unavailable.",
-          { exact: true },
-        )
-        .waitFor();
-      assert.equal(
-        await page
-          .getByRole("button", { name: "Connect wallet", exact: true })
           .count(),
         0,
       );
+      f.state.answerReady = true;
+      await page
+        .getByRole("button", { name: "Check now", exact: true })
+        .click();
+      await page.waitForFunction(() =>
+        document.querySelector("#attestation")?.value.includes("signature"),
+      );
+      assert(
+        await page
+          .getByRole("button", { name: "Settle", exact: true })
+          .isEnabled(),
+      );
+      await page.getByRole("button", { name: "Settle", exact: true }).click();
+      await page
+        .getByText("Confirmed on Ethereum.", { exact: true })
+        .waitFor({ timeout: 20000 });
+      const call = f.state.sent.at(-1);
+      assert.equal(call.functionName, "settle");
+      assert.equal(call.args[0], current - 2n);
+      assert.equal(call.args[1].answerType, 3);
+      assert.equal(call.args[1].panelSize, 20);
+      assert.equal(call.args[1].questionHash, hash);
+      assert.equal(call.args[2], signature);
+      assert.deepEqual(errors, []);
       await context.close();
     },
   );
   await check(
-    "missing contract code disables writes; long values reflow at 320",
+    "oracle purchase is disabled for future or unfunded windows",
     async () => {
-      const a = await setup({ noCode: true });
-      await connect(a.page);
-      await a.page.getByText(/has no code/).waitFor();
-      assert.equal(
-        await a.page
-          .getByRole("button", { name: "Approve 0.5 IMD", exact: true })
-          .isDisabled(),
-        true,
-      );
-      assert.equal(a.f.state.sent.length, 0);
-      await a.context.close();
-      const { page, context } = await setup({ hugeBalance: true });
-      await connect(page);
-      for (const width of [320, 390, 1440]) {
-        await page.setViewportSize({ width, height: 844 });
-        await page.locator(".account-menu>summary").click();
-        assert.equal(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth <= innerWidth,
-          ),
-          true,
+      for (const options of [{}, { empty: true }]) {
+        const { page, context } = await setup(options);
+        await connect(page);
+        await more(page, "Settle");
+        await page
+          .locator("#keeper-window")
+          .fill(String(options.empty ? current - 2n : next));
+        await page.getByRole("button", { name: "Load settlement" }).click();
+        await page
+          .getByRole("button", {
+            name: "Buy oracle answer · 0.5 IMD",
+            exact: true,
+          })
+          .waitFor();
+        assert(
+          await page
+            .getByRole("button", {
+              name: "Buy oracle answer · 0.5 IMD",
+              exact: true,
+            })
+            .isDisabled(),
         );
-        await page.locator(".account-menu>summary").click();
+        await context.close();
       }
+    },
+  );
+  await check(
+    "staking, unstaking and reward claims remain available",
+    async () => {
+      const { page, context, f } = await setup({ stake: true });
+      await connect(page);
+      await more(page, "Stake");
+      await page.locator("#stake-amount").fill("2");
+      await page
+        .getByRole("button", { name: "Approve STK", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Stake tokens", exact: true })
+        .waitFor();
+      await page
+        .getByRole("button", { name: "Stake tokens", exact: true })
+        .click();
+      await page.waitForFunction(() =>
+        document
+          .querySelector(".stake-section")
+          ?.textContent.includes("Your stake2 STK"),
+      );
+      await page.locator("#unstake-amount").fill("1");
+      await page
+        .getByRole("button", { name: "Unstake tokens", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Claim IMD rewards", exact: true })
+        .click();
+      await page
+        .getByText("No claimable rewards yet.", { exact: true })
+        .waitFor();
+      assert.deepEqual(
+        f.state.sent.map((x) => x.functionName),
+        ["approve", "stake", "unstake", "claimStaking"],
+      );
       await context.close();
     },
   );
 } catch (e) {
   console.error(e.stack);
-  if (browser) {
-    const pages = browser.contexts().flatMap((c) => c.pages());
-    for (let i = 0; i < pages.length; i++) {
-      await pages[i]
+  process.exitCode = 1;
+  if (browser)
+    for (const [i, page] of browser
+      .contexts()
+      .flatMap((c) => c.pages())
+      .entries()) {
+      await page
         .screenshot({ path: resolve(out, `failure-${i}.png`), fullPage: true })
         .catch(() => {});
       await writeFile(
         resolve(out, `failure-${i}.txt`),
-        await pages[i]
+        await page
           .locator("body")
           .innerText()
           .catch(() => ""),
       );
     }
-  }
-  process.exitCode = 1;
 } finally {
   await writeFile(
-    resolve(out, "results.json"),
+    resolve(out, `results-${process.env.HH_BROWSER ?? "chromium"}.json`),
     JSON.stringify({ fixtureOnly: true, reports }, null, 2),
   );
   if (browser) await browser.close();

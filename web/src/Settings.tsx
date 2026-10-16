@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import {
+  decodeAbiParameters,
+  parseAbiItem,
   encodeAbiParameters,
   getAddress,
   isAddress,
@@ -14,6 +16,7 @@ import { reader, same } from "./data";
 import { uint, dateTime, errorText } from "./model";
 import { Action, AddressLink, ErrorNote, Field } from "./ui";
 import { useTransactions } from "./transactions";
+import { scanLogs, firstBlock } from "./portfolio";
 import type { PageProps } from "./Bet";
 const settings = [
   {
@@ -38,8 +41,8 @@ const settings = [
 ] as const;
 export function Settings(props: PageProps) {
   return (
-    <details className="section settings">
-      <summary>Public settings & TEAM controls</summary>
+    <section className="section settings">
+      <h3>Public settings &amp; TEAM controls</h3>
       <p>
         TEAM can change only these four settings, each with 48 hours of public
         notice. Token choices are permanent once executed.
@@ -50,7 +53,7 @@ export function Settings(props: PageProps) {
       {props.g && (
         <AddressLink r={props.r} value={props.g.TEAM} label="TEAM address" />
       )}
-    </details>
+    </section>
   );
 }
 function Setting({
@@ -69,6 +72,36 @@ function Setting({
     queryKey: ["setting", key],
     queryFn: () => reader(r)<readonly [Hex, bigint]>("pendingConfig", [key]),
     refetchInterval: 15000,
+    retry: 1,
+  });
+  const pendingValue = useQuery({
+    queryKey: ["pending-value", key, q.data?.[0]],
+    enabled: !!q.data && q.data[1] > 0n,
+    queryFn: async ({ signal }) => {
+      const logs = await scanLogs(
+        r,
+        parseAbiItem(
+          "event ConfigScheduled(bytes32 indexed setting, bytes value, uint64 readyAt)",
+        ),
+        { setting: key },
+        firstBlock,
+        await r.client.getBlockNumber(),
+        signal,
+      );
+      const latest = [...logs]
+        .reverse()
+        .find(
+          (log: any) =>
+            log.args?.value && keccak256(log.args.value) === q.data![0],
+        );
+      if (!latest)
+        throw Error(
+          "The scheduled value could not be read from public events.",
+        );
+      return String(
+        decodeAbiParameters([{ type: s.type }], (latest as any).args.value)[0],
+      );
+    },
     retry: 1,
   });
   const team = !!address && !!g && same(address, g.TEAM);
@@ -162,6 +195,16 @@ function Setting({
                   : `Executable from ${dateTime(q.data[1])}`}
           </dd>
         </div>
+        {q.data && q.data[1] > 0n && (
+          <div>
+            <dt>Scheduled value</dt>
+            <dd className="break">
+              {pendingValue.isError
+                ? "Could not read the value; inspect public events below."
+                : (pendingValue.data ?? "Reading scheduled value…")}
+            </dd>
+          </div>
+        )}
         {q.data && q.data[1] > 0n && (
           <div>
             <dt>Value hash</dt>

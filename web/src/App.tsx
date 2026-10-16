@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
+import { useConnection } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Runtime } from "./config";
-import { useGlobal, useJackpot, useVerification, useWindow } from "./data";
-import { countdown, errorText, units } from "./model";
+import { useGlobal, useToken, useVerification } from "./data";
+import { errorText, units } from "./model";
 import { WalletControl, WalletProvider } from "./Wallet";
 import { TransactionProvider } from "./transactions";
 import { Bet } from "./Bet";
 import { Stake } from "./Stake";
 import { History } from "./History";
 import { Settings } from "./Settings";
-import { Stream } from "./Stream";
-import { AddressLink, Stat } from "./ui";
-import { zeroAddress } from "viem";
+import { Keeper } from "./Keeper";
+import { Intro, SOCIAL } from "./Intro";
 export function App({ runtime: r }: { runtime: Runtime }) {
   return (
     <WalletProvider r={r}>
@@ -21,17 +21,18 @@ export function App({ runtime: r }: { runtime: Runtime }) {
     </WalletProvider>
   );
 }
+export function getIMDLink(token: string) {
+  return `https://app.uniswap.org/swap?chain=mainnet&inputCurrency=ETH&outputCurrency=${token}`;
+}
 function Game({ r }: { r: Runtime }) {
-  const [tab, setTab] = useState(0),
-    [customWindow, setCustomWindow] = useState<bigint>(),
+  const [tab, setTab] = useState("Bet"),
     [clock, setClock] = useState(Date.now());
   const global = useGlobal(r),
     verification = useVerification(r),
-    jackpot = useJackpot(r, global.data);
-  const queries = useQueryClient();
+    queries = useQueryClient();
+  const { address } = useConnection();
   const g = global.data,
-    k = customWindow ?? g?.candidate;
-  const w = useWindow(r, k);
+    token = useToken(r, g?.IMD, address);
   useEffect(() => {
     const id = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(id);
@@ -41,20 +42,7 @@ function Game({ r }: { r: Runtime }) {
     : clock;
   const fresh = !!g && !global.isError && clock - global.dataUpdatedAt < 45000;
   const ready = fresh && verification.data === true && !verification.isError;
-  const bettingClose =
-    g && k !== undefined && w.data
-      ? g.genesisTimestamp + k * 3600n < w.data.times[0]
-        ? g.genesisTimestamp + k * 3600n
-        : w.data.times[0]
-      : undefined;
-  const line =
-    w.data?.window.status === 0 ? g?.currentLine : w.data?.window.line;
-  const currentClose = g
-    ? g.genesisTimestamp + (g.currentWindow + 1n) * 3600n
-    : undefined;
-  function changeTab(i: number) {
-    setTab(i);
-  }
+  const props = { r, g, ready, now };
   return (
     <>
       <a className="skip-link" href="#main">
@@ -62,148 +50,157 @@ function Game({ r }: { r: Runtime }) {
       </a>
       <div className="app-shell">
         <header className="header">
-          <a className="brand" href="#" aria-label="Hamster Hour home">
-            <img src="./favicon.svg" width="34" height="34" alt="" />
-            <h1>Hamster Hour</h1>
+          <a
+            className="brand"
+            href="#bet"
+            onClick={() => setTab("Bet")}
+            aria-label="Hamster Hour home"
+          >
+            <img src="./favicon.svg" width="42" height="42" alt="" />
+            <h1>HAMSTER HOUR</h1>
           </a>
-          <WalletControl r={r} />
-        </header>
-        <div className="intro">
-          <p>IMD bets on six hamster rounds.</p>
-          <span className="network-name">{r.chain.name}</span>
-        </div>
-        <Stream />
-        <section className="overview" aria-label="Current game state">
-          <Stat label="Betting closes in">{countdown(bettingClose, now)}</Stat>
-          <Stat label="The line">
-            {line === undefined ? "…" : `${line} passes`}
-          </Stat>
-          <Stat label="Available jackpot">
-            {!g
-              ? "Loading…"
-              : g.jackpotToken === zeroAddress
-                ? "Not configured"
-                : jackpot.isError
-                  ? "Unavailable"
-                  : jackpot.data
-                    ? `${units(jackpot.data.available, jackpot.data.decimals)} ${jackpot.data.symbol}`
-                    : "Loading…"}
-          </Stat>
-        </section>
-        <div className="sync-line">
-          <span className={ready ? "synced" : "muted"}>
-            {ready
-              ? `Block ${g!.blockNumber} · synced`
-              : global.isError || verification.isError
-                ? "Chain reads unavailable"
-                : "Verifying deployment…"}
-          </span>
-          <button
-            onClick={() => void queries.invalidateQueries()}
-            disabled={global.isFetching}
-          >
-            {global.isFetching ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-        {(global.isError || verification.isError || (g && !fresh)) && (
-          <div className="notice error" role="status">
-            {verification.isError
-              ? errorText(verification.error)
-              : "Contract state is unavailable or stale. Refresh to retry. Transactions are disabled."}
-          </div>
-        )}
-        <main id="main">
-          <nav className="tabs" role="tablist" aria-label="Game sections">
-            {["Bet", "Stake", "History"].map((name, i) => (
-              <button
-                role="tab"
-                id={`tab-${i}`}
-                aria-selected={tab === i}
-                aria-controls={`panel-${i}`}
-                tabIndex={tab === i ? 0 : -1}
-                key={name}
-                onClick={() => changeTab(i)}
-                onKeyDown={(e) => {
-                  let next = i;
-                  if (e.key === "ArrowRight") next = (i + 1) % 3;
-                  else if (e.key === "ArrowLeft") next = (i + 2) % 3;
-                  else if (e.key === "Home") next = 0;
-                  else if (e.key === "End") next = 2;
-                  else return;
-                  e.preventDefault();
-                  changeTab(next);
-                  document.getElementById(`tab-${next}`)?.focus();
-                }}
-              >
-                {name}
-                <span aria-hidden="true">{["↗", "+", "↶"][i]}</span>
-              </button>
-            ))}
-          </nav>
-          <div
-            id={`panel-${tab}`}
-            role="tabpanel"
-            aria-labelledby={`tab-${tab}`}
-            tabIndex={0}
-          >
-            {tab === 0 ? (
-              <Bet
-                r={r}
-                g={g}
-                ready={ready}
-                now={now}
-                k={k}
-                setK={setCustomWindow}
-              />
-            ) : tab === 1 ? (
-              <Stake r={r} g={g} ready={ready} now={now} />
-            ) : (
-              <History r={r} g={g} ready={ready} now={now} />
-            )}
-          </div>
-          <section className="round-strip">
-            <span>
-              Current window {g?.currentWindow.toString() ?? "…"} · round{" "}
-              {g?.currentRound.toString() ?? "…"}
-            </span>
-            <span>Window ends in {countdown(currentClose, now)}</span>
-          </section>
-          <Settings r={r} g={g} ready={ready} now={now} />
-        </main>
-        <footer>
-          <div>
-            <strong>One wheel. Open rules.</strong>
-            <p>
-              No owner. No house. Pari-mutuel pools, settled only by the IMD
-              oracle.
-            </p>
-            <p className="small muted">
-              TEAM receives 1% of non-void bets. The contract has no admin
-              withdrawal or upgrade. Exact-transfer token assumptions apply.
-            </p>
-          </div>
-          <div className="contract-links">
-            {r.deployment.contracts.map((c) => (
-              <AddressLink
-                key={c.name}
-                r={r}
-                value={c.address}
-                label={c.name}
-              />
-            ))}
-            <a href="./imd-deployment.json" target="_blank" rel="noreferrer">
-              Deployment record ↗
-            </a>
+          <div className="header-actions">
             <a
-              href={`https://github.com/identity-md-launches/launch-1951-workflow-contract-stage-context/tree/${r.deployment.sourceCommit}`}
+              className="social"
+              href={SOCIAL}
               target="_blank"
               rel="noreferrer"
+              aria-label="Hamster Hour on X"
             >
-              Deployed contract source ↗
+              X
+            </a>
+            <WalletControl r={r} />
+          </div>
+        </header>
+        <nav className="navigation" aria-label="Game sections">
+          <button
+            className={tab === "Bet" ? "active" : ""}
+            aria-current={tab === "Bet" ? "page" : undefined}
+            onClick={() => setTab("Bet")}
+          >
+            Bet
+          </button>
+          <details className="more-menu">
+            <summary>
+              More <span aria-hidden="true">+</span>
+            </summary>
+            <div className="more-popover">
+              {["Stake", "History", "Settle", "TEAM"].map((name) => (
+                <button
+                  key={name}
+                  aria-current={tab === name ? "page" : undefined}
+                  onClick={(e) => {
+                    setTab(name);
+                    e.currentTarget.closest("details")?.removeAttribute("open");
+                  }}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          </details>
+          <div className="balance-line">
+            {address ? (
+              <>
+                <span>
+                  {token.data?.balance === undefined
+                    ? "Reading balance…"
+                    : `${units(token.data.balance)} IMD`}
+                </span>
+                {g &&
+                  token.data?.balance !== undefined &&
+                  token.data.balance < 500000000000000000n && (
+                    <a
+                      href={getIMDLink(g.IMD)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Get IMD
+                    </a>
+                  )}
+              </>
+            ) : (
+              <span>Ethereum · IMD</span>
+            )}
+          </div>
+        </nav>
+        <main id="main">
+          {tab === "Bet" ? (
+            <Bet {...props} />
+          ) : (
+            <div className="secondary-page">
+              <div className="section-title">
+                <h2>{tab === "TEAM" ? "TEAM settings" : tab}</h2>
+                <button className="text-button" onClick={() => setTab("Bet")}>
+                  Back to betting
+                </button>
+              </div>
+              {tab === "Stake" ? (
+                <Stake {...props} />
+              ) : tab === "History" ? (
+                <History {...props} />
+              ) : tab === "Settle" ? (
+                <Keeper
+                  {...props}
+                  initialWindow={
+                    g && g.currentWindow > 0n ? g.currentWindow - 1n : undefined
+                  }
+                />
+              ) : (
+                <Settings {...props} />
+              )}
+            </div>
+          )}
+          {(global.isError || verification.isError || (g && !fresh)) && (
+            <div className="notice error" role="status">
+              {verification.isError
+                ? errorText(verification.error)
+                : "The latest game data could not load. Refresh to try again."}
+              <button onClick={() => void queries.invalidateQueries()}>
+                Refresh
+              </button>
+            </div>
+          )}
+          <div className="sync-line">
+            <span>
+              {ready
+                ? `Live from Ethereum · block ${g!.blockNumber}`
+                : global.isError
+                  ? "Waiting for game data"
+                  : "Reading the game…"}
+            </span>
+            <button
+              className="text-button"
+              onClick={() => void queries.invalidateQueries()}
+              disabled={global.isFetching}
+            >
+              {global.isFetching ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+        </main>
+        <footer>
+          <span>One wheel. Every hour.</span>
+          <div className="contract-links">
+            <a href={SOCIAL} target="_blank" rel="noreferrer">
+              X
+            </a>
+            {r.deployment.contracts.map((c) => (
+              <a
+                key={c.name}
+                href={`${r.deployment.network.explorer}/address/${c.address}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {c.name}
+              </a>
+            ))}
+            <a href="./imd-deployment.json" target="_blank" rel="noreferrer">
+              Deployment
             </a>
           </div>
         </footer>
       </div>
+      <Intro />
     </>
   );
 }

@@ -13,7 +13,7 @@ import {
 } from "./model";
 import { Action, ErrorNote, Field } from "./ui";
 import { useTransactions } from "./transactions";
-import { Keeper } from "./Keeper";
+
 import type { PageProps } from "./Bet";
 function OracleLink({ requestId }: { requestId: string }) {
   let uuid = "";
@@ -64,7 +64,7 @@ function OracleLink({ requestId }: { requestId: string }) {
           target="_blank"
           rel="noreferrer"
         >
-          Signed attestation ↗
+          Verified result ↗
         </a>
       )}
     </div>
@@ -105,12 +105,10 @@ export function History({ r, g, ready, now }: PageProps) {
       <div className="section-title">
         <h2>Window history</h2>
         <span className="small muted">
-          {g?.settledWindows.toString() ?? "…"} settled
+          {g?.settledWindows.toString() ?? "…"} closed
         </span>
       </div>
-      <p className="muted">
-        Results are accepted only from signed IMD oracle attestations.
-      </p>
+      <p className="muted">Results are verified by the IMD oracle.</p>
       <div className="input-row">
         <Field label="Find a window" id="history-window">
           <input
@@ -145,8 +143,8 @@ export function History({ r, g, ready, now }: PageProps) {
         <div className="empty-state">
           <h3>No funded windows in this range</h3>
           <p>
-            Empty windows are never settled. Browse earlier windows or look up a
-            number.
+            Empty windows have no result to close. Browse earlier windows or
+            look up a number.
           </p>
         </div>
       ) : (
@@ -164,7 +162,7 @@ export function History({ r, g, ready, now }: PageProps) {
                   {w.status === 2
                     ? `${w.result} passes`
                     : w.status === 3
-                      ? "Voided"
+                      ? "Refunded"
                       : BigInt(Math.floor(now / 1000)) < w.endsAt
                         ? "In progress"
                         : "Awaiting oracle"}
@@ -218,7 +216,7 @@ export function History({ r, g, ready, now }: PageProps) {
                     <dt>Status</dt>
                     <dd>
                       {
-                        ["Uncreated", "Pending", "Settled", "Voided"][
+                        ["Uncreated", "Pending", "Closed", "Refunded"][
                           details.data.window.status
                         ]
                       }
@@ -277,7 +275,7 @@ export function History({ r, g, ready, now }: PageProps) {
                           details.data.times[1] + g.TIMEOUT)
                     )
                   }
-                  reason="The window must settle or reach its refund deadline."
+                  reason="The window needs a verified result or must reach its refund deadline."
                   onClick={() =>
                     void send("history-claim", {
                       functionName: "claim",
@@ -290,7 +288,6 @@ export function History({ r, g, ready, now }: PageProps) {
           )}
         </section>
       )}
-      <Keeper r={r} g={g} ready={ready} now={now} initialWindow={selected} />
     </section>
   );
 }

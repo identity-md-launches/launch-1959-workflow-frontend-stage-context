@@ -1,0 +1,47 @@
+{
+  "recordedAt": "2026-10-16",
+  "build": "passed",
+  "typecheck": "passed",
+  "verify": "passed",
+  "modelTests": {
+    "passed": 13,
+    "failed": 0
+  },
+  "browserTests": {
+    "browser": "Chromium",
+    "passed": 11,
+    "fixtureOnly": true
+  },
+  "accessibility": {
+    "auditedSurfaces": 8,
+    "axeViolations": 0,
+    "overflowWidths": [
+      320,
+      375,
+      390,
+      768,
+      1440
+    ]
+  },
+  "solidityOracleTests": {
+    "passed": 16,
+    "failed": 0
+  },
+  "productionPaidSettlement": "not exercised",
+  "export": {
+    "verified": true,
+    "sourceCommit": "7ab2a01b3d9a15e2acca8b317e77058e6f2d41e9",
+    "contracts": [
+      {
+        "name": "OracleVerifier",
+        "abiHash": "f9bbf3c804c63e5ff0b155f43a412745e7623689907bbd3ba1b00aaf40ec2173"
+      },
+      {
+        "name": "HamsterHour",
+        "abiHash": "e7f29a8b124c75bd841e5e60e96135f01b7f14125f2c289b89b562752d544f40"
+      }
+    ],
+    "assets": 22,
+    "exportBytes": 1637242
+  }
+}

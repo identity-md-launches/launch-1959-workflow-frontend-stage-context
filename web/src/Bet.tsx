@@ -1,281 +1,363 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useConnection } from "wagmi";
-import { erc20Abi, formatUnits, type Address } from "viem";
+import { erc20Abi } from "viem";
 import type { Runtime } from "./config";
-import { useToken, useWindow, type GlobalState, same } from "./data";
+import {
+  useToken,
+  useWindow,
+  useJackpot,
+  type GlobalState,
+  reader,
+  loadWindow,
+} from "./data";
 import {
   amount,
   uint,
   units,
+  winnersPool,
   payoutMultiple,
+  countdown,
   dateTime,
   errorText,
 } from "./model";
 import { useTransactions } from "./transactions";
-import { Action, Field, ErrorNote, Stat } from "./ui";
+import { Action, Field, ErrorNote } from "./ui";
+import { Stream } from "./Stream";
+import { Sheet } from "./Sheet";
+import { MyBets } from "./MyBets";
 export type PageProps = {
   r: Runtime;
   g?: GlobalState;
   ready: boolean;
   now: number;
 };
-export function Bet({
-  r,
-  g,
-  ready,
-  now,
-  k,
-  setK,
-}: {
-  r: Runtime;
-  g?: GlobalState;
-  ready: boolean;
-  now: number;
-  k?: bigint;
-  setK: (k: bigint | undefined) => void;
-}) {
+type Choice = "OVER" | "UNDER" | "SLEEPING" | "RUNNING" | "EXACT";
+export function Bet({ r, g, ready, now }: PageProps) {
   const { address } = useConnection();
-  const w = useWindow(r, k, address);
-  const token = useToken(r, g?.IMD, address);
+  const [customWindow, setCustomWindow] = useState<bigint>();
+  const k = customWindow ?? g?.candidate;
+  const w = useWindow(r, k, address),
+    token = useToken(r, g?.IMD, address),
+    jackpot = useJackpot(r, g);
   const { send, busy } = useTransactions();
-  const [market, setMarket] = useState<0 | 1 | 2>(0),
-    [side, setSide] = useState(true),
-    [size, setSize] = useState("0.5"),
-    [guess, setGuess] = useState(""),
+  const [choice, setChoice] = useState<Choice>(),
+    [size, setSize] = useState("1"),
+    [guess, setGuess] = useState("");
+  const [phase, setPhase] = useState(""),
+    [error, setError] = useState(""),
+    [success, setSuccess] = useState(""),
     [windowInput, setWindowInput] = useState(""),
-    [error, setError] = useState("");
-  let parsed: bigint | undefined;
-  try {
-    parsed = amount(size, token.data?.decimals ?? 18);
-  } catch {
-    /* input errors shown on submit */
-  }
-  const balance = token.data?.balance,
-    allowance = token.data?.allowance;
-  const needsApproval =
-    parsed !== undefined && allowance !== undefined && allowance < parsed;
-  const resetApproval = needsApproval && allowance !== 0n;
-  const open =
-    !!w.data?.open &&
-    !!g &&
-    !!w.data &&
-    BigInt(Math.floor(now / 1000)) <
-      (w.data.times[0] < g.genesisTimestamp + (k ?? 0n) * 3600n
-        ? w.data.times[0]
-        : g.genesisTimestamp + (k ?? 0n) * 3600n);
-  const fresh =
-    Date.now() - w.dataUpdatedAt < 45000 &&
-    !w.isError &&
-    Date.now() - token.dataUpdatedAt < 45000 &&
-    !token.isError;
+    [windowError, setWindowError] = useState("");
+  const flow = useRef(false);
   const line =
     w.data?.window.status === 0 ? g?.currentLine : w.data?.window.line;
-  const sides = market === 0 ? w.data?.window.over : w.data?.window.sleep;
-  const pools = w.data?.window.pools;
-  const label = needsApproval
-    ? resetApproval
-      ? "Reset IMD allowance"
-      : `Approve ${size} IMD`
-    : `Place ${market === 0 ? "over / under" : market === 1 ? "exact" : "sleep"} bet`;
+  const closes =
+    g && k !== undefined && w.data
+      ? w.data.times[0] < g.genesisTimestamp + k * 3600n
+        ? w.data.times[0]
+        : g.genesisTimestamp + k * 3600n
+      : undefined;
+  const open =
+    !!w.data?.open &&
+    closes !== undefined &&
+    BigInt(Math.floor(now / 1000)) < closes;
+  const market =
+    choice === "EXACT"
+      ? 1
+      : choice === "SLEEPING" || choice === "RUNNING"
+        ? 2
+        : 0;
+  const side = choice === "OVER" || choice === "SLEEPING";
+  const fresh =
+    !w.isError &&
+    Date.now() - w.dataUpdatedAt < 45000 &&
+    !token.isError &&
+    Date.now() - token.dataUpdatedAt < 45000;
   const ticketOwned =
     market === 1 && (w.data?.position?.exactAmount ?? 0n) > 0n;
   const full =
-    market === 1 && g && w.data && w.data.entries >= g.MAX_EXACT_ENTRIES;
+    market === 1 && !!g && !!w.data && w.data.entries >= g.MAX_EXACT_ENTRIES;
   const disabled =
     !ready ||
     !fresh ||
     !open ||
-    balance === undefined ||
-    allowance === undefined ||
-    !!ticketOwned ||
-    !!full;
-  let reason =
+    !!phase ||
+    ticketOwned ||
+    full ||
+    token.data?.balance === undefined ||
+    token.data?.allowance === undefined;
+  const reason =
     !ready || !fresh
-      ? "Waiting for verified, current contract state."
+      ? "Reading the latest game and wallet balance…"
       : !open
-        ? "Betting is closed. Select the next open window."
+        ? "Betting closed. Choose the next window below."
         : ticketOwned
-          ? "Your EXACT ticket is fixed for this window."
+          ? "You already have an exact guess in this window."
           : full
-            ? "All 256 EXACT tickets have been taken."
-            : balance === undefined
-              ? "Your IMD balance is unavailable."
-              : undefined;
-  async function submit() {
+            ? "All exact guesses are taken for this window."
+            : undefined;
+  function choose(value: Choice) {
+    setChoice(value);
     setError("");
+    setSuccess("");
+    setPhase("");
+  }
+  async function submit() {
+    if (flow.current || busy) return;
+    flow.current = true;
+    setError("");
+    setPhase("Checking…");
     try {
       if (
-        !ready ||
+        disabled ||
         !g ||
         !w.data ||
         !token.data ||
+        !address ||
         k === undefined ||
-        disabled ||
-        busy
+        !choice
       )
-        throw Error("Refresh contract state before continuing.");
+        throw Error("Wait for the latest game data before placing a bet.");
+      const betChoice = choice,
+        betMarket = market,
+        betSide = side,
+        betWindow = k;
       const value = amount(size, token.data.decimals);
       if (value < g.MIN_BET)
-        throw Error(
-          `The minimum bet is ${units(g.MIN_BET, token.data.decimals)} IMD.`,
-        );
-      if (value > (balance ?? 0n))
-        throw Error("This bet exceeds your available IMD balance.");
+        throw Error(`The minimum bet is ${units(g.MIN_BET)} IMD.`);
+      if (value > token.data.balance!)
+        throw Error("You need more IMD for this bet. Choose a smaller amount.");
       if (value > g.MAX_POOL - w.data.window.pools[market])
-        throw Error("This amount exceeds the remaining market capacity.");
+        throw Error("This amount exceeds the remaining pool space.");
       const exactGuess = market === 1 ? uint(guess) : 0n;
-      if (needsApproval) {
-        await send("bet", {
-          address: g.IMD,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [r.game.address, resetApproval ? 0n : value],
-        });
-        return;
-      }
-      await send("bet", {
-        functionName:
-          market === 0
-            ? "betOverUnder"
-            : market === 1
-              ? "betExact"
-              : "betSleep",
-        args: [k, market === 1 ? exactGuess : side, value],
+      const allowance = await r.client.readContract({
+        address: g.IMD,
+        abi: erc20Abi,
+        functionName: "allowance",
+        args: [address, r.game.address],
       });
+      if (allowance < value) {
+        setPhase("Approving…");
+        if (
+          allowance > 0n &&
+          !(await send("bet", {
+            address: g.IMD,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [r.game.address, 0n],
+          }))
+        )
+          return;
+        if (
+          !(await send("bet", {
+            address: g.IMD,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [r.game.address, value],
+          }))
+        )
+          return;
+      }
+      setPhase("Placing…");
+      if (!(await reader(r)<boolean>("isBettingOpen", [betWindow])))
+        throw Error(
+          "Betting closed while you approved. Your IMD is still in your wallet.",
+        );
+      if (
+        await send("bet", {
+          functionName:
+            betMarket === 0
+              ? "betOverUnder"
+              : betMarket === 1
+                ? "betExact"
+                : "betSleep",
+          args: [betWindow, betMarket === 1 ? exactGuess : betSide, value],
+        })
+      ) {
+        let message =
+          betMarket === 1
+            ? "Bet placed. Your exact guess is in."
+            : `Bet placed. You’re on ${betChoice}.`;
+        if (betMarket !== 1) {
+          try {
+            const latest = await loadWindow(r, betWindow, address);
+            const sides =
+              betMarket === 0 ? latest.window.over : latest.window.sleep;
+            const bets =
+              betMarket === 0 ? latest.position!.over : latest.position!.sleep;
+            const weight = bets[betSide ? 1 : 0];
+            const estimate =
+              sides[betSide ? 0 : 1] === 0n
+                ? weight
+                : (winnersPool(latest.window.pools[betMarket]) * weight) /
+                  sides[betSide ? 1 : 0];
+            message = `Bet placed. You win about ${units(estimate)} IMD if ${betChoice}.`;
+          } catch {
+            /* The confirmed bet remains successful if the estimate cannot refresh. */
+          }
+        }
+        setSuccess(message);
+      }
     } catch (e) {
       setError(errorText(e));
+    } finally {
+      flow.current = false;
+      setPhase("");
     }
+  }
+  function pays(c: Choice) {
+    if (!w.data) return "Reading pool…";
+    const pair =
+      c === "SLEEPING" || c === "RUNNING"
+        ? w.data.window.sleep
+        : w.data.window.over;
+    const idx = c === "OVER" || c === "SLEEPING" ? 1 : 0;
+    const total = pair[0] + pair[1];
+    if (!total) return "No bets yet";
+    if (!pair[0] || !pair[1]) return "One side: refund";
+    return `pays x${payoutMultiple(total, pair[idx], pair[1 - idx]).replace("×", "")}`;
   }
   return (
     <>
-      <div className="work-grid">
-        <section className="bet-panel" aria-label="Place a bet">
-          <div className="section-title">
+      <div className="play-layout">
+        <div className="watch-zone">
+          <Stream />
+          <div className="desktop-hero">
+            <img
+              src="./assets/hamster-wheel.svg"
+              width="300"
+              height="234"
+              alt="Pixel hamster running in a glowing wheel"
+            />
+            <div>
+              <h2>
+                Small hamster.
+                <br />
+                Big decisions.
+              </h2>
+              <p className="muted">
+                Watch the wheel.
+                <br />
+                Pick your side.
+              </p>
+              <span className="pool-number">
+                {w.data
+                  ? units(w.data.window.pools.reduce((a, b) => a + b, 0n))
+                  : "…"}{" "}
+                IMD
+              </span>
+              <p className="small muted">in this window’s pools</p>
+            </div>
+          </div>
+        </div>
+        <section className="play-panel" aria-label="Bet on the next hour">
+          <div className="play-heading">
             <h2>Bet on the next hour</h2>
-            <span className="small muted">Window {k?.toString() ?? "…"}</span>
+            <span className="small muted">#{k?.toString() ?? "…"}</span>
           </div>
-          <div className="segmented" role="group" aria-label="Bet market">
-            {(["Over / under", "Exact", "Sleep"] as const).map((name, i) => (
-              <button
-                key={name}
-                aria-pressed={market === i}
-                onClick={() => {
-                  setMarket(i as 0 | 1 | 2);
-                  setError("");
-                }}
-              >
-                {name}
-              </button>
-            ))}
+          <div className="game-clock">
+            <div>
+              <span className="small muted">
+                {open ? "Place your bet in" : "Betting closes in"}
+              </span>
+              <strong className="countdown">
+                {countdown(closes, now).replace(/^00:/, "")}
+              </strong>
+            </div>
+            <div className="line-value">
+              <span className="small muted">The line</span>
+              <strong>{line?.toString() ?? "…"}</strong>
+              <span className="small muted">wheel passes</span>
+            </div>
           </div>
-          {market === 1 ? (
-            <Field
-              label="Your guess · total passes"
-              id="exact-guess"
-              hint="One ticket per wallet. Closest guesses share the prize."
-            >
-              <input
-                id="exact-guess"
-                inputMode="numeric"
-                value={guess}
-                onChange={(e) => setGuess(e.target.value)}
-                placeholder="Enter a whole number"
-              />
-            </Field>
-          ) : (
-            <div
-              className="side-options"
-              role="group"
-              aria-label={
-                market === 0 ? "Over or under" : "Will the hamster sleep?"
-              }
-            >
-              {[true, false].map((value) => (
+          <div className="market-buttons">
+            {(["OVER", "UNDER", "SLEEPING"] as Choice[]).map((c) => (
+              <div className="market-choice" key={c}>
                 <button
-                  className={side === value ? "selected" : ""}
-                  aria-pressed={side === value}
-                  key={String(value)}
-                  onClick={() => setSide(value)}
+                  className="market-button"
+                  onClick={() => choose(c)}
+                  aria-label={`Bet ${c}`}
                 >
-                  <span className="side-name">
-                    {market === 0
-                      ? value
-                        ? "Over"
-                        : "Under"
-                      : value
-                        ? "Yes, asleep"
-                        : "No, running"}
-                    <span aria-hidden="true">{side === value ? "●" : "○"}</span>
-                  </span>
-                  <span className="side-detail">
-                    {market === 0
-                      ? `${value ? ">" : "<"} ${line?.toString() ?? "…"} passes`
-                      : value
-                        ? "Zero passes"
-                        : "At least one pass"}
-                  </span>
-                  <span className="side-pool">
-                    {sides
-                      ? `${units(sides[value ? 1 : 0])} IMD`
-                      : "Pool loading…"}
-                  </span>
-                  <span className="small muted">
-                    {sides && pools
-                      ? payoutMultiple(
-                          pools[market],
-                          sides[value ? 1 : 0],
-                          sides[value ? 0 : 1],
-                        )
-                      : "Payout unavailable"}
+                  <span>{c}</span>
+                  <span className="small">
+                    {c === "SLEEPING"
+                      ? "0 passes"
+                      : `${c === "OVER" ? ">" : "<"} ${line?.toString() ?? "…"}`}
                   </span>
                 </button>
-              ))}
-            </div>
-          )}
-          <div className="amount-label">
-            <label htmlFor="bet-amount">Bet amount</label>
-            <span className="small muted">
-              {address
-                ? `Balance ${units(balance, token.data?.decimals)} IMD`
-                : "Minimum 0.5 IMD"}
-            </span>
+                <span className="pays">{pays(c)}</span>
+              </div>
+            ))}
           </div>
-          <div className="amount-input">
-            <input
-              id="bet-amount"
-              inputMode="decimal"
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
-              aria-describedby="bet-help bet-error"
-            />
-            <span>IMD</span>
-          </div>
-          <ErrorNote id="bet-error" message={error} />
-          <Action
-            r={r}
-            id="bet"
-            label={label}
-            onClick={() => void submit()}
-            disabled={disabled}
-            reason={reason}
-          />
-          <p id="bet-help" className="small muted">
-            {market === 1
-              ? "Tied tickets split equally, regardless of stake."
-              : "Payouts change as bets arrive. One-sided markets refund."}
+          <p className="game-description">
+            Bet IMD on how far the hamster runs in the next hour. Winners share
+            the pool. Verified by the IMD oracle.
           </p>
-          {needsApproval && (
-            <p className="small muted">
-              {resetApproval
-                ? "Reset the existing allowance to zero first. Then approve the exact bet amount."
-                : "Step 1: allow the game to spend this amount. Step 2: place your bet."}
+          <p className="coming-soon">Lose a bet, mine $HAMSTER. Coming soon.</p>
+          <button
+            className="text-button exact-link"
+            onClick={() => choose("EXACT")}
+          >
+            Guess the exact number <span aria-hidden="true">→</span>
+          </button>
+          {w.data && w.data.window.pools.every((p) => p === 0n) && (
+            <p className="empty-line">No bets yet, be first</p>
+          )}
+          {w.data && !open && (
+            <p className="notice">
+              Betting closed, next window opens in{" "}
+              {countdown(
+                g
+                  ? g.genesisTimestamp + (g.currentWindow + 1n) * 3600n
+                  : undefined,
+                now,
+              ).replace(/^00:/, "")}{" "}
+              <button
+                className="text-button"
+                onClick={() => setCustomWindow(undefined)}
+              >
+                Next window
+              </button>
             </p>
           )}
-          <details className="inline-details">
-            <summary>Window timing & selection</summary>
+          <details className="how-it-works">
+            <summary>How it works</summary>
             <p>
-              Rounds {k === undefined ? "…" : `${k * 6n}–${k * 6n + 5n}`}.
-              Betting closes before the first round starts.
+              Choose OVER or UNDER the line, or SLEEPING for zero wheel passes.
+              Bets close before the next hour starts. Six 10-minute rounds make
+              one window.
+            </p>
+            <p>
+              These are shared pools (pari-mutuel): your payout changes as bets
+              arrive. In each contested market, 91% goes to winners, 5% to
+              stakers, 3% to the oracle reserve and 1% to TEAM. Fees round down
+              on chain.
+            </p>
+            <p>
+              One-sided binary markets and a result equal to the line are
+              refunded. SLEEPING has its own pool, separate from OVER and UNDER.
+            </p>
+            <button className="text-button" onClick={() => choose("RUNNING")}>
+              Bet RUNNING: at least one pass
+            </button>
+            <p>
+              EXACT pays the three nearest distinct distances, with ties split
+              by ticket. One guess per wallet; it cannot be changed. An
+              uncontested exact ticket cannot win the jackpot.
+            </p>
+            <p>
+              The IMD oracle supplies a signed attestation. Anyone can settle a
+              finished window. If no accepted result arrives within 48 hours,
+              bets can be refunded. No $HAMSTER is mined yet.
+            </p>
+            <p>
+              Available jackpot:{" "}
+              {g?.jackpotToken && !/^0x0+$/.test(g.jackpotToken)
+                ? jackpot.data
+                  ? `${units(jackpot.data.available, jackpot.data.decimals)} ${jackpot.data.symbol}`
+                  : "Reading token…"
+                : "Not enabled yet"}
+              .
             </p>
             <dl className="key-values">
               <div>
@@ -286,16 +368,8 @@ export function Bet({
                 <dt>Ends</dt>
                 <dd>{dateTime(w.data?.times[1])}</dd>
               </div>
-              <div>
-                <dt>Refund deadline</dt>
-                <dd>
-                  {w.data && g
-                    ? dateTime(w.data.times[1] + g.TIMEOUT)
-                    : "Unavailable"}
-                </dd>
-              </div>
             </dl>
-            <Field label="Window number" id="bet-window">
+            <Field label="Choose a window" id="bet-window">
               <input
                 id="bet-window"
                 inputMode="numeric"
@@ -307,207 +381,132 @@ export function Bet({
               <button
                 onClick={() => {
                   try {
-                    setK(uint(windowInput, 64));
-                    setError("");
+                    setCustomWindow(uint(windowInput, 64));
+                    setWindowError("");
                   } catch (e) {
-                    setError(errorText(e));
+                    setWindowError(errorText(e));
                   }
                 }}
               >
                 Load window
               </button>
-              <button onClick={() => setK(undefined)}>Next open window</button>
+              <button onClick={() => setCustomWindow(undefined)}>
+                Next open window
+              </button>
             </div>
+            <ErrorNote message={windowError} />
           </details>
         </section>
-        <aside className="market-panel">
-          <h2>Inside the pools</h2>
-          <div className="pool-list">
-            {["Over / under", "Exact", "Sleep"].map((name, i) => (
-              <div key={name}>
-                <span>{name}</span>
-                <strong>
-                  {pools ? units(pools[i]) : "…"}{" "}
-                  <span className="muted">IMD</span>
-                </strong>
-              </div>
-            ))}
-          </div>
-          <div className="pool-total">
-            <span>Total this window</span>
-            <strong>
-              {pools ? units(pools.reduce((a, b) => a + b, 0n)) : "…"} IMD
-            </strong>
-          </div>
-          <h3>Shared pools. Shared upside.</h3>
-          <p className="muted">
-            91% goes to winners. 5% to stakers, 3% to the oracle reserve, 1% to
-            TEAM.
-          </p>
-          <details>
-            <summary>How payouts work</summary>
-            <p>
-              Over / under and Sleep pay in proportion to your winning stake.
-              Equal-to-line Over / under results refund. A one-sided binary
-              market refunds without fees.
-            </p>
-            <p>
-              EXACT pays the three closest distance tiers 60%, 30%, 10%. Ties
-              split equally. Missing tiers roll into first place. Two tickets
-              are needed to win the jackpot.
-            </p>
-            <p>
-              Figures above are implied total-return multiples after fee floors,
-              before your new bet. They are not guaranteed odds. A losing bet
-              can lose its full stake.
-            </p>
-          </details>
-          <p className="small muted">
-            Network fees are paid in ETH. USD values are unavailable.
-          </p>
-        </aside>
       </div>
-      <Claims r={r} g={g} ready={ready} now={now} />
-    </>
-  );
-}
-export function Claims({ r, g, ready, now }: PageProps) {
-  const { address } = useConnection();
-  const [input, setInput] = useState(""),
-    [selected, setSelected] = useState<bigint>();
-  const [includeJackpot, setIncludeJackpot] = useState(true),
-    [error, setError] = useState("");
-  const k =
-    selected ??
-    (g ? (g.currentWindow > 0n ? g.currentWindow - 1n : 0n) : undefined);
-  const q = useWindow(r, k, address);
-  const { send } = useTransactions();
-  const w = q.data?.window,
-    p = q.data?.position;
-  const final =
-    !!w &&
-    (w.status >= 2 ||
-      (w.status === 1 &&
-        !!g &&
-        BigInt(Math.floor(now / 1000)) >= w.endsAt + g.TIMEOUT));
-  const hasPosition =
-    p && [...p.over, ...p.sleep, p.exactAmount].some((n) => n > 0n);
-  const beneficiary =
-    address && w && g && (same(address, w.settler) || same(address, g.TEAM));
-  return (
-    <section className="section" aria-labelledby="claim-title">
-      <div className="section-title">
-        <h2 id="claim-title">Claim a finished window</h2>
-        <span className="small muted">Window {k?.toString() ?? "…"}</span>
-      </div>
-      <div className="claim-grid">
-        <div>
-          <div className="input-row">
-            <Field label="Window number to claim" id="claim-window">
-              <input
-                id="claim-window"
-                inputMode="numeric"
-                value={input}
-                placeholder={k?.toString()}
-                onChange={(e) => setInput(e.target.value)}
+      <MyBets r={r} g={g} ready={ready} now={now} />
+      {choice && (
+        <Sheet
+          locked={!!phase}
+          title={success ? "You’re in." : `Bet ${choice}`}
+          close={() => {
+            if (!flow.current) setChoice(undefined);
+          }}
+        >
+          {success ? (
+            <div className="bet-success">
+              <img
+                src="./assets/hamster-happy.svg"
+                width="100"
+                height="100"
+                alt="Happy hamster"
               />
-            </Field>
-            <button
-              onClick={() => {
-                try {
-                  setSelected(uint(input, 64));
-                  setError("");
-                } catch (e) {
-                  setError(errorText(e));
-                }
-              }}
-            >
-              Look up
-            </button>
-          </div>
-          <ErrorNote message={error} />
-          <p className="small muted">
-            {q.isPending
-              ? "Loading window…"
-              : q.isError
-                ? "Window read failed. Try another window or refresh."
-                : w?.status === 0
-                  ? "No bets were placed in this window."
-                  : w?.status === 2
-                    ? `Settled at ${w.result} passes.`
-                    : w?.status === 3
-                      ? "Voided. Bets are refundable."
-                      : final
-                        ? "The settlement deadline passed. Claiming also voids the window."
-                        : `Awaiting settlement. Refunds from ${dateTime(w?.endsAt === undefined || !g ? undefined : w.endsAt + g.TIMEOUT)}.`}
-          </p>
-        </div>
-        <div>
-          {address && p ? (
-            <>
-              <div className="stats compact">
-                <Stat label="Your total bets">
-                  {units(
-                    [...p.over, ...p.sleep, p.exactAmount].reduce(
-                      (a, b) => a + b,
-                      0n,
-                    ),
-                  )}{" "}
-                  IMD
-                </Stat>
-                <Stat label="IMD claim">
-                  {p.imdClaimed ? "Processed" : "Not claimed"}
-                </Stat>
-              </div>
-              {p.exactAmount > 0n && (
-                <p className="small">
-                  EXACT guess: {p.guess.toString()} passes ·{" "}
-                  {units(p.exactAmount)} IMD
-                </p>
-              )}
-            </>
+              <p role="status">{success}</p>
+              <p className="small muted">
+                Estimated total return, including your bet. Pools can change. A
+                one-sided pool is refunded.
+              </p>
+              <button className="primary" onClick={() => setChoice(undefined)}>
+                Back to the wheel
+              </button>
+            </div>
           ) : (
-            <p className="muted">Connect to read your bets and claim status.</p>
+            <>
+              <p className="muted">
+                Window {k?.toString() ?? "…"} ·{" "}
+                {choice === "EXACT"
+                  ? "Closest guesses share the pool"
+                  : choice === "SLEEPING"
+                    ? "No wheel passes"
+                    : choice === "RUNNING"
+                      ? "At least one wheel pass"
+                      : `${choice === "OVER" ? "More" : "Fewer"} than ${line?.toString() ?? "…"} passes`}
+              </p>
+              {choice === "EXACT" && (
+                <Field
+                  label="Your guess · total passes"
+                  id="exact-guess"
+                  hint="One ticket per wallet. Equal-distance tickets share equally."
+                >
+                  <input
+                    id="exact-guess"
+                    value={guess}
+                    inputMode="numeric"
+                    onChange={(e) => setGuess(e.target.value)}
+                    disabled={!!phase}
+                  />
+                </Field>
+              )}
+              <div className="amount-label">
+                <label htmlFor="bet-amount">Bet amount</label>
+                <span className="small muted">
+                  {address
+                    ? token.data?.balance === undefined
+                      ? "Reading balance…"
+                      : `${units(token.data.balance)} IMD available`
+                    : "Minimum 0.5 IMD"}
+                </span>
+              </div>
+              <div className="amount-input">
+                <input
+                  id="bet-amount"
+                  inputMode="decimal"
+                  value={size}
+                  onChange={(e) => setSize(e.target.value)}
+                  disabled={!!phase}
+                />
+                <span>IMD</span>
+              </div>
+              <div
+                className="amount-chips"
+                role="group"
+                aria-label="Choose IMD amount"
+              >
+                {[1, 5, 10, 25].map((n) => (
+                  <button
+                    key={n}
+                    aria-pressed={size === String(n)}
+                    disabled={!!phase}
+                    onClick={() => setSize(String(n))}
+                  >
+                    {n} IMD
+                  </button>
+                ))}
+              </div>
+              <ErrorNote message={error} />
+              <p className="flow-status" role="status">
+                {phase}
+              </p>
+              <Action
+                r={r}
+                id="bet"
+                label="Place bet"
+                disabled={disabled}
+                reason={reason}
+                onClick={() => void submit()}
+              />
+              <p className="small muted">
+                Your wallet may ask for an IMD approval, then your bet. Both
+                need ETH for network fees. We approve only this amount.
+              </p>
+            </>
           )}
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={includeJackpot}
-              onChange={(e) => setIncludeJackpot(e.target.checked)}
-            />
-            Include jackpot token
-          </label>
-          <p className="small muted">
-            Uncheck to collect IMD if the jackpot token blocks a transfer.
-          </p>
-          <Action
-            r={r}
-            id="claim"
-            label="Check and claim"
-            disabled={
-              !ready ||
-              !final ||
-              q.isError ||
-              Date.now() - q.dataUpdatedAt > 45000 ||
-              (!hasPosition && !beneficiary)
-            }
-            reason={
-              !final
-                ? "Claims open after settlement or the refund deadline."
-                : !hasPosition && !beneficiary
-                  ? "No bets or settlement role for this account."
-                  : undefined
-            }
-            onClick={() => {
-              if (k !== undefined)
-                void send("claim", {
-                  functionName: "claim",
-                  args: [k, includeJackpot],
-                });
-            }}
-          />
-        </div>
-      </div>
-    </section>
+        </Sheet>
+      )}
+    </>
   );
 }

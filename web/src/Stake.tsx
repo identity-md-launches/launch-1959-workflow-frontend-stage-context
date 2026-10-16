@@ -87,7 +87,7 @@ export function Stake({ r, g, ready }: PageProps) {
     <section className="section stake-section">
       <h2>Stake for a share</h2>
       <p className="muted">
-        Earn a share of the 5% staking allocation at settlement.
+        Earn a share of the 5% staking allocation when each window closes.
       </p>
       {!g ? (
         <p role="status">Loading staking configuration…</p>
@@ -103,8 +103,8 @@ export function Stake({ r, g, ready }: PageProps) {
             {units(g.preStakingReserve)} IMD
           </Stat>
           <p className="small muted">
-            The reserve releases across 30 eligible settlements after
-            activation. Watch public settings below.
+            The reserve releases across 30 eligible window results after
+            activation. See TEAM settings under More.
           </p>
         </div>
       ) : (
@@ -198,9 +198,8 @@ export function Stake({ r, g, ready }: PageProps) {
           </div>
           <ErrorNote message={error} />
           <p className="small muted">
-            Weight is your stake at settlement, not how long you hold it. New
-            stakes do not immediately release a backlog. USD values are
-            unavailable.
+            Rewards depend on your stake when each window closes. New stakes do
+            not immediately release a backlog. USD values are unavailable.
           </p>
         </>
       )}

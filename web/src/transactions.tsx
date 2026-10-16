@@ -23,6 +23,7 @@ type Call = {
   args?: readonly unknown[];
   address?: Address;
   abi?: Abi;
+  onSubmitted?: (hash: Hex) => void;
 };
 export type TxState = {
   phase:
@@ -192,6 +193,7 @@ export function TransactionProvider({
         gas: (gas * 120n) / 100n,
       });
       persist({ id, hash });
+      call.onSubmitted?.(hash);
       state({
         phase: "confirming",
         message: "Submitted. Waiting for on-chain confirmation…",
@@ -205,6 +207,7 @@ export function TransactionProvider({
           hash = replacement.transaction.hash;
           cancelled = replacement.reason === "cancelled";
           persist({ id, hash });
+          call.onSubmitted?.(hash);
           state({
             phase: "confirming",
             message: "Following the replacement transaction…",

@@ -1,5 +1,13 @@
 [
   {
+    "view": "Intro overlay, reduced motion",
+    "violations": []
+  },
+  {
+    "view": "Reduced motion video",
+    "paused": true
+  },
+  {
     "view": "Bet",
     "violations": []
   },
@@ -12,11 +20,43 @@
     "violations": []
   },
   {
+    "view": "Settle",
+    "violations": []
+  },
+  {
+    "view": "TEAM",
+    "violations": []
+  },
+  {
+    "view": "Amount sheet",
+    "violations": []
+  },
+  {
+    "view": "Amount sheet keyboard return",
+    "focused": "Bet OVER"
+  },
+  {
     "view": "Wallet picker",
     "violations": []
   },
   {
-    "view": "200% text size at 390",
+    "view": "Reflow 320",
+    "horizontalOverflow": false
+  },
+  {
+    "view": "Reflow 375",
+    "horizontalOverflow": false
+  },
+  {
+    "view": "Reflow 390",
+    "horizontalOverflow": false
+  },
+  {
+    "view": "Reflow 768",
+    "horizontalOverflow": false
+  },
+  {
+    "view": "Reflow 1440",
     "horizontalOverflow": false
   }
 ]

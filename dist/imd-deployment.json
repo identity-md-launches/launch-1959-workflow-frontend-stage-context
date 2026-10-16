@@ -28,36 +28,64 @@
       "sha256": "6a9227be836e723378c21d3683835f3fbaa2b4e94e80f0dd6d0fcfbbd57af4e2"
     },
     {
-      "path": "assets/ccip-NlJQI3Yh.js",
-      "sha256": "232b6b0bfbdbea1177f4440907c557a625f6be3baaa6c772d9b8ea88dd2f4c1e"
+      "path": "assets/FONT-LICENSE.txt",
+      "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
     },
     {
-      "path": "assets/dist-CC2yHjne.js",
-      "sha256": "a936d3bb3877e453fa2a9dd4f480e249dc6ad6a57e521a8a5e3ef124d163f294"
+      "path": "assets/ccip-CROTUT42.js",
+      "sha256": "bc11e895bc59d4b298a5011aa846f8fd35e58fbec8eb13f9e5f6f5c02f9cf576"
     },
     {
-      "path": "assets/index-DFURROpn.css",
-      "sha256": "16e284948273abadf2665dd7659f0296c35d5e1c0458a0d43fd7c164d210b06a"
+      "path": "assets/dist-BWFyP7pV.js",
+      "sha256": "a14ef90c375a2109b5f81c3c33d87fafd7def7c51305d02d8ad2c4c20505d3cb"
     },
     {
-      "path": "assets/index-DSjZPsWS.js",
-      "sha256": "729005a63ab9d0880439b5787ac30e4bf342802a49ec2fc2d45fce8cbb3108ed"
+      "path": "assets/hamster-asleep.svg",
+      "sha256": "8c961b69d6d0d4b01c7e40a165e7a3691be963fc20f8fdf7013e8e803c5b5b8c"
+    },
+    {
+      "path": "assets/hamster-chewing.mp4",
+      "sha256": "996111da83ed76ceb1f6c89837ecb55fa5766f50730c99b43111a95ae799985e"
+    },
+    {
+      "path": "assets/hamster-happy.svg",
+      "sha256": "b458b8986c2a4fef777a44c077cf1633486a14f316234d350dafabef508080ad"
+    },
+    {
+      "path": "assets/hamster-wheel.svg",
+      "sha256": "283d73895734a6216cf301f9aaf98fabaf7fbe17a28e169c99bb276b22238641"
+    },
+    {
+      "path": "assets/ibm-plex-mono-bold-7sUh57Bg.woff2",
+      "sha256": "4f84d86cfd060f4ded334358ff8a4c81d4db2ed5addd568359d693f44a87765a"
+    },
+    {
+      "path": "assets/ibm-plex-mono-regular-DMJ8VG8y.woff2",
+      "sha256": "08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7"
+    },
+    {
+      "path": "assets/index-Caa-XfQN.css",
+      "sha256": "5183a5700808909ee74ed8ab235715d79cd67a5ffcd353ef52a23cc1ba203c14"
+    },
+    {
+      "path": "assets/index-DCGDlX90.js",
+      "sha256": "b811d82aaced14c77683d97e8b54f49686ac94298b9b77992641fc2a1d476417"
     },
     {
       "path": "favicon.svg",
-      "sha256": "401d5bd7d5345e9ebfa8ae3e263f3f01e28ed376959047b1b85e044fd31e9b82"
+      "sha256": "a7c813dda3c3273399903a7aab54769d6d8227410e49cbf7b39241fd1116b01a"
     },
     {
       "path": "index.html",
-      "sha256": "fc645ad9a41df84764509d51bd481cc6c09542d086d313edb59509598111717f"
+      "sha256": "3e67a05e8e39afaf8cac53c979d9c030b70eac6f57933fe992ea9bfad0d5965c"
     },
     {
       "path": "share.png",
-      "sha256": "b04d3f12088d1677effd7e6448002f97c7b2442a109a6edcbc43f76db7e8512b"
+      "sha256": "d3343be0ed4a608757f0f7284be2963a8b31c0452042847b28292fb343ea9261"
     },
     {
       "path": "share.svg",
-      "sha256": "9fc97c9295bb492d53ff2c3bc4ade0f61172c885698af9451e07f429906317ef"
+      "sha256": "b32e439d3ca4200a728629119539f38cc734602c3652623abbc74d8abd7721e2"
     },
     {
       "path": "wallets/browser.svg",
