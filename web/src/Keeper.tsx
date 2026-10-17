@@ -194,7 +194,10 @@ export function Keeper({
         <dl className="key-values">
           <div>
             <dt>Signed result</dt>
-            <dd>{preview.result.toString()} passes</dd>
+            <dd>
+              {preview.result.toString()}{" "}
+              {preview.result === 1n ? "pass" : "passes"}
+            </dd>
           </div>
           <div>
             <dt>Panel agreement</dt>

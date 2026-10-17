@@ -583,6 +583,27 @@ button.secondary {
 .window-line {
   margin: -12px 0 12px;
 }
+.window-progress {
+  min-width: 0;
+  margin: 0 0 12px;
+  font-variant-numeric: tabular-nums;
+}
+.window-progress-summary {
+  font-size: var(--s1);
+}
+.window-progress-bar {
+  height: 3px;
+  margin-top: 8px;
+  background: var(--line);
+}
+.window-progress-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+.window-progress > p {
+  margin: 8px 0 0;
+}
 .line-unit {
   position: relative;
   display: inline-flex;
@@ -1018,6 +1039,7 @@ footer {
   gap: 24px;
 }
 .position-item {
+  min-width: 0;
   border-left: 2px solid var(--line);
   padding-left: 16px;
 }
@@ -1130,9 +1152,13 @@ footer {
   font-size: 32px;
   padding: 16px 0;
   min-width: 0;
+  flex: 1 1 0;
 }
 .amount-input > span {
   color: var(--muted);
+  white-space: nowrap;
+  min-width: 3ch;
+  flex: 0 0 auto;
 }
 .amount-chips {
   display: grid;
@@ -1502,6 +1528,11 @@ dialog::backdrop {
   }
 }
 @media (max-width: 900px) {
+  .window-progress-summary {
+    white-space: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
   .app-shell {
     padding: 0 20px;
   }

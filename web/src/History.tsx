@@ -9,6 +9,7 @@ import {
   dateTime,
   uuidFromBytes32,
   errorText,
+  counted,
   type GameWindow,
 } from "./model";
 import { Action, ErrorNote, Field } from "./ui";
@@ -160,7 +161,7 @@ export function History({ r, g, ready, now }: PageProps) {
               <div>
                 <strong>
                   {w.status === 2
-                    ? `${w.result} passes`
+                    ? counted(w.result, "pass", "passes")
                     : w.status === 3
                       ? "Refunded"
                       : BigInt(Math.floor(now / 1000)) < w.endsAt

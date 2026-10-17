@@ -1,0 +1,130 @@
+{
+  "fixtureOnly": true,
+  "reports": [
+    {
+      "name": "maintenance: all five sheets, public pages and progress at 1280, 800 and 375",
+      "passed": true,
+      "durationMs": 9625
+    },
+    {
+      "name": "maintenance: first-visit guide and collapse preference survive navigation and reload",
+      "passed": true,
+      "durationMs": 1522
+    },
+    {
+      "name": "maintenance: sleeping zero counter, My bets, fallback baselines and twenty-second polling",
+      "passed": true,
+      "durationMs": 3829
+    },
+    {
+      "name": "maintenance: jackpot copy follows configuration; chat and poke counters pluralize",
+      "passed": true,
+      "durationMs": 884
+    },
+    {
+      "name": "revision: failed idle refresh uses the fallback and recovers",
+      "passed": true,
+      "durationMs": 1870
+    },
+    {
+      "name": "revision: one legacy or discovered wallet connects directly; multiple wallets keep the picker",
+      "passed": true,
+      "durationMs": 1839
+    },
+    {
+      "name": "revision: fast speed means zoomies until current-window passes exceed twice the line",
+      "passed": true,
+      "durationMs": 730
+    },
+    {
+      "name": "revision: pool and jackpot reels show exact digits at rest and after updates",
+      "passed": true,
+      "durationMs": 1936
+    },
+    {
+      "name": "intro video, dismissal, return visit and responsive first screen",
+      "passed": true,
+      "durationMs": 1564
+    },
+    {
+      "name": "stream publicId switches only to a valid video",
+      "passed": true,
+      "durationMs": 549
+    },
+    {
+      "name": "idle feed shows SLEEPING at 375 and 1440; proxy failure falls back to the last stream",
+      "passed": true,
+      "durationMs": 1257
+    },
+    {
+      "name": "wheel chat: read-only, then a signed post appears and server words surface",
+      "passed": true,
+      "durationMs": 11080
+    },
+    {
+      "name": "poke counter, logo sunglasses and the Konami spin",
+      "passed": true,
+      "durationMs": 2901
+    },
+    {
+      "name": "one click approval then exactly one OVER bet; chips and success",
+      "passed": true,
+      "durationMs": 1610
+    },
+    {
+      "name": "existing allowance uses one transaction; UNDER, SLEEPING and hidden EXACT",
+      "passed": true,
+      "durationMs": 3247
+    },
+    {
+      "name": "rejection, amount validation and wrong-chain recovery",
+      "passed": true,
+      "durationMs": 985
+    },
+    {
+      "name": "mobile wallet paths, focus return, low balance and no-TEAM controls",
+      "passed": true,
+      "durationMs": 1142
+    },
+    {
+      "name": "TEAM schedule shows decoded pending value and execute date publicly",
+      "passed": true,
+      "durationMs": 934
+    },
+    {
+      "name": "automatic wallet result discovery and one claim",
+      "passed": true,
+      "durationMs": 1007
+    },
+    {
+      "name": "losing card feeds the hamster and shares the L",
+      "passed": true,
+      "durationMs": 765
+    },
+    {
+      "name": "oracle approve + paid request, persistence, signed prefill and settle encoding",
+      "passed": true,
+      "durationMs": 2926
+    },
+    {
+      "name": "a reverted oracle payment shows the failed receipt and restores Buy",
+      "passed": true,
+      "durationMs": 1602
+    },
+    {
+      "name": "an invalid window lookup shows the error and a way back",
+      "passed": true,
+      "durationMs": 1995
+    },
+    {
+      "name": "oracle purchase is disabled for future or unfunded windows",
+      "passed": true,
+      "durationMs": 1372
+    },
+    {
+      "name": "staking, unstaking and reward claims remain available",
+      "passed": true,
+      "durationMs": 1958
+    }
+  ]
+}

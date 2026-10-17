@@ -1,8 +1,8 @@
 # Hamster Hour
 
-The live hamster betting app runs entirely from the committed static export in [`dist/`](dist/). This revision (v2) routes the wheel's live and status feeds through the project proxy, shows a SLEEPING screen when the stream is off, adds the wallet-signed Wheel chat, a meme layer (poke, moods, result cards, easter eggs, slot-machine jackpot digits), the requested copy, and closes the design critic's four findings. Earlier revisions added the three-choice Bet screen, wallet amount sheets, automatic results/claims, the paid oracle flow, public TEAM settings and the first-visit video intro. The existing Ethereum contracts and their economics are unchanged.
+The live hamster betting app runs from the complete static export in [`dist/`](dist/). This maintenance update fixes the IMD suffix in every amount sheet, singular counter labels, conditional jackpot copy, worker-backed live window progress, and the first-visit How it works disclosure. The existing design, contracts, wallet flow, chat protocol and secondary tools are preserved. No dependency, package manifest, lockfile or build configuration was changed.
 
-The follow-up review fixes cached SLEEPING state after a failed refresh, one-tap connection for a legacy injected wallet, the villain-era threshold, and clipped slot digits. Build, typecheck, 15 unit tests, 21 Chromium interaction scenarios and the accessibility scan passed. The design probe retained its five documented exceptions; WebKit could not run because system libraries were missing. See the [revision checks and limitations](docs/frontend/REVISION.md) and [finding responses](.imd-responses.json).
+Validation and the six-domain Better Interface review are recorded in [the maintenance report](docs/frontend/MAINTENANCE.md). The production build, typecheck, ABI/export verification, unit tests and Chromium interactions were run locally. The report distinguishes intercepted wallet/service fixtures from real read-only Ethereum and worker checks and records browser limitations.
 
 ## Run the website
 
@@ -20,7 +20,7 @@ npm run preview -- --host 127.0.0.1
 
 `--legacy-peer-deps` is required with the existing protected lockfile: plain `npm ci` reports a missing optional test peer, `playwright-core`. The manifest and lockfile have been preserved. The production build writes repository-root `dist/`, uses relative URLs, copies the pinned ABI exports, verifies their canonical hashes, and regenerates the asset manifest. Serve `dist/` through any HTTP static server or IPFS gateway; no application server, API key or wallet relay is required. `npm run dev` starts Vite after the first build.
 
-See [web/README.md](web/README.md) for architecture, wallet behavior, oracle payment details and repeatable browser checks; [DESIGN.md](DESIGN.md) for the implemented design system; and [validation report](docs/frontend/VALIDATION.md) for actual checks and limitations. Test wallet/API fixtures are confined to `web/tests/` and never enter the production export.
+See [web/README.md](web/README.md) for architecture, wallet behavior, oracle payment details and repeatable browser checks; [DESIGN.md](DESIGN.md) for the implemented design system; and [maintenance report](docs/frontend/MAINTENANCE.md) for current checks and limitations. Test wallet/API fixtures are confined to `web/tests/` and never enter the production export.
 
 The deployed game is [HamsterHour](https://etherscan.io/address/0xc5217f129da200a8e86229de4eabf3686eef64b1), with [OracleVerifier](https://etherscan.io/address/0xdcd7a7dee31d589f9df8113780050c18e7ea1f7d), on Ethereum chain 1. No contract was deployed or changed by this frontend revision.
 

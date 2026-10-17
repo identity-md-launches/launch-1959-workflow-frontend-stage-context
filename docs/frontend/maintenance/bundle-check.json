@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-10-17T06:33:12.016Z",
+  "payloadFiles": 192,
+  "uncompressedPayloadBytes": 5570908,
+  "submissionLimitBytes": 8388608,
+  "underLimit": true,
+  "protectedChanges": [],
+  "unnecessaryPackagingPaths": [],
+  "submodules": 0,
+  "exportAssetCount": 24,
+  "exportBytes": 1672003,
+  "assetsMatchManifest": true,
+  "exportEqualsTestedBuild": true,
+  "relativeIndexAssets": true,
+  "dependenciesAndBuildConfigurationUnchanged": true,
+  "note": "Payload count includes existing tracked files and intended new files, excluding removed inputs and test/scratch. The final pass includes this audit record; no package/cache/archive directories are delivered."
+}

@@ -104,7 +104,7 @@ export function Stream({
             <p className="sleep-title">HAMSTER IS SLEEPING · stream is off</p>
             <p className="sleep-stats">
               {status.data
-                ? `last known: ${status.data.speedMmPerSecond} mm/s · ${Number(status.data.cumulativeWorkUnits).toLocaleString()} passes total`
+                ? `last known: ${status.data.speedMmPerSecond} mm/s · ${BigInt(status.data.cumulativeWorkUnits).toLocaleString()} ${BigInt(status.data.cumulativeWorkUnits) === 1n ? "pass" : "passes"} total`
                 : status.isError
                   ? "last known passes unavailable"
                   : "reading last known passes…"}

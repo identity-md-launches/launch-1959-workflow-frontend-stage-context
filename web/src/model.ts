@@ -7,6 +7,11 @@ import {
 } from "viem";
 export type Triple = readonly [bigint, bigint, bigint];
 export type Pair = readonly [bigint, bigint];
+export const counted = (
+  n: number | bigint,
+  singular: string,
+  plural = `${singular}s`,
+) => `${n} ${n === 1 || n === 1n ? singular : plural}`;
 export interface GameWindow {
   status: number;
   startsAt: bigint;

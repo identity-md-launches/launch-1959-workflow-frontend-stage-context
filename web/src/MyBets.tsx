@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { same, loadWindow, useWindow, useToken } from "./data";
@@ -8,7 +8,7 @@ import {
   walletWindows,
   exactRank,
 } from "./portfolio";
-import { units, type Position } from "./model";
+import { counted, units, type Position } from "./model";
 import { Action } from "./ui";
 import { useTransactions } from "./transactions";
 import { SeedConfetti, reducedMotion, shareIntent } from "./meme";
@@ -25,7 +25,7 @@ function positionLabels(p: Position) {
     .filter(([, v]) => BigInt(v) > 0n)
     .map(([name, v]) => `${name} · ${units(BigInt(v))} IMD`);
 }
-export function MyBets(props: PageProps) {
+export function MyBets(props: PageProps & { liveProgress?: ReactNode }) {
   const { r, g } = props,
     { address } = useConnection();
   const current = useWindow(r, g?.currentWindow, address),
@@ -92,6 +92,10 @@ export function MyBets(props: PageProps) {
                     ))}
                   </ul>
                 )}
+                {row.k === g?.currentWindow &&
+                  row.data?.position &&
+                  positionTotal(row.data.position) > 0n &&
+                  props.liveProgress}
               </div>
             ))}
           </div>
@@ -180,8 +184,8 @@ export function ResultCard({ r, g, ready, now, k }: PageProps & { k: bigint }) {
   const share = (outcome: "W" | "L") =>
     shareIntent(
       outcome === "W"
-        ? `W. The hamster ran ${w.result} passes in window ${k} and I called it. ${SITE}`
-        : `L. The hamster ran ${w.result} passes in window ${k} and I fed it. ${SITE}`,
+        ? `W. The hamster ran ${counted(w.result, "pass", "passes")} in window ${k} and I called it. ${SITE}`
+        : `L. The hamster ran ${counted(w.result, "pass", "passes")} in window ${k} and I fed it. ${SITE}`,
     );
   return (
     <article
@@ -226,7 +230,9 @@ export function ResultCard({ r, g, ready, now, k }: PageProps & { k: bigint }) {
           Window {k.toString()} ·{" "}
           {refunded ? "Refund available" : "Verified result"}
         </span>
-        <h3>{refunded ? "No answer in time" : `${w.result} passes`}</h3>
+        <h3>
+          {refunded ? "No answer in time" : counted(w.result, "pass", "passes")}
+        </h3>
         <p>
           {refunded
             ? "Everyone gets their bet back."

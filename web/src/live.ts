@@ -12,6 +12,7 @@ export type Live = {
 export type Status = {
   speedMmPerSecond: number;
   cumulativeWorkUnits: string;
+  liveCounter?: bigint;
   observedAt?: string;
   freshness?: string;
 };
@@ -47,6 +48,10 @@ export function parseStatus(data: unknown): Status {
         : typeof units === "number" && Number.isFinite(units)
           ? String(Math.floor(units))
           : "0",
+    liveCounter:
+      typeof units === "string" && /^\d+$/.test(units)
+        ? BigInt(units)
+        : undefined,
     observedAt: typeof m.observedAt === "string" ? m.observedAt : undefined,
     freshness: typeof m.freshness === "string" ? m.freshness : undefined,
   };
@@ -99,6 +104,109 @@ export function useStatus() {
     refetchOnWindowFocus: false,
     retry: 1,
   });
+}
+export type Settlement = {
+  previousSettledThroughRound: bigint;
+  settledThroughRound: bigint;
+  cumulativeWork: bigint;
+  workAdded: bigint;
+};
+/** Only decimal strings are accepted: JSON numbers can lose counter precision. */
+export function parseRounds(data: unknown): Settlement[] {
+  const list = (data as { recentSettlements?: unknown } | null)
+    ?.recentSettlements;
+  if (!Array.isArray(list)) throw Error("The rounds feed is unavailable.");
+  const fields = [
+    "previousSettledThroughRound",
+    "settledThroughRound",
+    "cumulativeWork",
+    "workAdded",
+  ] as const;
+  return list.slice(0, 10).flatMap((entry) => {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      !fields.every(
+        (key) => typeof entry[key] === "string" && /^\d+$/.test(entry[key]),
+      )
+    )
+      return [];
+    return [
+      {
+        previousSettledThroughRound: BigInt(entry.previousSettledThroughRound),
+        settledThroughRound: BigInt(entry.settledThroughRound),
+        cumulativeWork: BigInt(entry.cumulativeWork),
+        workAdded: BigInt(entry.workAdded),
+      },
+    ];
+  });
+}
+/** GET /rounds uses the same worker as /live and /status, never Squeekchain. */
+export function useRounds() {
+  return useQuery({
+    queryKey: ["rounds"],
+    queryFn: async () => parseRounds(await getJSON("/rounds")),
+    refetchInterval: 20000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+}
+// This is Squeekchain's epoch, independent of the game's configurable genesis.
+export const SQUEEKCHAIN_GENESIS = 1791847800n;
+const floorDivide = (n: bigint, d: bigint) =>
+  n / d - (n < 0n && n % d !== 0n ? 1n : 0n);
+export function windowProgress(
+  startsAt: bigint,
+  endsAt: bigint,
+  now: bigint,
+  line: bigint,
+  status: Status | undefined,
+  settlements: readonly Settlement[] | undefined,
+) {
+  if (now < startsAt || now >= endsAt) return undefined;
+  const firstRound = floorDivide(startsAt - SQUEEKCHAIN_GENESIS, 600n) + 1n;
+  const lastRound = firstRound + 5n;
+  const round = Number((now - startsAt) / 600n + 1n);
+  const r = Math.max(1, Math.min(6, round));
+  const exact = settlements?.find(
+    (s) => s.settledThroughRound === firstRound - 1n,
+  );
+  // Select by round even if an upstream list arrives out of order.
+  const baseline =
+    exact ??
+    settlements?.reduce<Settlement | undefined>(
+      (best, s) =>
+        s.settledThroughRound < firstRound &&
+        (!best || s.settledThroughRound > best.settledThroughRound)
+          ? s
+          : best,
+      undefined,
+    );
+  const total = status?.liveCounter;
+  const passes =
+    baseline && total !== undefined
+      ? total > baseline.cumulativeWork
+        ? total - baseline.cumulativeWork
+        : 0n
+      : undefined;
+  const percent =
+    passes === undefined
+      ? undefined
+      : line <= 0n
+        ? passes > 0n
+          ? 100
+          : 0
+        : passes >= line
+          ? 100
+          : Number((passes * 10000n) / line) / 100;
+  return {
+    firstRound,
+    lastRound,
+    round: r,
+    passes,
+    approximate: !!baseline && !exact,
+    percent,
+  };
 }
 /** One wheel pass is about 21 cm, so a line of N passes per hour is N·210/3600 mm/s. */
 export const PASS_MM = 210;

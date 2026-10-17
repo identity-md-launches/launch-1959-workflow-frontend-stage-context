@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useConnection } from "wagmi";
-import { erc20Abi } from "viem";
+import { erc20Abi, zeroAddress } from "viem";
 import type { Runtime } from "./config";
 import {
   useToken,
@@ -19,7 +19,10 @@ import {
   countdown,
   dateTime,
   errorText,
+  counted,
 } from "./model";
+import { useStatus, useRounds, windowProgress } from "./live";
+import { WindowProgress } from "./WindowProgress";
 import { useTransactions } from "./transactions";
 import { Action, Field, ErrorNote } from "./ui";
 import { Stream } from "./Stream";
@@ -34,6 +37,7 @@ export type PageProps = {
   now: number;
 };
 type Choice = "OVER" | "UNDER" | "SLEEPING" | "RUNNING" | "EXACT";
+const howKey = "hamster-hour:how-it-works:v1";
 export function Bet({
   r,
   g,
@@ -46,8 +50,46 @@ export function Bet({
   const [customWindow, setCustomWindow] = useState<bigint>();
   const k = customWindow ?? g?.candidate;
   const w = useWindow(r, k, address),
+    current = useWindow(r, g?.currentWindow, address),
     token = useToken(r, g?.IMD, address),
     jackpot = useJackpot(r, g);
+  const status = useStatus(),
+    rounds = useRounds();
+  const currentLine = current.data?.window.status
+    ? current.data.window.line
+    : g?.currentLine;
+  const liveProgress = g && current.data && currentLine !== undefined && (
+    <WindowProgress
+      k={g.currentWindow}
+      line={currentLine}
+      progress={windowProgress(
+        current.data.times[0],
+        current.data.times[1],
+        BigInt(Math.floor(now / 1000)),
+        currentLine,
+        status.isError ? undefined : status.data,
+        rounds.isError ? undefined : rounds.data,
+      )}
+    />
+  );
+  const jackpotEnabled = !!g && g.jackpotToken !== zeroAddress;
+  const [howOpen, setHowOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem(howKey);
+      return saved === null || saved === "open";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      // The first visit opens the guide; later visits default to collapsed.
+      if (localStorage.getItem(howKey) === null)
+        localStorage.setItem(howKey, "closed");
+    } catch {
+      /* The guide still works when storage is unavailable. */
+    }
+  }, []);
   const { send, busy } = useTransactions();
   const [choice, setChoice] = useState<Choice>(),
     [size, setSize] = useState("1"),
@@ -246,7 +288,7 @@ export function Bet({
               Poke the hamster
             </button>
             <span className="small muted" role="status">
-              poked {pokes.count} {pokes.count === 1 ? "time" : "times"}
+              poked {counted(pokes.count, "time")}
             </span>
           </div>
           <div className="desktop-hero">
@@ -301,7 +343,7 @@ export function Bet({
               <span className="small muted">The line</span>
               <strong>{line?.toString() ?? "…"}</strong>
               <span className="small muted line-unit">
-                wheel passes
+                {line === 1n ? "wheel pass" : "wheel passes"}
                 <button
                   type="button"
                   className="tip-trigger"
@@ -321,6 +363,7 @@ export function Bet({
             {countdown(closes, now).replace(/^00:/, "")} · result about 1 h
             after start
           </p>
+          {liveProgress}
           <div className="market-buttons">
             {(["OVER", "UNDER", "SLEEPING"] as Choice[]).map((c) => (
               <div className="market-choice" key={c}>
@@ -387,7 +430,20 @@ export function Bet({
               </button>
             </p>
           )}
-          <details className="how-it-works">
+          <details
+            className="how-it-works"
+            open={howOpen}
+            onToggle={(e) => {
+              const open = e.currentTarget.open;
+              if (open === howOpen) return;
+              setHowOpen(open);
+              try {
+                localStorage.setItem(howKey, open ? "open" : "closed");
+              } catch {
+                /* Remember only for this visit when storage is blocked. */
+              }
+            }}
+          >
             <summary>How it works</summary>
             <p>
               Choose OVER or UNDER the line, or SLEEPING for zero wheel passes.
@@ -415,10 +471,10 @@ export function Bet({
               finished window. If no accepted result arrives within 48 hours,
               bets can be refunded. No $HAMSTER is mined yet.
             </p>
-            <p>
-              Available jackpot:{" "}
-              {g?.jackpotToken && !/^0x0+$/.test(g.jackpotToken) ? (
-                jackpot.data ? (
+            {jackpotEnabled && (
+              <p>
+                Available jackpot:{" "}
+                {jackpot.data ? (
                   <>
                     <SlotNumber
                       value={units(
@@ -430,12 +486,10 @@ export function Bet({
                   </>
                 ) : (
                   "Reading token…"
-                )
-              ) : (
-                "Not enabled yet"
-              )}
-              .
-            </p>
+                )}
+                .
+              </p>
+            )}
             <dl className="key-values">
               <div>
                 <dt>Starts</dt>
@@ -476,7 +530,7 @@ export function Bet({
           <Chat r={r} g={g} />
         </section>
       </div>
-      <MyBets r={r} g={g} ready={ready} now={now} />
+      <MyBets r={r} g={g} ready={ready} now={now} liveProgress={liveProgress} />
       {choice && (
         <Sheet
           locked={!!phase}
@@ -512,12 +566,13 @@ export function Bet({
                     ? "No wheel passes"
                     : choice === "RUNNING"
                       ? "At least one wheel pass"
-                      : `${choice === "OVER" ? "More" : "Fewer"} than ${line?.toString() ?? "…"} passes`}
+                      : `${choice === "OVER" ? "More" : "Fewer"} than ${line !== undefined ? counted(line, "pass", "passes") : "… passes"}`}
               </p>
               {choice === "EXACT" && (
                 <p className="exact-rule">
-                  Closest three guesses share the pool. The jackpot pays only if
-                  the closest guess is within 2% of the result.
+                  Closest three guesses share the pool.
+                  {jackpotEnabled &&
+                    " The jackpot pays only if the closest guess is within 2% of the result."}
                 </p>
               )}
               {(choice === "SLEEPING" || choice === "RUNNING") && (

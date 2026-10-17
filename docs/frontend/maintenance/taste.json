@@ -1,0 +1,117 @@
+{
+  "at": "2026-10-17T06:32:05.256Z",
+  "checks": [
+    {
+      "name": "render",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 14185,
+      "output": "renders, no script errors or missing local files\nexternal hosts: www.youtube.com, hamster-hour.hamsterhour562.workers.dev, ethereum-rpc.publicnode.com, fonts.gstatic.com, googleads.g.doubleclick.net, static.doubleclick.net, www.google.com, ssl.gstatic.com, jnn-pa.googleapis.com"
+    },
+    {
+      "name": "layout",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 1,
+      "output": "no horizontal scroll at 320, 390 or 1440\nno text box overlaps another\n6 floating controls cover text:\n390px: #root > dialog.intro-overlay:nth-of-type(1) > div.intro-content > button.intro-close covers div.app-shell > header.header > div.header-actions > button.wallet-button (\"Connect wallet\")\n390px: dialog.intro-overlay:nth-of-type(1) > div.intro-content > div.intro-video-frame:nth-of-type(1) > button.video-toggle covers section.play-panel > div.game-clock:nth-of-type(2) > div.line-value:nth-of-type(2) > span.small.muted:nth-of-type(2) (\"wheel passes\")\n390px: dialog.intro-overlay:nth-of-type(1) > div.intro-content > div.intro-actions:nth-of-type(2) > button.primary covers div.play-layout:nth-of-type(1) > section.play-panel > div.window-progress:nth-of-type(3) > p.small.muted (\"Live counter, unofficial. Result is sett\")\n390px: dialog.intro-overlay:nth-of-type(1) > div.intro-content > div.intro-actions:nth-of-type(2) > a.button covers div.play-layout:nth-of-type(1) > section.play-panel > div.window-progress:nth-of-type(3) > p.small.muted (\"Live counter, unofficial. Result is sett\")\n… 2 more\nno text cut off by overflow: hidden"
+    },
+    {
+      "name": "targets",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all 26 controls at least 24px or spaced at 390\n11 under the 44px comfortable size"
+    },
+    {
+      "name": "contrast",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all measured text meets 4.5:1 (3:1 large)\n112 text boxes over images, video, canvas or gradients not measured"
+    },
+    {
+      "name": "casing",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 0,
+      "output": "1 all-caps text boxes in content:\n1440px: #intro-title \"HAMSTER HOUR\"\n1 more in header, nav or footer (brand chrome, not counted)"
+    },
+    {
+      "name": "tracking",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "letter-spacing natural in content (display type may run tight)"
+    },
+    {
+      "name": "eyebrows",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 1,
+      "output": "7 kicker labels above headings:\n390px: \"Poke the hamster\" above \"Bet on the next hour\" (div.play-layout:nth-of-type(1) > div.watch-zone > div.poke-row:nth-of-type(1) > button.poke-button)\n1440px: \"Place your bet in\" above \"58:12\" (section.play-panel > div.game-clock:nth-of-type(2) > div:nth-of-type(1) > span.small.muted)\n1440px: \"The line\" above \"1000\" (section.play-panel > div.game-clock:nth-of-type(2) > div.line-value:nth-of-type(2) > span.small.muted:nth-of-type(1))\n390px: \"Start playing\" above \"UNDER\" (dialog.intro-overlay:nth-of-type(1) > div.intro-content > div.intro-actions:nth-of-type(2) > button.primary)\n390px: \"More\" above \"HAMSTER HOUR\" (div.app-shell > nav.navigation > details.more-menu > summary)\n1440px: \"Watch the wheel. Pick your sid\" above \"0\" (div.watch-zone > div.desktop-hero:nth-of-type(2) > div > p.muted:nth-of-type(1))\n1440px: \"Pause video\" above \"bet. lose. win $HAMSTER.\" (dialog.intro-overlay:nth-of-type(1) > div.intro-content > div.intro-video-frame:nth-of-type(1) > button.video-toggle)"
+    },
+    {
+      "name": "type-sizes",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "390: 5 sizes in use, 6 with one-offs (12px×38, 14px×21, 16px×4, 20px×3, 32px×2, 48px×1)\n1440: 6 sizes in use, 6 with one-offs (12px×37, 14px×22, 16px×2, 20px×9, 32px×2, 48px×2)\nbar: 6 sizes used more than once, 8 counting one-offs, per width"
+    },
+    {
+      "name": "type-faces",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 0,
+      "output": "families (1): ibm plex mono\nweights (2): 400, 700\nmonospace prose: 7, e.g. #main > div.play-layout:nth-of-type(1) > section.play-panel > p.window-line.small:nth-of-type(1) \"Betting on window 104 · starts in 58:12 \""
+    },
+    {
+      "name": "glyphs",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "no em dashes or emoji in text"
+    },
+    {
+      "name": "slogans",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "3 two-beat lines; a stack is four or more, so keep the best and cut the rest:\n\"bet. lose. win $HAMSTER.\" (#root > dialog.intro-overlay:nth-of-type(1) > div.intro-content > p)\n\"Small hamster. Big decisions.\" (div.watch-zone > div.desktop-hero:nth-of-type(2) > div > h2)\n\"Watch the wheel. Pick your side.\" (div.watch-zone > div.desktop-hero:nth-of-type(2) > div > p.muted:nth-of-type(1))"
+    },
+    {
+      "name": "repetition",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 2,
+      "output": "no repeated lines"
+    },
+    {
+      "name": "copy-budget",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "prose on the first screen: 45 words at 390 (bar 60), 83 at 1440 (bar 90)\nall words on the first screen: 122 at 390, 182 at 1440\nwhole page: 383 words, 237 of them prose"
+    },
+    {
+      "name": "chrome",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 0,
+      "output": "border and shadow together: 1 (#root > dialog.intro-overlay:nth-of-type(1) > div.intro-content > div.intro-video-frame:nth-of-type(1))\ncards inside cards: 0\ngradient text: 0"
+    },
+    {
+      "name": "motion",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "transition: all on 0 elements\nendless animations: 0; still running with reduced motion: 0"
+    },
+    {
+      "name": "share",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "title \"Hamster Hour | Bet on the wheel\", favicon, og:title, og:image, description"
+    }
+  ]
+}

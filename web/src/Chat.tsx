@@ -6,7 +6,7 @@ import type { Runtime } from "./config";
 import { services } from "./config";
 import { reader, type GlobalState } from "./data";
 import { positionTotal } from "./portfolio";
-import { shortAddress, type Position } from "./model";
+import { counted, shortAddress, type Position } from "./model";
 import { useWalletControl } from "./Wallet";
 export type ChatMessage = {
   id: string;
@@ -237,7 +237,7 @@ export function Chat({ r, g }: { r: Runtime; g?: GlobalState }) {
       <div className="chat-head">
         <h2 id="chat-title">Wheel chat</h2>
         <span className="small muted">
-          {feedError ? "reconnecting…" : `${messages.length} messages`}
+          {feedError ? "reconnecting…" : counted(messages.length, "message")}
         </span>
       </div>
       <div

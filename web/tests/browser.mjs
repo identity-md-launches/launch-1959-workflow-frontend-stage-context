@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve, extname, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import AxeBuilder from "@axe-core/playwright";
 import {
   decodeFunctionData,
   encodeFunctionResult,
@@ -187,7 +188,7 @@ function fixture(options = {}) {
     sent: [],
     walletCalls: [],
     signed: [],
-    chat: [],
+    chat: options.chat ?? [],
     chatReject: "",
     live: options.sleeping
       ? { state: "idle", playback: { kind: "canonical-hls" } }
@@ -201,7 +202,24 @@ function fixture(options = {}) {
     proxyDown: !!options.proxyDown,
     liveRequests: 0,
     speed: options.speed ?? 0,
-    cumulativeWorkUnits: "45200",
+    cumulativeWorkUnits: options.counter ?? "45200",
+    recentSettlements: options.rounds ?? [
+      {
+        previousSettledThroughRound: String(current * 6n),
+        settledThroughRound: String(current * 6n + 1n),
+        cumulativeWork: "45100",
+        workAdded: "100",
+      },
+      {
+        previousSettledThroughRound: String(current * 6n - 1n),
+        settledThroughRound: String(current * 6n),
+        cumulativeWork: "45000",
+        workAdded: "100",
+      },
+    ],
+    roundsRequests: 0,
+    statusRequests: 0,
+    jackpotConfigured: !!options.jackpot,
     pools: options.empty
       ? [0n, 0n, 0n]
       : [parseEther("12"), parseEther("10"), parseEther("2")],
@@ -245,7 +263,7 @@ function fixture(options = {}) {
                 : 0,
       startsAt: started,
       endsAt: started + 3600n,
-      line: 1000n,
+      line: options.line ?? 1000n,
       source: "https://sepolia.squeekchain.com",
       result: k === current - 1n ? 1470n : 0n,
       pools: state.pools,
@@ -339,10 +357,10 @@ function fixture(options = {}) {
         currentWindow: current,
         hasStarted: true,
         closedWindowFloor: 0n,
-        currentLine: 1000n,
+        currentLine: options.line ?? 1000n,
         settledWindows: 3n,
         stakingToken: state.stakeConfigured ? stakeToken : zeroAddress,
-        jackpotToken: options.jackpot ? imd : zeroAddress,
+        jackpotToken: state.jackpotConfigured ? imd : zeroAddress,
         IMD: imd,
         TEAM: team,
         sourceUrl: "https://sepolia.squeekchain.com",
@@ -663,6 +681,10 @@ async function setup(options = {}) {
     await page.addInitScript(() =>
       localStorage.setItem("hamster-hour:intro-dismissed:v1", "yes"),
     );
+  if (!options.fresh && !options.firstGuide)
+    await page.addInitScript(() =>
+      localStorage.setItem("hamster-hour:how-it-works:v1", "closed"),
+    );
   page.on("pageerror", (e) => errors.push(e.message));
   await page.exposeFunction("__walletRequest", async (args) => {
     try {
@@ -768,6 +790,8 @@ async function setup(options = {}) {
       const req = route.request(),
         u = new URL(req.url());
       if (u.pathname === "/live") f.state.liveRequests++;
+      if (u.pathname === "/status") f.state.statusRequests++;
+      if (u.pathname === "/rounds") f.state.roundsRequests++;
       if (f.state.proxyDown) return route.abort("failed");
       const cors = { "access-control-allow-origin": "*" };
       if (u.pathname === "/live")
@@ -783,6 +807,11 @@ async function setup(options = {}) {
               speedMmPerSecond: f.state.speed,
             },
           },
+        });
+      if (u.pathname === "/rounds")
+        return route.fulfill({
+          headers: cors,
+          json: { recentSettlements: f.state.recentSettlements },
         });
       if (u.pathname === "/chat" && req.method() === "GET") {
         const since = Number(u.searchParams.get("since") ?? 0);
@@ -925,6 +954,337 @@ async function check(name, fn) {
 try {
   const engine = process.env.HH_BROWSER === "webkit" ? webkit : chromium;
   browser = await engine.launch({ headless: true });
+  await check(
+    "maintenance: all five sheets, public pages and progress at 1280, 800 and 375",
+    async () => {
+      for (const width of [1280, 800, 375]) {
+        const { page, context, errors, consoleErrors, f } = await setup({
+          noProvider: true,
+        });
+        await page.setViewportSize({
+          width,
+          height: width === 375 ? 812 : 1000,
+        });
+        const direct = [];
+        page.on("request", (r) => {
+          if (new URL(r.url()).hostname.endsWith("squeekchain.com"))
+            direct.push(r.url());
+        });
+        const progress = page.locator(".play-panel .window-progress");
+        await progress.getByText(/200 passes so far · line 1000/).waitFor();
+        assert.equal(
+          await progress.getByRole("progressbar").getAttribute("aria-valuenow"),
+          "20",
+        );
+        assert(
+          await progress
+            .getByText(
+              "Live counter, unofficial. Result is settled by the IMD oracle.",
+            )
+            .isVisible(),
+        );
+        assert(f.state.roundsRequests > 0);
+        if (width === 375) {
+          const audit = await new AxeBuilder({ page })
+            .exclude("iframe")
+            .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+            .analyze();
+          assert.deepEqual(
+            audit.violations,
+            [],
+            "running progress accessibility",
+          );
+        }
+        if (width <= 800) {
+          assert.equal(
+            await progress
+              .locator(".window-progress-summary")
+              .evaluate((el) => getComputedStyle(el).whiteSpace),
+            "nowrap",
+          );
+          assert(
+            await progress
+              .locator(".window-progress-bar")
+              .evaluate((el) => el.clientWidth <= el.parentElement.clientWidth),
+          );
+        }
+        for (const choice of [
+          "OVER",
+          "UNDER",
+          "SLEEPING",
+          "RUNNING",
+          "EXACT",
+        ]) {
+          if (choice === "EXACT")
+            await page
+              .getByRole("button", { name: /Guess the exact number/ })
+              .click();
+          else {
+            await page
+              .getByRole("button", {
+                name: `Bet ${choice === "RUNNING" ? "SLEEPING" : choice}`,
+                exact: true,
+              })
+              .click();
+            if (choice === "RUNNING")
+              await page
+                .getByRole("button", { name: /Bet RUNNING instead/ })
+                .click();
+          }
+          await page
+            .getByRole("heading", { name: `Bet ${choice}`, exact: true })
+            .waitFor();
+          await page
+            .locator("#bet-amount")
+            .fill("123456789012345678901234567890.5");
+          const layout = await page.locator(".amount-input").evaluate((el) => {
+            const input = el.querySelector("input"),
+              suffix = el.querySelector("span");
+            const s = suffix.getBoundingClientRect(),
+              i = input.getBoundingClientRect(),
+              p = el.getBoundingClientRect();
+            const range = document.createRange();
+            range.selectNodeContents(suffix);
+            return {
+              nowrap: getComputedStyle(suffix).whiteSpace,
+              minWidth: parseFloat(getComputedStyle(suffix).minWidth),
+              lines: range.getClientRects().length,
+              inside: s.right <= p.right && i.right <= s.left + 1,
+              inputWidth: i.width,
+            };
+          });
+          assert.equal(layout.nowrap, "nowrap");
+          assert(layout.minWidth > 20);
+          assert.equal(layout.lines, 1);
+          assert(layout.inside);
+          assert(layout.inputWidth > 50);
+          await page
+            .getByRole("button", { name: "5 IMD", exact: true })
+            .click();
+          assert.equal(await page.locator("#bet-amount").inputValue(), "5");
+          if (choice === "EXACT")
+            assert.equal(
+              await page.getByText(/The jackpot pays only/).count(),
+              0,
+            );
+          await page.screenshot({
+            path: resolve(
+              out,
+              `maintenance-${choice.toLowerCase()}-${width}.png`,
+            ),
+          });
+          await page.keyboard.press("Escape");
+        }
+        await page.locator(".how-it-works summary").click();
+        assert(await page.locator("#bet-window").isVisible());
+        assert.equal(await page.getByText(/Available jackpot:/).count(), 0);
+        await page.screenshot({
+          path: resolve(out, `maintenance-how-${width}.png`),
+          fullPage: true,
+        });
+        for (const tab of ["History", "TEAM", "Stake", "Settle"]) {
+          await more(page, tab);
+          if (tab === "History") {
+            await page.locator(".history-row").first().waitFor();
+            await page.locator("#history-window").fill(String(current - 1n));
+            await page
+              .getByRole("button", { name: "Find window", exact: true })
+              .click();
+            await page.locator(".window-detail .key-values").waitFor();
+          } else if (tab === "TEAM") {
+            await page.locator(".setting").first().waitFor();
+            assert.equal(await page.locator(".settings input").count(), 0);
+            assert.equal(await page.locator(".setting").count(), 4);
+          }
+          assert(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          );
+          await page.screenshot({
+            path: resolve(out, `maintenance-${tab.toLowerCase()}-${width}.png`),
+            fullPage: true,
+          });
+        }
+        assert.deepEqual(direct, []);
+        assert.deepEqual(errors, []);
+        assert.deepEqual(consoleErrors, []);
+        await context.close();
+      }
+    },
+  );
+  await check(
+    "maintenance: first-visit guide and collapse preference survive navigation and reload",
+    async () => {
+      const { page, context, errors } = await setup({ firstGuide: true });
+      const guide = page.locator(".how-it-works");
+      assert(await guide.evaluate((el) => el.open));
+      await page.locator(".play-panel .window-progress").waitFor();
+      const first = await page
+        .getByRole("button", { name: "Bet OVER", exact: true })
+        .boundingBox();
+      assert(
+        first && first.y + first.height <= 844,
+        "main action visible at 390×844",
+      );
+      await page.screenshot({
+        path: resolve(out, "maintenance-first-screen-390.png"),
+      });
+      await page.reload();
+      await page
+        .getByRole("button", { name: "Bet OVER", exact: true })
+        .waitFor();
+      assert.equal(await guide.evaluate((el) => el.open), false);
+      await guide.locator("summary").click();
+      await page.reload();
+      await guide.locator("summary").waitFor();
+      assert.equal(await guide.evaluate((el) => el.open), true);
+      await guide.locator("summary").click();
+      await more(page, "History");
+      await page.getByRole("button", { name: "Bet", exact: true }).click();
+      assert.equal(await guide.evaluate((el) => el.open), false);
+      await page.reload();
+      await guide.locator("summary").waitFor();
+      assert.equal(await guide.evaluate((el) => el.open), false);
+      assert.deepEqual(errors, []);
+      await context.close();
+    },
+  );
+  await check(
+    "maintenance: sleeping zero counter, My bets, fallback baselines and twenty-second polling",
+    async () => {
+      for (const width of [1280, 800, 375]) {
+        const { page, context, f, errors } = await setup({
+          sleeping: true,
+          counter: "45000",
+          clock: true,
+        });
+        await page.setViewportSize({
+          width,
+          height: width === 375 ? 812 : 1000,
+        });
+        const progress = page.locator(".play-panel .window-progress");
+        await progress.getByText(/0 passes so far/).waitFor();
+        assert.equal(
+          await progress.getByRole("progressbar").getAttribute("aria-valuenow"),
+          "0",
+        );
+        await connect(page);
+        await page
+          .locator(".my-bets .window-progress")
+          .getByText(/0 passes so far/)
+          .waitFor();
+        assert(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+          "connected My bets must not widen the page",
+        );
+        if (width === 375) {
+          const audit = await new AxeBuilder({ page })
+            .exclude("iframe")
+            .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+            .analyze();
+          assert.deepEqual(
+            audit.violations,
+            [],
+            "zero-pass My bets accessibility",
+          );
+        }
+        await page.screenshot({
+          path: resolve(out, `maintenance-sleeping-${width}.png`),
+          fullPage: true,
+        });
+        const before = [f.state.statusRequests, f.state.roundsRequests];
+        f.state.cumulativeWorkUnits = "45001";
+        await page.clock.fastForward(20100);
+        await progress.getByText(/1 pass so far/).waitFor();
+        assert(
+          f.state.statusRequests > before[0] &&
+            f.state.roundsRequests > before[1],
+        );
+        f.state.recentSettlements = [
+          {
+            previousSettledThroughRound: String(current * 6n - 2n),
+            settledThroughRound: String(current * 6n - 1n),
+            cumulativeWork: "44800",
+            workAdded: "100",
+          },
+        ];
+        await page.clock.fastForward(20100);
+        await progress.getByText(/≈201 passes so far/).waitFor();
+        f.state.recentSettlements = [];
+        await page.clock.fastForward(20100);
+        await progress
+          .locator(".window-progress-summary")
+          .getByText(/^round [1-6] of 6$/)
+          .waitFor();
+        assert.equal(await progress.getByRole("progressbar").count(), 0);
+        assert.deepEqual(errors, []);
+        await context.close();
+      }
+    },
+  );
+  await check(
+    "maintenance: jackpot copy follows configuration; chat and poke counters pluralize",
+    async () => {
+      const { page, context, f, errors } = await setup({
+        clock: true,
+        line: 1n,
+        chat: [
+          {
+            id: "one",
+            address: account,
+            message: "hello wheel",
+            ts: Date.now(),
+          },
+        ],
+      });
+      await page.getByText("1 message", { exact: true }).waitFor();
+      assert.match(
+        await page.locator(".line-unit").innerText(),
+        /wheel pass\b/,
+      );
+      assert(
+        !/wheel passes/.test(await page.locator(".line-unit").innerText()),
+      );
+      await page
+        .locator(".play-panel [role='progressbar'][aria-valuenow='100']")
+        .waitFor();
+      await page.getByRole("button", { name: "Poke the hamster" }).click();
+      await page.getByText("poked 1 time", { exact: true }).waitFor();
+      await page.getByRole("button", { name: "Poke the hamster" }).click();
+      await page.getByText("poked 2 times", { exact: true }).waitFor();
+      f.state.chat.push({
+        id: "two",
+        address: account,
+        message: "keep running",
+        ts: Date.now() + 1,
+      });
+      await page.clock.fastForward(5100);
+      await page.getByText("2 messages", { exact: true }).waitFor();
+      await page
+        .getByRole("button", { name: /Guess the exact number/ })
+        .click();
+      assert.equal(await page.getByText(/The jackpot pays only/).count(), 0);
+      await page.keyboard.press("Escape");
+      await page.locator(".how-it-works summary").click();
+      assert.equal(await page.getByText(/Available jackpot:/).count(), 0);
+      f.state.jackpotConfigured = true;
+      await page.clock.fastForward(12100);
+      await page.getByText(/Available jackpot:/).waitFor();
+      await page
+        .getByRole("button", { name: /Guess the exact number/ })
+        .click();
+      await page
+        .getByText(
+          /The jackpot pays only if the closest guess is within 2% of the result/,
+        )
+        .waitFor();
+      assert.deepEqual(errors, []);
+      await context.close();
+    },
+  );
   await check(
     "revision: failed idle refresh uses the fallback and recovers",
     async () => {

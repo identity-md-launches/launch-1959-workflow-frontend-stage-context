@@ -1,0 +1,26 @@
+{
+  "fixtureOnly": true,
+  "subsetOf": "interactions.json",
+  "reports": [
+    {
+      "name": "maintenance: all five sheets, public pages and progress at 1280, 800 and 375",
+      "passed": true,
+      "durationMs": 9625
+    },
+    {
+      "name": "maintenance: first-visit guide and collapse preference survive navigation and reload",
+      "passed": true,
+      "durationMs": 1522
+    },
+    {
+      "name": "maintenance: sleeping zero counter, My bets, fallback baselines and twenty-second polling",
+      "passed": true,
+      "durationMs": 3829
+    },
+    {
+      "name": "maintenance: jackpot copy follows configuration; chat and poke counters pluralize",
+      "passed": true,
+      "durationMs": 884
+    }
+  ]
+}
