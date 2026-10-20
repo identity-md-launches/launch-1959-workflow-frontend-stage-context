@@ -5,7 +5,8 @@ import { createWalletClient, custom, getAddress, isAddress } from "viem";
 import type { Runtime } from "./config";
 import { services } from "./config";
 import { reader, type GlobalState } from "./data";
-import { positionTotal } from "./portfolio";
+const positionTotal = (p: Position) =>
+  p.over + p.under + p.yes + p.no + (p.hasTicket ? 1n : 0n);
 import { counted, shortAddress, type Position } from "./model";
 import { useWalletControl } from "./Wallet";
 export type ChatMessage = {
@@ -152,7 +153,7 @@ export function Chat({ r, g }: { r: Runtime; g?: GlobalState }) {
   }, [messages, stuck]);
   const senders = [...new Set(messages.map((m) => m.address.toLowerCase()))];
   const windows = g
-    ? [...new Set([g.currentWindow, g.candidate].map(String))]
+    ? [...new Set([g.currentWindow, g.earliestNotStartedWindow].map(String))]
     : [];
   const bettors = useQuery({
     queryKey: ["chat-bettors", senders.join(","), windows.join(",")],
@@ -242,6 +243,8 @@ export function Chat({ r, g }: { r: Runtime; g?: GlobalState }) {
       </div>
       <div
         className="chat-list"
+        tabIndex={0}
+        aria-label="Wheel chat messages"
         ref={list}
         role="log"
         aria-live="polite"

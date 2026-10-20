@@ -1,119 +1,17 @@
 {
   "version": 1,
-  "launchId": "ed83213d-f7c5-487c-b17b-c79ba8d2c3fc",
   "chainId": 1,
-  "sourceCommit": "7ab2a01b3d9a15e2acca8b317e77058e6f2d41e9",
-  "attestationHash": "b917945ed7708748cd8eaa1f0167ffd922a021b7c08f32b99ca4d2c8adc13ad6",
+  "sourceCommit": "49f53ca0f278fe4edf6431f68a51468552372af7",
+  "repoUrl": "https://github.com/identity-md-launches/launch-2260-build-hamster-hour-v2",
+  "addressAuthority": "Explicit v2 contract address in the current assignment; the historical handoff describes the replaced deployment.",
   "contracts": [
     {
-      "name": "OracleVerifier",
-      "address": "0xdcd7a7dee31d589f9df8113780050c18e7ea1f7d",
-      "abiHash": "f9bbf3c804c63e5ff0b155f43a412745e7623689907bbd3ba1b00aaf40ec2173",
-      "abiPath": "abi/OracleVerifier.json"
-    },
-    {
       "name": "HamsterHour",
-      "address": "0xc5217f129da200a8e86229de4eabf3686eef64b1",
-      "abiHash": "e7f29a8b124c75bd841e5e60e96135f01b7f14125f2c289b89b562752d544f40",
+      "address": "0xe33ab493249a2df0d8c4a71ac54f46d1f7778367",
+      "abiHash": "1b4767e78f20172a55d48af634b51337edf1805d463361e0d2df249cc822b698",
+      "runtimeCodeHash": "0x1e66fecb356e22bc82058abcbb1564d5604606a2d776fbd107bca301a5989cde",
+      "deploymentBlock": "26229405",
       "abiPath": "abi/HamsterHour.json"
-    }
-  ],
-  "assets": [
-    {
-      "path": "abi/HamsterHour.json",
-      "sha256": "818700404c7ab99d31914280820da87c1c829861f6ed64288c14c722fa886232"
-    },
-    {
-      "path": "abi/OracleVerifier.json",
-      "sha256": "6a9227be836e723378c21d3683835f3fbaa2b4e94e80f0dd6d0fcfbbd57af4e2"
-    },
-    {
-      "path": "assets/FONT-LICENSE.txt",
-      "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
-    },
-    {
-      "path": "assets/ccip-06obj-61.js",
-      "sha256": "f9ae2fe80f4ca2d601d1cc94e6f72f2b09a477f862bf6d064f962db328003a4e"
-    },
-    {
-      "path": "assets/dist-Bqb6McJ3.js",
-      "sha256": "42f580c898f50f9da266895a83626edf4419439f62ba26f768f2d11c66f1158e"
-    },
-    {
-      "path": "assets/hamster-asleep.svg",
-      "sha256": "8c961b69d6d0d4b01c7e40a165e7a3691be963fc20f8fdf7013e8e803c5b5b8c"
-    },
-    {
-      "path": "assets/hamster-chewing.mp4",
-      "sha256": "996111da83ed76ceb1f6c89837ecb55fa5766f50730c99b43111a95ae799985e"
-    },
-    {
-      "path": "assets/hamster-curled.svg",
-      "sha256": "af5389592f8ee61f5d0bc106d4ca60e38cb23cdfa6dacce718be0d9a06e06a8d"
-    },
-    {
-      "path": "assets/hamster-happy.svg",
-      "sha256": "b458b8986c2a4fef777a44c077cf1633486a14f316234d350dafabef508080ad"
-    },
-    {
-      "path": "assets/hamster-thumbs.svg",
-      "sha256": "d8975ecf705a9db96fb2f8229a8366830b5cc1c31f50a72d4b6121e5da7277dd"
-    },
-    {
-      "path": "assets/hamster-wheel.svg",
-      "sha256": "283d73895734a6216cf301f9aaf98fabaf7fbe17a28e169c99bb276b22238641"
-    },
-    {
-      "path": "assets/ibm-plex-mono-bold-7sUh57Bg.woff2",
-      "sha256": "4f84d86cfd060f4ded334358ff8a4c81d4db2ed5addd568359d693f44a87765a"
-    },
-    {
-      "path": "assets/ibm-plex-mono-regular-DMJ8VG8y.woff2",
-      "sha256": "08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7"
-    },
-    {
-      "path": "assets/index-BWvrJ_sm.css",
-      "sha256": "b6f319d1a22c457d7ebfe2e2f385fd4ef69dfb25851d35ec0a3cb182bf72cf3c"
-    },
-    {
-      "path": "assets/index-BcGdBZPn.js",
-      "sha256": "795088d3b306df5e4cd697d23a7261b005e45ba352c47b7b4bc0dd19a0ba39f0"
-    },
-    {
-      "path": "favicon.svg",
-      "sha256": "a7c813dda3c3273399903a7aab54769d6d8227410e49cbf7b39241fd1116b01a"
-    },
-    {
-      "path": "index.html",
-      "sha256": "d6460a4b21eda740f9ed6d5143a7fad163e387591e0a1fef1954d2fa6ac57e71"
-    },
-    {
-      "path": "share.png",
-      "sha256": "d3343be0ed4a608757f0f7284be2963a8b31c0452042847b28292fb343ea9261"
-    },
-    {
-      "path": "share.svg",
-      "sha256": "b32e439d3ca4200a728629119539f38cc734602c3652623abbc74d8abd7721e2"
-    },
-    {
-      "path": "wallets/browser.svg",
-      "sha256": "306e95b3082512a07983db23181c3a0a1cd18233364241b16604f0e2ebe528fd"
-    },
-    {
-      "path": "wallets/coinbase.svg",
-      "sha256": "74b55347075cbbb2a0292cca0f94459d531afd23586ecfd2fcc670236c590439"
-    },
-    {
-      "path": "wallets/metamask.svg",
-      "sha256": "892c7dfab8c4ca5682878dda3f42f55a75195d7d365e4adb0832845f3a0a2135"
-    },
-    {
-      "path": "wallets/phantom.svg",
-      "sha256": "f841f8112e131259a2e5123177950099c79487e61e77971f4e193e6c374419eb"
-    },
-    {
-      "path": "wallets/rabby.svg",
-      "sha256": "dcae4de88ebfa10cffa1fe28df13d7c8c0b40736ef2b704f1f2fc348e777e443"
     }
   ],
   "network": {
@@ -170,5 +68,107 @@
     "blockExplorerUrls": [
       "https://etherscan.io"
     ]
-  }
+  },
+  "assets": [
+    {
+      "path": ".well-known/agent-skills/hamster-hour.zip",
+      "sha256": "c73912d849f5e8bc159bf92574d6493b23b32b1dd3c7fad1d80a98b7e3478173"
+    },
+    {
+      "path": ".well-known/agent-skills/index.json",
+      "sha256": "d98f079bdddd5b600dd4669a57bdf60aec816eb3f8670c6d2f671055d62a82e9"
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "dd2f3b7b786c1dc24db8fff3413d0033d73a0c6682e95cc7a67e8c964385baee"
+    },
+    {
+      "path": "abi/HamsterHour.json",
+      "sha256": "058990a08d7d4cc6b55aefe268c2d0ff1bab2da1abeeae1677e728aecfdd3122"
+    },
+    {
+      "path": "assets/ccip-BOTEuETH.js",
+      "sha256": "5d29d985e90a5809877bab1ba71ec8a26656a9d27d9d3ef157670ddc5443adf2"
+    },
+    {
+      "path": "assets/dist-BRpGbLqX.js",
+      "sha256": "cdd1a599d3d067fc1a4725d185362cfffac8c6cf57d057e52296cae669df5910"
+    },
+    {
+      "path": "assets/geist-bold-C1cGlxeJ.woff2",
+      "sha256": "1254436402a0b144e0ea246add21e542a84dec0cb6674aba3649d6f317319207"
+    },
+    {
+      "path": "assets/geist-regular-DL2d_lCt.woff2",
+      "sha256": "b6933261c577d8258b196682f7d5a5377d24a2b9cf8037e93759deaa90773fcf"
+    },
+    {
+      "path": "assets/geist-semibold-CxNI6K-g.woff2",
+      "sha256": "0d25d102ffe7d1f0c6cc63c836970c9c93b6d500dab06145967f6c8b4fcd34da"
+    },
+    {
+      "path": "assets/index-B3bdhpDm.css",
+      "sha256": "8425997daf139687be7043973bb74a5b08efdc123c4b6406e5b18a03da67c266"
+    },
+    {
+      "path": "assets/index-ki7qGkPy.js",
+      "sha256": "9a061e67f2227cd34d069c5661c77ef11edafee57845d39a8135042a8b894148"
+    },
+    {
+      "path": "assets/silkscreen-DMhLDebm.woff2",
+      "sha256": "28fbde5c357d4002f9a07fb6e116b7393674439bb2309c07fd6ed96ba45b1917"
+    },
+    {
+      "path": "favicon.svg",
+      "sha256": "e71f2222f4a8cf4b0672e1426e265e57c362019989514bddb67c9b2b2a68f7ed"
+    },
+    {
+      "path": "fonts/Geist-LICENSE.txt",
+      "sha256": "1781d2806a07d91c4edf4740b88449fab7d0eadad53f7c351b94cd4d4eb8c00f"
+    },
+    {
+      "path": "fonts/Silkscreen-LICENSE.txt",
+      "sha256": "86c5e9c9382cdcc5948704fdfe60f2aa164a719746931219a42736ecd9cefbd3"
+    },
+    {
+      "path": "index.html",
+      "sha256": "71ab9f2add350eb45b5a03681b7b642fccfedead18ef1e3e8d40563eadcdf994"
+    },
+    {
+      "path": "llms.txt",
+      "sha256": "2731f959e760e93c732c32a5e71f063d3ad63f74f7f54ebe44d86085bd164a9e"
+    },
+    {
+      "path": "share.png",
+      "sha256": "89197867e90edad0d65ebd5dfdcae1fa0bbffceec11f278c4caa22d97dc44d0b"
+    },
+    {
+      "path": "telemetry/stats30.json",
+      "sha256": "1afd0f29dfb9e38586ef738efc7979864081effaa7aa22661af7f9ee94dc62c1"
+    },
+    {
+      "path": "telemetry/stats7.json",
+      "sha256": "c77dedf19c8a3079ee7291f35f7cc29762449c66dd338f6d9fe57167e44176c0"
+    },
+    {
+      "path": "wallets/browser.svg",
+      "sha256": "306e95b3082512a07983db23181c3a0a1cd18233364241b16604f0e2ebe528fd"
+    },
+    {
+      "path": "wallets/coinbase.svg",
+      "sha256": "74b55347075cbbb2a0292cca0f94459d531afd23586ecfd2fcc670236c590439"
+    },
+    {
+      "path": "wallets/metamask.svg",
+      "sha256": "892c7dfab8c4ca5682878dda3f42f55a75195d7d365e4adb0832845f3a0a2135"
+    },
+    {
+      "path": "wallets/phantom.svg",
+      "sha256": "f841f8112e131259a2e5123177950099c79487e61e77971f4e193e6c374419eb"
+    },
+    {
+      "path": "wallets/rabby.svg",
+      "sha256": "dcae4de88ebfa10cffa1fe28df13d7c8c0b40736ef2b704f1f2fc348e777e443"
+    }
+  ]
 }

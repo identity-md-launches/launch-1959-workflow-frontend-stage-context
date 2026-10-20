@@ -1,0 +1,6 @@
+name = "hamster-hour-v2-api"
+main = "worker.mjs"
+compatibility_date = "2026-10-20"
+# This is an additive worker. Keep the original hamster-hour worker and its chat storage.
+# Attach this worker to hamster-hour.hamsterhour562.workers.dev only by merging its
+# three new route branches into that existing worker. See README.md for either handoff.

@@ -1,127 +1,58 @@
 # Hamster Hour
 
-The live hamster betting app runs from the complete static export in [`dist/`](dist/). This maintenance update fixes the IMD suffix in every amount sheet, singular counter labels, conditional jackpot copy, worker-backed live window progress, and the first-visit How it works disclosure. The existing design, contracts, wallet flow, chat protocol and secondary tools are preserved. No dependency, package manifest, lockfile or build configuration was changed.
+A cozy pixel betting app for the live HamsterHour v2 contract on Ethereum. The finished static site is in [`dist/`](dist/); editable React/TypeScript source is in [`web/src/`](web/src/). The existing `hamsterhour.fun` domain and worker hostname are retained. Nothing is deployed, published, re-minted or signed by this repository update.
 
-Validation and the six-domain Better Interface review are recorded in [the maintenance report](docs/frontend/MAINTENANCE.md). The production build, typecheck, ABI/export verification, unit tests and Chromium interactions were run locally. The report distinguishes intercepted wallet/service fixtures from real read-only Ethereum and worker checks and records browser limitations.
+## Install, preview and rebuild
 
-## Run the website
-
-Use Node 24 (or a current version supported by Vite 8) and npm:
+Node 22 and npm are sufficient. From `web/`:
 
 ```sh
-cd web
 npm ci --legacy-peer-deps
-npm run typecheck
-npm test
 npm run build
-npm run verify
 npm run preview -- --host 127.0.0.1
 ```
 
-`--legacy-peer-deps` is required with the existing protected lockfile: plain `npm ci` reports a missing optional test peer, `playwright-core`. The manifest and lockfile have been preserved. The production build writes repository-root `dist/`, uses relative URLs, copies the pinned ABI exports, verifies their canonical hashes, and regenerates the asset manifest. Serve `dist/` through any HTTP static server or IPFS gateway; no application server, API key or wallet relay is required. `npm run dev` starts Vite after the first build.
+Open the URL printed by Vite. The build typechecks TypeScript, bundles local assets using the existing relative `base: './'`, writes repository-root `dist/`, and verifies the ABI and asset inventory. `npm run dev` starts the existing development server. Navigation uses hashes; no server rewrite is required. The source package manifest, lockfile, Vite/TypeScript configuration and all existing contract build configuration/dependencies are preserved. The protected lockfile requires `--legacy-peer-deps`: plain `npm ci` reports a missing peer `playwright-core@1.64.1`.
 
-See [web/README.md](web/README.md) for architecture, wallet behavior, oracle payment details and repeatable browser checks; [DESIGN.md](DESIGN.md) for the implemented design system; and [maintenance report](docs/frontend/MAINTENANCE.md) for current checks and limitations. Test wallet/API fixtures are confined to `web/tests/` and never enter the production export.
+For an environment that must not create repository `node_modules`, run `node web/scripts/sandbox-build.mjs` from the repository root. It installs the same protected lockfile in a temporary project and copies the site and bundled worker back. That is the method used for this delivery. No dependency directory or npm archive is delivered.
 
-The deployed game is [HamsterHour](https://etherscan.io/address/0xc5217f129da200a8e86229de4eabf3686eef64b1), with [OracleVerifier](https://etherscan.io/address/0xdcd7a7dee31d589f9df8113780050c18e7ea1f7d), on Ethereum chain 1. No contract was deployed or changed by this frontend revision.
-
-## Contract behavior
-
-No owner, no house: pari-mutuel only, with results only from the IMD oracle. The contract never owes more than it holds under the supported ERC-20 assumptions below. TEAM gets 1% of non-void bets and nothing else as a privileged beneficiary. It cannot withdraw deposits, reserves, stakes or jackpots. TEAM has only the four public, 48-hour-delayed configuration powers required by the brief. There is no upgrade, pause, token mint, ownership transfer or emergency withdrawal.
-
-The original contract implementation, offline Foundry tests and [ABI exports](docs/ABI.md) remain in this repository. The sections below document those deployed contracts.
-
-## Build and test
+Useful checks, from an installed `web/`:
 
 ```sh
-forge build
-FOUNDRY_FUZZ_SEED=0xe427f6772b7230d5c85541af762798b7daf4fd8f75c5b62f29396f55b3ec9cb1 forge test
-forge fmt --check
+npm run typecheck
+npm test
+npm run verify
+IMD_PLAYWRIGHT=/path/to/playwright/index.mjs PLAYWRIGHT_BROWSERS_PATH=/path/to/browsers node tests/browser.mjs
+node scripts/build-worker.mjs
 ```
 
-Solidity **0.8.26**, Cancun, optimizer 200 runs, metadata bytecode hash disabled. Dependencies are ordinary vendored source files; no network, environment variables, FFI or filesystem cheatcodes are required by the tests. The same fuzz seed is pinned in `foundry.toml`. See [verification coverage](docs/VERIFICATION.md) and [dependency provenance](docs/DEPENDENCIES.md).
+The browser script starts and closes its own bounded preview at a subpath, uses the real production bundle, and intercepts wallet/RPC/service traffic. It does not spend funds. `HH_TEST='text in a scenario name'` selects a scenario. `node scripts/share-image.mjs` regenerates the locally rendered 1200×630 social image when Playwright is available.
 
-## Deployment parameters
+## Live contract and transactions
 
-Deploy in this order through the launch factory, with zero ETH:
+- HamsterHour v2: [`0xe33ab493249a2df0d8c4a71ac54f46d1f7778367`](https://etherscan.io/address/0xe33ab493249a2df0d8c4a71ac54f46d1f7778367), Ethereum mainnet, chain ID 1.
+- IMD: `0xd34a99bc0f67ae1bbd63c660e6d0b0dd03e263b7`, 18 decimals.
+- ABI: [`web/contracts/HamsterHour.json`](web/contracts/HamsterHour.json), fetched from the requested [v2 repository](https://github.com/identity-md-launches/launch-2260-build-hamster-hour-v2) at commit `49f53ca0f278fe4edf6431f68a51468552372af7`.
+- Deployment block: `26229405`. Observed runtime Keccak: `0x1e66fecb356e22bc82058abcbb1564d5604606a2d776fbd107bca301a5989cde`.
 
-| Contract | Constructor arguments, in order |
-| --- | --- |
-| `OracleVerifier` | `signer_ = 0x5598aa9146215bc13eb26f2c692ad1461fd32982` |
-| `HamsterHour` | `team_ = $owner`, `verifier_ = $contract:OracleVerifier` |
+The historical deployment input describes the replaced game. The current assignment explicitly supplies the replacement address and source, so `web/deployment/handoff.json` records that authority and the v2 identity. `web/deployment/network.json` is byte-identical to the supplied network input. The static `imd-deployment.json` carries that complete network block, ABI hash, runtime code hash and asset inventory. The interface reads addresses and ABI from it at runtime. Historical Solidity deliverables in `src/`, `test/`, `lib/` and `docs/abi/` are not frontend runtime inputs and have not been changed.
 
-`$owner` is the supplied launch wallet **0x6cba4751742f6989fa224b2dc5d5d52fcef98a34**. It becomes immutable `TEAM`; neither the factory nor the launch service receives a role. Both constructors are nonpayable, use static address arguments, and make no calls to dependencies. The table is guidance for the separate manifest assignment, not a manifest.
+Before any signature, the app checks live chain ID, code hash, token and genesis, then simulates from the connected account. Approval is for the entered amount only. Approval and betting are separate steps. The review retains the exact chosen hour/side/amount while state refreshes; it rechecks closing before sending. Receipts, reverts and wallet rejection are visible, with explorer links. No unlimited approval, private key, oracle key, arbitrary recipient or relayer is used.
 
-Chain: Ethereum mainnet, id **1**. IMD is fixed at **0xd34a99bc0f67ae1bbd63c660e6d0b0dd03e263b7**; its `symbol()` and 18 `decimals()` were confirmed by Ethereum reads. The signer was obtained from the [public IMD oracle API](https://api.imd.fun/oracle/requests?limit=1), confirmed against [IMD's published protocol reference](https://api.imd.fun/reads/skill/oracle-consumer) and a real signed Squeekchain result. This is an external oracle key, not TEAM. There is no signer rotation because the approved game allows no additional administrative powers. A signer/protocol change requires a new release; existing unanswered windows retain their refund path.
+EIP-6963 browser discovery, wallet-browser links for MetaMask/Coinbase/Rabby/Phantom, Coinbase Smart Wallet, reconnection, chain switching and disconnect use the preserved wallet implementation. There is no project ID or relay. “Claim all” deliberately asks for one transaction per payable hour because the contract has no batch claim method. The user pays Ethereum gas.
 
-## Windows and bets
+## What the game shows
 
-Genesis is **1791847800** (2026-10-12 23:30:00 UTC). Each round lasts **600 seconds**; window `k` covers rounds `6k` through `6k+5` and lasts **3600 seconds**. Bet strictly before its start, settle at or after its end, and refund from exactly **48 hours** after its end if it remains unsettled. Before genesis, `currentRound()` and `currentWindow()` return zero and `hasStarted()` is false.
+The line and four binary pools come from `windowInfo(k)`. OVER/UNDER are one market, SNOOZE yes/no another. Bets close at the hour's start; equality is UNDER. Under 100 passes refunds OVER/UNDER. A one-sided pool refunds; otherwise estimates include the new stake and 9% fees. A 5 IMD ticket wins within ±0.5% of the settled result; winners split 80% and 20% carries. Prize amounts are labelled unfixed until chronological finalization. Feed donations split 90% jackpot / 10% tip jar. My bets uses wallet-indexed events, live positions and `claimable`, including later jackpot claims. No fictional activity or market amounts are seeded into production.
 
-The first bet creates a window and snapshots its start, end, source URL and line. Later settings do not change it. An update to genesis cannot reopen an uncreated window that already started under the previous schedule. Betting on an existing window closes at the earlier of its snapshotted start and its start under the current genesis, so moving genesis earlier immediately closes windows whose rounds have begun on the corrected clock; their snapshotted end still governs settlement and the timeout. Use `windowTimes(k)` to read a created window's actual schedule. Empty windows are never settled and never enter the result history.
+Live wheel video, hardware status, settlement telemetry and signed chat retain the original `/live`, `/status`, `/rounds`, `/chat` worker endpoints. Chat signs the existing plain text protocol and never sends a transaction. Telemetry is informational: stale/missing readings remain unknown. The mascot and automatic night theme follow fresh speed, independently of the camera. Six seeds show exact ten-minute telemetry when available, including the current interval's live count against an exact preceding baseline. A missing interval stays unknown; the odometer labels approximate baselines. Only the IMD oracle settles results.
 
-Approve IMD to `HamsterHour`, then call `betOverUnder(k, over, amount)`, `betExact(k, guess, amount)` or `betSleep(k, sleeping, amount)`. The minimum **per call** is **0.5 IMD** (`5e17` units). Binary bets can be added on either side. EXACT accepts one immutable ticket per address/window, with a `uint256` guess. Tickets cannot be cancelled or changed.
+## Worker and agent handoff
 
-The line is **1000** until seven windows have successfully settled, then the floored mean of the last seven results **in settlement order**. All successful nonempty settlements count, including ones whose binary markets refund; timeouts do not. A pre-created future window keeps its earlier line. There is no betting horizon, so participants should inspect that snapshot before betting.
+[`worker/worker.mjs`](worker/worker.mjs) is a standalone additive Cloudflare module, with source in `web/worker/index.ts`. See [`worker/README.md`](worker/README.md) for installation/merge options. It implements `/stats7`, `/stats30` and `/api/window`, preserving the existing endpoints through fallthrough. **The new routes have not been published.** The current public worker returns 404 for stats routes. The website shows dated, real Squeekchain snapshots with “Saved telemetry · refresh unavailable” until the extension is installed. It never labels the saved chart live. Snapshot dates are embedded in the files; after 24 hours the wake estimate is suppressed. The existing worker source, hosting account and chat storage were not provided, so no attempt was made to replace them.
 
-## Payout rules and resolved edge cases
+[`SKILL.md`](SKILL.md) is published in the export alongside `/.well-known/agent-skills/index.json` and its SHA-256-identified archive, matching the Squeekchain discovery format. After the static export is hosted, `npx skills add https://hamsterhour.fun` discovers it. It covers identity/ABI verification, reading hours, pools, betting, tickets, feeds, claims, spending limits and own-wallet-only safety. The API route requires the worker handoff; the skill explains direct contract reading as the fallback.
 
-Each market has its own pool. An OVER/UNDER or SLEEP pool with only one funded side refunds **100%**, without fees. OVER/UNDER also refunds when the result equals the line: neither strictly above nor strictly below wins. EXACT is not a binary market, so the one-sided rule does not apply to it. A timeout refunds every bet in every market, without any fee or jackpot allocation.
+## Validation and limits
 
-For each remaining market, settlement allocates **5% to staking, 3% to the oracle reserve, 1% to TEAM and the remaining 91% to winners**. Fees round down to whole token units, and the fractional remainder stays with winners. Binary winners share pro rata by their winning stake. The last winning claimant collects that market's rounding remainder, so all winner funds can leave.
-
-EXACT ranks **distinct absolute distances** from the result. First, second and third tiers receive **60%, 30%, 10%** of that market's winner allocation. All tickets in the same tier split it **equally**, irrespective of amount; the last claimant in a tier collects rounding dust. Missing tiers roll their allocations into first: one tier gets 100%, two get 70%/30%. This resolves the brief's unspecified fewer-than-three case. The closest tier also shares the jackpot equally. One ticket/address is not Sybil resistance; one person can buy tickets through multiple addresses. A larger EXACT stake does not buy a larger tied payout.
-
-`claim(k)` pays the caller's market proceeds/refunds, any earned TEAM fee or settlement reimbursement, and its jackpot. Claims never expire. `claim(k, false)` pays only IMD, allowing IMD recovery when an optional prize token rejects transfers; a subsequent `claim(k)` can collect the prize. At the refund deadline, `claim(k)` also finalizes the timeout automatically. Losers have no payout, and duplicate claims fail. A zero-unit share of a tiny tied jackpot can still be acknowledged so the last winner receives its residual unit.
-
-## Oracle operation
-
-Anyone may purchase and submit an attestation. There is no backend signer, direct Squeekchain oracle, Intake callback, or contract-funded request. A keeper pays the external oracle itself and calls `settle(k, attestation, signature)` before the 48-hour deadline. See [the exact request and verification procedure](docs/ORACLE.md).
-
-The contract checks the canonical IMD v2 typed data, caller-domain signature, chain, canonical question hash, answer encoding, validity, replay and panel thresholds. The signer and oracle panel remain the source of truth; the contract cannot inspect the physical wheel. It requires a panel of at least **5**, quorum at least **4**, and `agreed >= quorum`, with `agreed <= panelSize`. There is a **300-second** clock tolerance for an oracle clock ahead of the chain (`issuedAt <= now + 300`). `settle` additionally requires `issuedAt >= endsAt`: an attestation signed before the last round ended cannot include it. A keeper whose oracle clock runs behind the chain must re-request. Signing the wrong question, domain, source, round range or answer type cannot move funds.
-
-The oracle reserve reimburses exactly **0.5 IMD** to the first successful settlement caller, through `claim(k)`. It reserves that amount at settlement when funded. A settlement in which every funded market refunded takes no oracle fee and earns no reimbursement. If insufficient, settlement still succeeds and the reimbursement is deferred until reserve funds are available; it never draws from refunds or prizes or records an unfunded token liability. Anyone can donate specifically with `fundOracleReserve(amount)`. A later `claim(k)` by that settler can reserve and collect the full amount. Deferred reimbursements compete for available reserve funds; no ordering is promised. Reimbursement goes to the transaction caller, not the purchaser named in an off-chain receipt, so public attestations and mempool transactions can be copied.
-
-The initial source is `https://sepolia.squeekchain.com`. The free IMD preflight accepted the exact template with **no blockers**, but returned a `not_answerable` advisory for the sampled rounds. This is not proof that records will be available. Keepers must verify all six published results exist, use the snapshotted source and exact question, and stop spending on unanswered windows at their deadline. Nobody must run a keeper for users to recover timeout refunds.
-
-## Staking and reserve release
-
-Staking opens only after the one-shot token setting is executed. `stake(amount)` pulls that token, `unstake(amount)` returns principal, and `claimStaking()` pulls earned IMD. There is no lock period. Weight is the amount staked **at settlement**, not stake duration. This deliberately permits just-in-time stake and flash-loan competition for a distribution; no holding-period economics were added.
-
-Rewards use an accumulator with precision **1e27**. Each account checkpoints on stake changes and claims; it cannot claim distributions from before its entry. Before configuration, the 5% share accumulates in `preStakingReserve`. Configuration freezes that amount as `releaseTotal`. It releases in **30 equal cumulative fractions**, rounding each cumulative fraction down and releasing the remainder by tranche 30.
-
-Because windows are lazy, “30 windows after setting” is implemented as the first **30 successful nonempty settlements whose snapshotted end is after activation**, in settlement order. Empty windows, timeouts, and already-ended windows settled after activation do not consume tranches. If no stake exists, both current rewards and released tranches accumulate in `stakingUndistributed`; the next settlement with stake distributes the backlog. Staking alone does not distribute a backlog. Accumulator/checkpoint dust remains reserved in the contract with no withdrawal authority.
-
-## Jackpot and token assumptions
-
-ERC-20 transfers into the contract are donations unless they use a betting, staking or reserve-funding function. Only the one-shot jackpot token is paid as a jackpot. Other directly sent tokens remain held, potentially forever: there is no sweep or rescue power.
-
-At settlement, the next EXACT prize is that token's **entire free balance**, excluding every pending claim and, if currencies overlap, IMD liabilities and staking principal. Earlier unclaimed jackpots are reserved, never re-awarded. A settled window with fewer than **two** EXACT tickets is uncontested: its lone ticket keeps its EXACT market payout but never takes the jackpot, which stays for a later contested window. This stops one minimum ticket in an otherwise empty window from settling first and taking a donation meant for a real guessing contest. It is not Sybil resistance: two addresses still make a contest, and settlement order among ended windows remains free; an empty jackpot pays nothing. All tied closest tickets share the reserved amount, through pull claims. Donations arriving after settlement belong to a future jackpot.
-
-Configured tokens must be honest, non-rebasing ERC-20s with exact transfer amounts. Non-returning tokens are supported. Fee-on-transfer deposits and tokens reporting success without moving funds are rejected. A token that later confiscates, rebases, lies about balances, charges outgoing fees or blocks transfers is outside this solvency assumption. An unreadable jackpot balance is skipped without blocking settlement; a failing jackpot transfer can be bypassed with the IMD-only claim overload. TEAM must inspect token behavior before its irreversible choice.
-
-## After launch
-
-Only TEAM schedules and executes settings; execution requires the exact scheduled value and **48 hours** of delay. Scheduling a replacement restarts the delay. Both phases emit the value publicly. There is no cancellation, upgrade or other setter.
-
-| Setting | Schedule, wait, then execute | Value and source |
-| --- | --- | --- |
-| Staking token, once | `scheduleStakingToken(token)` → `setStakingToken(token)` | TEAM's chosen deployed staking token, obtained from that token's official deployment record. No address was specified in this brief; staking is intentionally closed until set. |
-| Jackpot token, once | `scheduleJackpotToken(token)` → `setJackpotToken(token)` | TEAM's chosen deployed prize token, obtained from its official deployment record. No address was specified; no jackpot is assigned until set. |
-| Source URL | `scheduleSourceUrl(url)` → `setSourceUrl(url)` | Public Squeekchain result source. Initial value is the supplied console; a correction can use its official `/status` page. HTTPS, printable ASCII, no quotes/backslashes/spaces, at most 256 bytes. |
-| Genesis | `scheduleGenesisTimestamp(timestamp)` → `setGenesisTimestamp(timestamp)` | A corrected round-zero timestamp from Squeekchain's official record. Initial value is the supplied 1791847800. Never changes an existing window's stored schedule, but closes its betting early if the corrected start has passed. |
-
-Each address must be nonzero; token setters require deployed code on execution, not during constructors. Tokens may equal IMD or each other because principal and rewards are separately reserved. TEAM can change what future questions reference and how future windows are scheduled, so participants must monitor these public proposals. The launch owner need not configure optional tokens immediately.
-
-Permissionless keepers settle and expire windows; beneficiaries claim their own balances. The deployment service supplies confirmed contract addresses to the later website. Tests and local review are not an independent security audit; release still requires the workflow's independent review.
-
-## Chosen bounds
-
-Fixed bounds: **256 EXACT tickets/window**, **uint128 maximum pool per market**, **uint128 maximum total staking principal**, **256-byte source URL**, **5/4 minimum panel/quorum**, **1e27 accumulator precision**. The ticket bound keeps ranking and settlement bounded; binary markets have no bettor-count loop or participant cap. All other round durations, delays, fee rates, minimum bet and reimbursement amounts are the brief's fixed values. No setting can change them.
-
-## Trust assumptions recorded at review
-
-- **Staking token choice.** TEAM's one-shot staking token decides who can earn the 5% staker share and the pre-staking reserve. A token only TEAM holds or mints would route both to TEAM. Reviewers of a `scheduleStakingToken` proposal should check the token's supply control during its 48-hour notice.
-- **Oracle signer.** `OracleVerifier` pins one attester key with no rotation. If IMD rotates or loses it, no window can settle again; open windows refund after their timeout and a new deployment is required.
-- **Pending settings do not lapse.** A scheduled `sourceUrl` or genesis can be executed any time after its 48-hour delay. Watch `pendingConfig` and `ConfigScheduled` events; `sourceUrl` selects the result source named in each new window's oracle question.
-- **Genesis range.** Genesis changes are bounded only to keep window arithmetic in `uint64`. An extreme value can stop new windows or push the schedule of later-created windows far out; existing deposits stay refundable.
-- **Window horizon.** Windows can be created arbitrarily far ahead and freeze the line and source at creation; a later source change cannot reach them, so they may only void at timeout.
+Actual build, typecheck, ABI/export integrity, unit/worker tests, Chromium interactions and the six-domain Better Interface review are recorded in [`docs/frontend/V2-VALIDATION.md`](docs/frontend/V2-VALIDATION.md). [`DESIGN.md`](DESIGN.md) documents the final tokens and components. Read-only mainnet verification and the worker's real contract snapshot succeeded. Transaction tests use fixtures; no real money or signed production chat was sent. YouTube playback, physical phone wallet launches and passkey creation remain unverified. The optional browser MCP connection was unavailable; the supplied Chromium/Playwright runtime performed rendered checks instead.

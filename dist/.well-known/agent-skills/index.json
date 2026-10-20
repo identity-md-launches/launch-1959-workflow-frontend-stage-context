@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+  "skills": [
+    {
+      "name": "hamster-hour",
+      "type": "archive",
+      "description": "Read Hamster Hour v2 and prepare wallet-owned IMD bets, jackpot tickets, feeds and claims within spending limits.",
+      "url": "hamster-hour.zip",
+      "digest": "sha256:c73912d849f5e8bc159bf92574d6493b23b32b1dd3c7fad1d80a98b7e3478173"
+    }
+  ]
+}

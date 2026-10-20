@@ -1,7 +1,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -11,32 +10,26 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   createWalletClient,
   custom,
-  type Abi,
-  type Address,
+  erc20Abi,
   type Hex,
+  type Address,
 } from "viem";
-import type { Runtime } from "./config";
+import { type Runtime } from "./config";
 import { verifyDeployment } from "./data";
 import { errorText } from "./model";
-type Call = {
-  functionName: string;
-  args?: readonly unknown[];
-  address?: Address;
-  abi?: Abi;
-  onSubmitted?: (hash: Hex) => void;
-};
-export type TxState = {
-  phase:
-    "simulating" | "wallet" | "confirming" | "unknown" | "confirmed" | "error";
-  message: string;
-  hash?: Hex;
-};
-const TxContext = createContext<{
-  states: Record<string, TxState>;
+import { useWalletControl } from "./Wallet";
+const Context = createContext<{
   busy: boolean;
-  send: (id: string, call: Call) => Promise<boolean>;
-}>({ states: {}, busy: false, send: async () => false });
-export const useTransactions = () => useContext(TxContext);
+  message: string;
+  error: string;
+  hash?: Hex;
+  run: (
+    fn: string,
+    args: readonly unknown[],
+    approval?: boolean,
+  ) => Promise<boolean>;
+}>({ busy: false, message: "", error: "", run: async () => false });
+export const useTransaction = () => useContext(Context);
 export function TransactionProvider({
   r,
   children,
@@ -44,266 +37,101 @@ export function TransactionProvider({
   r: Runtime;
   children: ReactNode;
 }) {
-  const [states, setStates] = useState<Record<string, TxState>>({});
-  const [busy, setBusy] = useState(false);
+  const { address, connector, chainId } = useConnection();
+  const { open, switchChain } = useWalletControl();
+  const cache = useQueryClient();
   const locked = useRef(false);
-  const [pending, setPending] = useState<{ id: string; hash: Hex } | null>(
-    null,
-  );
-  const [checking, setChecking] = useState(false);
-  const { address, chainId, connector } = useConnection();
-  const queries = useQueryClient();
-  const storageKey = `hamster-hour:pending:${r.deployment.launchId}`;
-  function persist(value: { id: string; hash: Hex } | null) {
-    try {
-      if (value) localStorage.setItem(storageKey, JSON.stringify(value));
-      else localStorage.removeItem(storageKey);
-    } catch {
-      /* confirmation tracking still works without storage */
-    }
-  }
-  useEffect(() => {
-    try {
-      const value = JSON.parse(localStorage.getItem(storageKey) ?? "null");
-      if (
-        value &&
-        typeof value.id === "string" &&
-        /^0x[\da-f]{64}$/i.test(value.hash)
-      ) {
-        setPending(value);
-        locked.current = true;
-        setBusy(true);
-        setStates((v) => ({
-          ...v,
-          [value.id]: {
-            phase: "unknown",
-            hash: value.hash,
-            message:
-              "A submitted transaction still needs a confirmation check.",
-          },
-        }));
-      }
-    } catch {
-      /* invalid local state is not trusted */
-    }
-  }, [storageKey]);
-  async function refresh() {
-    await queries.invalidateQueries({
-      predicate: (q) => !["stream"].includes(String(q.queryKey[0])),
-    });
-  }
-  async function checkPending() {
-    if (!pending || checking) return;
-    setChecking(true);
-    try {
-      await verifyDeployment(r);
-      const receipt = await r.client.getTransactionReceipt({
-        hash: pending.hash,
-      });
-      if (receipt.status === "success") {
-        await refresh();
-        setStates((v) => ({
-          ...v,
-          [pending.id]: {
-            phase: "confirmed",
-            hash: pending.hash,
-            message: "Confirmed on Ethereum.",
-          },
-        }));
-      } else
-        setStates((v) => ({
-          ...v,
-          [pending.id]: {
-            phase: "error",
-            hash: pending.hash,
-            message: "The transaction reverted. No action was completed.",
-          },
-        }));
-      setPending(null);
-      persist(null);
-      locked.current = false;
-      setBusy(false);
-    } catch {
-      setStates((v) => ({
-        ...v,
-        [pending.id]: {
-          phase: "unknown",
-          hash: pending.hash,
-          message:
-            "Confirmation is still unavailable. Check the transaction on the explorer before retrying.",
-        },
-      }));
-    } finally {
-      setChecking(false);
-    }
-  }
-  async function send(id: string, call: Call) {
+  const [busy, setBusy] = useState(false),
+    [message, setMessage] = useState(""),
+    [error, setError] = useState(""),
+    [hash, setHash] = useState<Hex>();
+  async function run(fn: string, args: readonly unknown[], approval = false) {
     if (locked.current) return false;
+    if (!address || !connector) {
+      open();
+      return false;
+    }
+    if (chainId !== r.chain.id) {
+      await switchChain();
+      return false;
+    }
     locked.current = true;
     setBusy(true);
-    const state = (s: TxState) => setStates((v) => ({ ...v, [id]: s }));
-    let hash: Hex | undefined;
-    let finalized = false;
-    let cancelled = false;
-    state({ phase: "simulating", message: "Checking this action on chain…" });
+    setError("");
+    setHash(undefined);
+    setMessage("Checking the transaction…");
     try {
-      if (!connector || !address)
-        throw Error("Connect your wallet to continue.");
+      await verifyDeployment(r);
       const provider = await connector.getProvider();
       const wallet = createWalletClient({
         account: address,
         chain: r.chain,
         transport: custom(provider as any),
       });
-      if (chainId !== r.chain.id || (await wallet.getChainId()) !== r.chain.id)
-        throw Error(`Switch your wallet to ${r.chain.name} first.`);
-      if (
-        (await wallet.getAddresses())[0]?.toLowerCase() !==
-        address.toLowerCase()
-      )
-        throw Error(
-          "Your wallet account changed. Reconnect before trying again.",
-        );
-      await verifyDeployment(r);
-      const request = {
-        address: call.address ?? r.game.address,
-        abi: call.abi ?? r.game.abi,
-        functionName: call.functionName,
-        args: call.args ?? [],
+      const target: Address = approval ? r.token.address : r.game.address;
+      const simulation = await r.client.simulateContract({
+        address: target,
+        abi: approval ? erc20Abi : r.game.abi,
+        functionName: fn,
+        args,
         account: address,
-      };
-      const simulation = await r.client.simulateContract(request);
-      const gas = await r.client.estimateContractGas(request);
-      // Recheck identity after RPC preflight, immediately before requesting a signature.
-      if (
-        (await wallet.getChainId()) !== r.chain.id ||
-        (await wallet.getAddresses())[0]?.toLowerCase() !==
-          address.toLowerCase()
-      )
-        throw Error(
-          "Your wallet account or network changed. Review the action again.",
-        );
-      state({
-        phase: "wallet",
-        message: "Review the action and network fee in your wallet.",
-      });
-      hash = await wallet.writeContract({
-        ...simulation.request,
-        chain: r.chain,
-        gas: (gas * 120n) / 100n,
-      });
-      persist({ id, hash });
-      call.onSubmitted?.(hash);
-      state({
-        phase: "confirming",
-        message: "Submitted. Waiting for on-chain confirmation…",
-        hash,
-      });
+      } as any);
+      setMessage("Confirm in your wallet…");
+      const tx = await wallet.writeContract(simulation.request as any);
+      setHash(tx);
+      setMessage("Waiting for Ethereum confirmation…");
       const receipt = await r.client.waitForTransactionReceipt({
-        hash,
+        hash: tx,
         confirmations: 1,
         timeout: 180000,
-        onReplaced: (replacement) => {
-          hash = replacement.transaction.hash;
-          cancelled = replacement.reason === "cancelled";
-          persist({ id, hash });
-          call.onSubmitted?.(hash);
-          state({
-            phase: "confirming",
-            message: "Following the replacement transaction…",
-            hash,
-          });
-        },
       });
-      finalized = true;
-      persist(null);
-      if (cancelled)
-        throw Error("The transaction was cancelled in your wallet.");
       if (receipt.status !== "success")
-        throw Error("The transaction reverted. No action was completed.");
-      await refresh();
-      state({
-        phase: "confirmed",
-        message: "Confirmed on Ethereum.",
-        hash,
-      });
+        throw Error("The transaction reverted. You can try again.");
+      setMessage(
+        approval
+          ? "IMD approved. Confirm your action next."
+          : fn === "claim"
+            ? "Your IMD has been claimed."
+            : "Confirmed on Ethereum.",
+      );
+      await cache.invalidateQueries();
       return true;
     } catch (e) {
-      if (hash && !finalized) {
-        setPending({ id, hash });
-        state({
-          phase: "unknown",
-          hash,
-          message:
-            "Confirmation is unavailable. Check the submitted transaction before sending another.",
-        });
-      } else state({ phase: "error", message: errorText(e), hash });
+      setError(errorText(e));
+      setMessage("");
       return false;
     } finally {
-      if (!hash || finalized) {
-        locked.current = false;
-        setBusy(false);
-      }
+      locked.current = false;
+      setBusy(false);
     }
   }
   return (
-    <TxContext.Provider value={{ states, busy, send }}>
-      {pending && (
-        <div className="pending-transaction" role="status">
-          <span>
-            A submitted transaction needs confirmation. New actions are locked
-            to prevent duplicates.
-          </span>
-          <a
-            href={`${r.deployment.network.explorer}/tx/${pending.hash}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            View transaction ↗
-          </a>
-          <button onClick={() => void checkPending()} disabled={checking}>
-            {checking ? "Checking receipt…" : "Check confirmation"}
-          </button>
-        </div>
-      )}
+    <Context.Provider value={{ busy, message, error, hash, run }}>
       {children}
-    </TxContext.Provider>
+    </Context.Provider>
   );
 }
-export function TxFeedback({ id, r }: { id: string; r: Runtime }) {
-  const { states } = useTransactions();
-  const state = states[id];
+export function TransactionStatus({ r }: { r: Runtime }) {
+  const t = useTransaction();
   return (
-    <div
-      className={`tx-feedback ${state?.phase === "error" ? "error" : ""}`}
-      role="status"
-    >
-      {state && (
-        <>
-          <span>{state.message}</span>
-          {state.hash && (
-            <a
-              href={`${r.deployment.network.explorer}/tx/${state.hash}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View transaction ↗
-            </a>
-          )}
-        </>
+    <div className="transaction-status" role="status">
+      {t.error ? (
+        <p className="error">{t.error}</p>
+      ) : t.message ? (
+        <p>
+          {t.busy && <span className="spinner" />}
+          {t.message}
+        </p>
+      ) : null}
+      {t.hash && (
+        <a
+          href={`${r.deployment.network.explorer}/tx/${t.hash}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          View transaction ↗
+        </a>
       )}
     </div>
   );
-}
-export function txLabel(state: TxState | undefined, label: string) {
-  return state &&
-    ["simulating", "wallet", "confirming", "unknown"].includes(state.phase)
-    ? state.phase === "simulating"
-      ? "Checking…"
-      : state.phase === "wallet"
-        ? "Confirm in wallet…"
-        : state.phase === "unknown"
-          ? "Check pending transaction"
-          : "Confirming…"
-    : label;
 }

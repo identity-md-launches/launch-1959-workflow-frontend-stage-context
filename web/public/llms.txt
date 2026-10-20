@@ -1,0 +1,10 @@
+# Hamster Hour
+
+- Agent skill: https://hamsterhour.fun/SKILL.md
+- Install: npx skills add https://hamsterhour.fun
+- Discovery: https://hamsterhour.fun/.well-known/agent-skills/index.json
+- ABI: https://hamsterhour.fun/abi/HamsterHour.json
+- Deployment: https://hamsterhour.fun/imd-deployment.json
+- Read-only API: https://hamsterhour.fun/api/window
+
+Ethereum mainnet, own wallet only. Never handle private keys. Read SKILL.md for verification, spending limits and game rules.

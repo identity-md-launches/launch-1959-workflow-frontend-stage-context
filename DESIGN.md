@@ -1,97 +1,90 @@
-# Hamster Hour design system
+# Hamster Hour design
 
 ## Overview
 
-A mobile-first betting terminal for a live hamster wheel. The first visit has a full-screen meme-video introduction; after dismissal, the player (live YouTube embed or the SLEEPING screen), countdown, line and three betting choices are the main interface, with the wallet-signed Wheel chat beneath them. The desktop version places the game controls and chat beside the player and adds an original pixel hamster running in a wheel. More contains the secondary contract tools. A meme layer (poke, mood, result cards, easter eggs) sits on top without changing the game.
+Hamster Hour is a single-page React game for people betting IMD on a real hamster's next hour. The implemented direction is “cozy pixel”: warm paper, a large tight headline ending in a peach period, an original geometric hamster/cage/wheel, rounded cards and small pixel counters. The illustration is original SVG in `web/src/pixel.tsx`, not a character from another property. The three pages share a header, footer and runtime data: The wheel, Stats and My bets. The worker extension is a separate deployment handoff; it preserves the existing camera/chat endpoint behavior, including chat preflight, and is not a static runtime dependency bundle.
 
-The visual idea is a dark grid terminal lit by neon green, with one orange-and-cream goggle hamster. This document describes `web/src/` and the shipped `dist/`, not the earlier frontend. The deployed contracts and economics are unchanged.
+The source of truth is `web/src/styles.css`, with component composition in `App.tsx`, `Bet.tsx`, `Jackpot.tsx`, `Stats.tsx` and `MyBets.tsx`. `DESIGN.md` describes the final implemented system; validation and observed limitations are in `docs/frontend/V2-VALIDATION.md`.
 
 ## Colors
 
-Canonical tokens live in `web/src/styles.css`.
+All page colors use CSS properties, switched by the root `data-theme` attribute. Automatic mode follows fresh positive wheel speed; a visitor can select day/night manually or restore Auto theme in the footer.
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `--bg` | `#0b0d0b` | Page, inputs and dialogs |
-| `--surface` | `#101710` | Neutral controls, notices, menus |
-| `--raised` | `#142116` | Hover and selected menu surfaces |
-| `--line` | `#163a1c` | Structural dividers; 25px SVG grid at 25% opacity |
-| `--green` | `#39ff6a` | Actions, ring art, pool numbers, countdown and selected chips |
-| `--text` | `#f2f0e6` | Headings, body and focus outline |
-| `--dim` | `#5a8f63` | The coming-soon line and footer text on the page background |
-| `--muted` | `#85aa8b` | Readable supporting labels and body text across surfaces |
-| `--danger` | `#ffae9c` | Errors, always accompanied by explanatory text |
-| `--glow` | `0 0 18px #39ff6a26` | Interactive neon glow |
+| Role/token        | Day       | Night / use                             |
+| ----------------- | --------- | --------------------------------------- |
+| `--bg`            | `#FFF5E6` | `#1E1A2E`                               |
+| `--card`          | `#FFFBF4` | `#29233D`                               |
+| `--ink`           | `#2B2118` | `#FFF5E6`                               |
+| `--muted`         | `#796451` | `#BEAFCF`                               |
+| `--line`          | `#E9D9C3` | `#493D5B`                               |
+| `--hover`         | `#F4E9D8` | `#362E4B`                               |
+| `--focus`         | `#80502C` | `#FFE08A`                               |
+| `--error`         | `#A52F2F` | `#FFB3BD`                               |
+| `--peach`         | `#FFB48A` | Primary action / selected OVER          |
+| `--butter`        | `#FFE08A` | Jackpot / quick amount / hover          |
+| `--mint`          | `#A8E6C6` | Activity / wins                         |
+| `--lilac`         | `#CDB8FF` | Selected SNOOZE / wheel                 |
+| `--over`          | `#E07A3E` | OVER rail / button shadow               |
+| `--under`         | `#5B8DEF` | UNDER rail / button shadow              |
+| `--snooze`        | `#9A6FE0` | SNOOZE rail / button shadow             |
+| `--chart-outline` | `#527E63` | Night `#A8E6C6`; visible bar boundaries |
 
-Computed solid-token contrast against `--bg`: foreground text 17.07:1, accent 14.57:1, dim 5.15:1, muted 7.54:1 and error 10.95:1. These are calculated token pairs, not a claim that video frames were measured. `--dim` is not used for text on `--raised`, where its calculated 4.40:1 would be too low. The rendered accessibility scan and probe also checked eligible text; image/grid-dependent backgrounds and cross-origin YouTube content have stated limitations in validation.
+The brief's `#8A7765` is retained as `--muted-brand`; body metadata uses the darker `--muted` for contrast. `--rose: #FF9AA8` remains a palette primitive without a current control role. Selected UNDER uses a pale `#C9DDFF` fill with its specified blue shadow. Status always has text as well as color. Results keep their numbers in `--ink` and use category-colored top edges. The jackpot stays `#29233D` in both themes, with butter numbers and `#C4B6CF` secondary copy.
 
-Pixel-art oranges and creams are local illustration colors, not additional interface status colors. Wallet marks retain their official brand colors. The design is intentionally dark-only.
-
-Buttons: `.primary` is a dark fill (`--bg`) with a 1px `--green` border and bold green text; hover adds `--glow` and a faint inset glow. `.secondary` uses `--dim` text and border. Selected amount chips use `--raised` with an inset green ring. The LIVE badge is green on near-black with a text glow; SLEEPING uses `--dim`. Chat identicons use `hsl(hue 75% 62%)` derived from the address, decorative only. Confetti seeds are `#2a2420` / `#f2e2b7`.
+Computed solid-token ratios: day ink/page 14.59:1, day muted/card 5.42:1, night ink/card 13.88:1, night muted/card 7.29:1, dark ink/peach 9.11:1, jackpot butter/card 11.61:1. These calculations are for the stated solid token pairs. Rendered checks and decorative/image limitations are recorded in validation.
 
 ## Typography
 
-IBM Plex Mono is bundled as regular 400 and bold 700 Latin WOFF2 in `web/src/assets/`. The fallback is `monospace`. `font-display: swap` and `font-synthesis: none` are set; both used weights are supplied. There is no external font request from the app.
+Two local families, four WOFF2 files in `web/src/assets/`:
 
-The six sizes are 12, 14, 16, 20, 32 and 48px (`--s1` through `--s6`). Supporting labels are 12px; body is 14px; inputs and tertiary headings are 16px; section headings and primary choices are 20px; desktop hero/line values are 32px; countdown/desktop intro title are 48px. The mobile intro title is 32px and the header name is 14px. At 320px the compact header and SLEEPING label use 12px to fit without clipping.
+- Geist regular 400, semibold 600 and bold 700 for interface text, headings and body copy; fallback Arial/sans-serif.
+- Silkscreen regular 400 for the big pass count, line, jackpot, category tags and headline statistics; fallback monospace.
 
-Body line height is 1.6, headings 1.25 and countdown 1.2. Headings balance their lines. Changing digits use tabular numerals; the face itself is monospaced. The uppercase brand is bold with small display tracking; body copy has natural spacing. The countdown uses -0.04em and the desktop hero -0.035em tracking. Long numbers, addresses and URLs generally wrap rather than being clipped. The amount suffix is `white-space: nowrap`, at least `3ch` wide and cannot flex-shrink; its adjacent input uses `flex: 1 1 0` and `min-width: 0`. The live-progress summary stays on a single horizontally scrollable line at 900px and below so the full values remain reachable. Technical addresses remain available in full through the account menu and copy/explorer controls.
+Six size tokens: `--small` 12px, `--label` 14px, `--body` 16px, `--heading` 20px, `--number` 40px, `--display` 82px. Display becomes 88px at 1440+, 62px at 1100 and below, 48px at 800 and below, and 40px below 360. Numeric labels use tabular figures. Silkscreen is never used for paragraphs. Body line-height is 1.5; the main headline is 1.02, or 1 on mobile, with -0.065em tracking. Section headings use -0.025em. Controls use native labels and no tracked uppercase eyebrow.
 
-`SlotNumber` shares `--slot-row-height: 1.2em` between its viewport, each digit row and its translation. A value's visible digits therefore align with its accessible label at every font size, including after updates and with reduced motion.
+The mobile amount, chat and modal inputs are at least 16px; the main amount is 20px. Mobile native selects are 16px. The word IMD is a separate nonwrapping flex item. Font licenses are shipped in `dist/fonts/`.
 
 ## Layout
 
-`app-shell` has a 1248px maximum width and 24px inline gutters, reduced to 20px at 900px, 16px at 600px and 12px at 350px. Spacing follows 4/8/12/16/20/24/32/40px steps. The grid extends across the whole page using an SVG pattern rather than a gradient.
+`.site` is centered, normally at most 1280px including 40px side padding. At 1440+ it is at most 1340px with 50px padding; padding falls to 28px, 22px, then 16px as space narrows. Most layout gaps are 24px, then 20/18px on smaller screens; component gaps use 4, 8, 10, 12 and 16px.
 
-Above 900px, `play-layout` has 1.65fr and 1fr columns separated by 32px; above 1100px the gap becomes 40px. The right column holds the betting panel, How it works and the Wheel chat (280px scrolling log). At 900px and below it becomes one column and the decorative wheel hero is hidden. The `.player` slot is exactly 16:9 whether it holds the YouTube iframe or the absolutely positioned SLEEPING screen; the badge sits in its top-left corner and the 3 s "HE'S RUNNING" banner is centred low. The poke row sits directly under the player.
+At desktop, the habitat and activity strip occupy the leading column; the betting form occupies the trailing column. The main and lower grids use `1.4fr / 1fr` with a minimum 350px betting column. The lower pair is camera/jackpot. Chat/My bets form another pair. Stats uses a full-width chart, two detail cards and a four-column event summary.
 
-On phones, the reading order is header (brand + mood), Bet/More utilities, player, poke row, countdown/line with the passes tooltip, the window line, live progress, three buttons, short explanation, exact-guess link, How it works, Wheel chat (240px log) and personal bets. The three main choices remain one row. No marketing content appears before the game. The main choices remain in the first 390×844 viewport after the intro is dismissed, including the live progress block (browser assertion and screenshot in the maintenance check).
+Breakpoints are 1440, 1100, 800, 680 and 359px. At 680 and below, betting comes first in the content order, then the habitat and activity. The headline and three choices remain on the opening screen at 390px. A fixed bottom summary/action bar reserves an 82px plus safe-area region: the page scrolls inside `.site` above it, so the action does not cover text. Other tabs return to ordinary document scrolling. Chat uses native collapsible details; results and activity feeds expose horizontal scrolling. Results and chat are keyboard-focusable scroll regions. The header's tabs wrap onto their own row. Dialogs become full-width bottom sheets with safe-area padding.
 
-The secondary pages are at most 900px wide. `work-grid` and personal positions use two columns on wide screens and one on phones. History and settings wrap long data. Personal-position grid items have `min-width: 0` to contain the new live summary. Wallet and amount dialogs become full-width bottom sheets below 600px, with safe-area bottom padding and a scrollable maximum height of 92dvh.
+Screens inspected at 320, 390, 800 and 1440 CSS pixels. Mobile browser emulation is not a physical-device or native 200% zoom test.
 
 ## Elevation & Depth
 
-The interface uses dark fills, one-pixel separators and square borders. Neon glow is reserved for the specified rings, countdown, pool values, hover and intro frame. The intro frame intentionally combines a green border and glow. There are no gradients, stock illustrations, background animation or decorative photos; the requested intro video and live stream are the media exceptions.
+Cards use a 1px warm border and no shadow. A very low-opacity fixed SVG turbulence overlay supplies film grain and ignores pointer events. The habitat has a faint square grid. Activity plots and the share card add small dotted/grid touches.
 
-Native modal dialogs use the browser top layer, a dark translucent backdrop and 4px backdrop blur. Their background is inert while open. Account and More popovers use small z-index layers; ordinary content and pending-transaction notices stay in flow.
+The requested chunky action treatment is intentional: main buttons use a 4px downward colored shadow plus a 1px dark border. Category buttons have corresponding shadows. This is a documented exception to the probe's generic “border and shadow together” preference. Help popovers and account menus are elevated; dialogs use the native top layer, a dark translucent backdrop and 4px backdrop blur. The mobile action bar is z-index 40, errors 80, and skip navigation 100.
 
 ## Shapes
 
-Controls have zero border radius. The mascot’s circular neon ring and stepped pixel goggles are art, not rounded UI containers. The front-view hamster has orange fur, cream cheeks and round pixel goggles. `favicon.svg` is the default face; `hamster-happy.svg` smiles; `hamster-asleep.svg` closes its eyes; `hamster-curled.svg` is the curled-up sleeper on the SLEEPING screen; `hamster-thumbs.svg` gives the thumbs up on a winning card. `hamster-wheel.svg` is the desktop runner. Sunglasses are two black CSS pixels overlaid on the logo after ten clicks. `share.svg` and its 1200×630 PNG include the mascot.
+Cards and dialogs have 26px outer corners, within the requested 22–28px range. Buttons and navigation pills use 99px radii. Category choices and video frames use 16px; fields use 12–14px; graph bars use 4–5px. The pixel illustration deliberately uses stepped hard corners and `shape-rendering: crispEdges` instead of rounded illustration geometry.
 
 ## Components
 
-| Component | Source | Behavior |
-| --- | --- | --- |
-| `Intro` | `web/src/Intro.tsx` | Full-screen local video; Start playing, Escape, close and backdrop dismissal; one-time localStorage memory; pause control and reduced-motion start state |
-| `Stream` | `web/src/Stream.tsx`, `live.ts` | `/live` every 20 s through the proxy: live YouTube embed (switches on publicId change), SLEEPING screen (curled mascot, zzz, last known mm/s and passes from `/status`), fallback embed of the last known stream when the proxy fails, including after a cached idle response; successful polls restore the current state; LIVE/SLEEPING badge; one-time green pulse and banner on going live |
-| `Chat` / `Identicon` | `web/src/Chat.tsx` | 5 s polling log (200 kept, autoscroll unless scrolled up), EIP-191 signed posts, 200-char/no-link/5 s client rules, plain-word server errors, address + pixel identicon + "bet" tag, read-only with "Connect to chat" |
-| Meme layer | `web/src/meme.tsx`, `App.tsx`, `Bet.tsx`, `MyBets.tsx` | Poke button with synthesized squeak, hop and local counter; header mood; `SlotNumber` digit reels; `SeedConfetti`; winning/losing result cards with share intents; logo-click sunglasses; Konami spin; page dim while sleeping |
-| `Bet` / `Sheet` | `web/src/Bet.tsx`, `Sheet.tsx` | Three primary choices; secondary EXACT/RUNNING; first-visit expanded How it works with persisted disclosure choice; jackpot copy shown only when the on-chain token is configured; amount chips and custom input; checking/approval/placing/success/error states; exact-amount approval followed by one bet |
-| `WindowProgress` | `web/src/WindowProgress.tsx`, `live.ts` | Current on-chain window times, six-round mapping from Squeekchain’s independent epoch, worker settlement baseline and live counter; exact/approximate/round-only fallbacks; 3px green progress bar capped at 100%, labelled progressbar and a keyboard-scrollable summary region; muted unofficial-oracle note; no animation |
-| `MyBets` / `ResultCard` | `web/src/MyBets.tsx` | Current/next positions, live progress beside a bet on the running window, pending results, real outcome and payout, one Claim, optional separate jackpot transfer |
-| `Action`, `Field`, `ErrorNote` | `web/src/ui.tsx` | Shared connect/switch/action gate, persistent input labels, disabled reasons and announced feedback |
-| `WalletProvider` / `WalletControl` | `web/src/Wallet.tsx` | Named extension discovery and legacy injected wallets connect directly when exactly one is detected; the generic duplicate is omitted when discovery names providers; multiple/no wallets retain the native picker, phone links and Coinbase Smart Wallet; network switch and account menu |
-| `TransactionProvider` | `web/src/transactions.tsx` | Simulation, wallet review, confirmation, replacement tracking and unresolved-receipt recovery |
-| `OraclePurchase` / `Keeper` | `web/src/OraclePurchase.tsx`, `Keeper.tsx` | Reviewable paid oracle request, polling/persistence, verified prefill, manual paste, settlement, timeout and reserve funding |
-| `Settings` | `web/src/Settings.tsx` | Everyone sees current/pending values and dates; only TEAM gets editable inputs and actions |
-| `Stake` / `History` | `web/src/Stake.tsx`, `History.tsx` | Existing staking actions and public history, including manual lookup and claims |
+| Component / source                               | Use and behavior                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CardHead`, `Help` · `ui.tsx`                    | Consistent heading/action alignment. The question mark is native details/summary, usable with keyboard and pointer. Text stays readable in both themes.                                                                                                                                                |
+| `BetPanel` · `Bet.tsx`                           | Local-time hour, large line, three category buttons, independent SNOOZE yes/no, live return estimate, amount/quick picks, approval step, review dialog, timeline and mobile action bar. Inline failures preserve input. A review freezes account/hour/side/amount and rechecks closing before sending. |
+| `WalletProvider`, `WalletControl` · `Wallet.tsx` | EIP-6963 extensions, mobile wallet links, Coinbase passkey wallet, switch-chain and account menu. Native dialog closes with Escape/backdrop/close button and restores focus.                                                                                                                           |
+| `Sheet` · `Sheet.tsx`                            | Native modal shared by review, ticket, feed and share. Focus stays inside; closing restores the trigger. Pending transactions prevent accidental dismissal.                                                                                                                                            |
+| `TransactionProvider` · `transactions.tsx`       | Verification → simulation → wallet → receipt. Visible pending/failure/success text and explorer link; duplicate sends are locked while a transaction is pending.                                                                                                                                       |
+| `Hamster`, `Seed`, `Jar` · `pixel.tsx`           | Original code-native illustration. Fresh speed switches sleep/run and wheel movement. Six telemetry seeds and the decorative coin jar accompany readable numeric values. Unknown readings remain unknown.                                                                                              |
+| `Activity`, `Stats` · `Stats.tsx`                | Local-hour telemetry chart, now marker, 7/30-day filters, records and event statistics. Charts have contrasting edges and accessible text. Saved data is dated and identified.                                                                                                                         |
+| `MyBets` · `MyBets.tsx`                          | Wallet-specific positions, claimable IMD, per-hour claim and sequential Claim all. New wins show a banner and optional jingle/confetti. Empty and failed reads have explicit states.                                                                                                                   |
+| `Stream`, `Chat` · corresponding files           | Existing cam and signed chat protocols. Video has pause/play; reduced-motion starts it paused. Chat scroll can be inspected independently and collapses on phones.                                                                                                                                     |
+| `Share` · `Share.tsx`                            | Locally rendered PNG with exact side, amount, line and local time, download and X intent. Text is fitted to the canvas rather than clipped.                                                                                                                                                            |
 
-Most actions are at least 44px high; wallet rows are at least 52px. Compact utility links and the video control retain sufficient size/spacing. Focus is a 2px off-white outline with 4px offset. Controls have hover, press, disabled and focus-visible states; selection also has `aria-pressed`. The native dialogs contain focus and restore it on dismissal. During the approval/bet flow, closing its sheet is disabled so the transaction state remains visible.
+All interactive controls have focus-visible outlines, pressed/hover/disabled states and native semantics. Most high-frequency transitions are 150ms. Buttons press to scale 0.96. Continuous wheel/sleep animations opt into no-preference motion; reduce-motion stops animations and transitions. A separate Pause control stops illustration loops. Optional WebAudio uses square-wave notes, with a four-note win jingle. Sound is off until enabled; it can be toggled in the header or footer.
 
-UI transitions are 120ms on named properties; pressed buttons scale to 0.96. Motion in the meme layer: zzz drift (3.6s loop, only while sleeping), 480ms hop, 700ms digit reels, 1.2s green pulse, 1.3s page spin, falling seeds on a winning card. `prefers-reduced-motion` removes every animation and transition, renders zzz static, hides the seeds, cancels the spin and stops the chewing video from autoplaying. The external YouTube player controls its own video behavior. The tooltip under the line opens on hover, focus or tap of its 24px "?" control.
+## Do's and Don'ts
 
-The live progress block reuses `--s1` (12px), `--muted` and existing body text; tabular numerals; `--line` for the 3px track and `--green` for its fill; 8px from summary to bar and 8px to the small print, with 12px below the block. At desktop widths its text can wrap within the panel. At 900px and below the summary scrolls horizontally as one line, the bar fits the available width, and the small print wraps naturally. This does not add a type size, color, shadow, animation or dependency. Its settlement-based baseline is separate from the pre-existing mood counter. Missing or failed worker data shows only the round, with no invented zero.
+Reuse `CardHead` and the color/type tokens for another section. Keep data grouped with the control it explains. Use actual contract or telemetry values and preserve pending/unknown states. For a new page, add a hash navigation entry, compose existing cards, retain one h1, and check both themes at 320/390/1440.
 
-The header mood uses speed for sleeping, stretching, cruising and zoomies. With nonzero speed, villain era requires tracked current-window passes strictly above twice the line. This existing local observation counter starts at the first status sample seen in the window; it is not the oracle's settled result.
+Keep category colors on pale controls, shadows and result rails; use the foreground token for small result text. Preserve the six-size hierarchy. Keep wallet/transaction implementation details inside meaningful verification, approval or error states. Do not add an external font CDN, fictional activity, unlimited approval, a new wallet relay, a scrolling marquee, or an illustration animation without a static state cue and a motion opt-out.
 
-## Do’s and don’ts
-
-- Build a new secondary surface from `.secondary-page`, `.section`, `Field` and `Action`; add it to More without pushing the Bet controls downward.
-- Use the existing six sizes, two weights and semantic color roles. Keep important long values readable and allow wrapping.
-- Keep pools, balances, timing, results and configuration derived from chain reads. A missing value is a loading/error state, not a zero.
-- Use plain player words: shared pool, verified result, refunded and close the window. Precise protocol vocabulary belongs in How it works, Settle, TEAM and documentation.
-- Reuse the transaction and wallet gates. Never add a separate private signer, fake provider, relay dependency or alternate deployment.
-- Regenerate the full static export and manifest after a source/asset change. Keep the local video, fonts and license with it.
-
-The latest six-domain review, probe exceptions, interaction evidence and unperformed checks are in the [maintenance report](docs/frontend/MAINTENANCE.md); the [revision report](docs/frontend/REVISION.md) is retained for historical changes, with the [original validation record](docs/frontend/VALIDATION.md) retained. Guidance attribution and licenses are retained in [docs/frontend/ATTRIBUTION.md](docs/frontend/ATTRIBUTION.md).
+Design guidance attribution: Better Interface by Jakub Krehel (MIT) and the document method adapted from Paul Bakaus's Impeccable (Apache-2.0), as pinned by this assignment. The combined license is preserved in `docs/frontend/BETTER-INTERFACE-LICENSE.txt`.

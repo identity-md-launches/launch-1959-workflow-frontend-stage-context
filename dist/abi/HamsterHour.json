@@ -8,7 +8,12 @@
         "internalType": "address"
       },
       {
-        "name": "verifier_",
+        "name": "attester_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "intake_",
         "type": "address",
         "internalType": "address"
       }
@@ -17,7 +22,20 @@
   },
   {
     "type": "function",
-    "name": "ACC_PRECISION",
+    "name": "ATTESTER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "BINARY_JACKPOT_PCT",
     "inputs": [],
     "outputs": [
       {
@@ -30,7 +48,7 @@
   },
   {
     "type": "function",
-    "name": "BOOTSTRAP_LINE",
+    "name": "BINARY_ORACLE_PCT",
     "inputs": [],
     "outputs": [
       {
@@ -43,26 +61,52 @@
   },
   {
     "type": "function",
-    "name": "CONFIG_DELAY",
+    "name": "BINARY_STAKERS_PCT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "BINARY_TEAM_PCT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "FEED_TIP_PCT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "GENESIS",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "uint64",
         "internalType": "uint64"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "GENESIS_SETTING",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -82,20 +126,7 @@
   },
   {
     "type": "function",
-    "name": "JACKPOT_SETTING",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "MAX_EXACT_ENTRIES",
+    "name": "INITIAL_LINE",
     "inputs": [],
     "outputs": [
       {
@@ -108,7 +139,33 @@
   },
   {
     "type": "function",
-    "name": "MAX_POOL",
+    "name": "INTAKE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ISSUED_AT_TOLERANCE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "JACKPOT_PAYOUT_PCT",
     "inputs": [],
     "outputs": [
       {
@@ -121,13 +178,39 @@
   },
   {
     "type": "function",
-    "name": "MAX_SOURCE_LENGTH",
+    "name": "MAX_GUESS",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_TICKETS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_AGREED",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "stateMutability": "view"
@@ -147,7 +230,46 @@
   },
   {
     "type": "function",
-    "name": "ORACLE_REIMBURSEMENT",
+    "name": "MIN_PANEL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "OPEN_AHEAD",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ORACLE_ACTION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ORACLE_PRICE",
     "inputs": [],
     "outputs": [
       {
@@ -160,13 +282,26 @@
   },
   {
     "type": "function",
-    "name": "RESERVE_RELEASE_WINDOWS",
+    "name": "ORACLE_REQUEST_VALIDITY",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PUBLIC_SETTLE_HOLD",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "stateMutability": "view"
@@ -186,7 +321,7 @@
   },
   {
     "type": "function",
-    "name": "SOURCE_SETTING",
+    "name": "SETTING_STAKING",
     "inputs": [],
     "outputs": [
       {
@@ -199,13 +334,39 @@
   },
   {
     "type": "function",
-    "name": "STAKING_SETTING",
+    "name": "SETTING_TIP",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "SNOOZE_THRESHOLD",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "SOURCE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -219,6 +380,71 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TICKET_ORACLE_PCT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TICKET_PRICE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TICKET_STAKERS_PCT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TICKET_TEAM_PCT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TIMELOCK",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "stateMutability": "view"
@@ -251,8 +477,136 @@
   },
   {
     "type": "function",
-    "name": "accIMDPerStake",
+    "name": "WINDOW_ROUNDS",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "allocate",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "attestationDigest",
+    "inputs": [
+      {
+        "name": "a",
+        "type": "tuple",
+        "internalType": "struct OracleAttestation.Attestation",
+        "components": [
+          {
+            "name": "requestId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "chainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "questionHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "answerType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "answer",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "figure",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "fromBlock",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "toBlock",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "blockHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "panelJobId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "panelSize",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "quorum",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "agreed",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "issuedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "balances",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -261,29 +615,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "betExact",
-    "inputs": [
-      {
-        "name": "k",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "guess",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -310,7 +641,7 @@
   },
   {
     "type": "function",
-    "name": "betSleep",
+    "name": "betSnooze",
     "inputs": [
       {
         "name": "k",
@@ -318,7 +649,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "sleeping",
+        "name": "yes",
         "type": "bool",
         "internalType": "bool"
       },
@@ -333,20 +664,7 @@
   },
   {
     "type": "function",
-    "name": "claim",
-    "inputs": [
-      {
-        "name": "k",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "claim",
+    "name": "buyTicket",
     "inputs": [
       {
         "name": "k",
@@ -354,9 +672,9 @@
         "internalType": "uint256"
       },
       {
-        "name": "includeJackpot",
-        "type": "bool",
-        "internalType": "bool"
+        "name": "guess",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -364,14 +682,63 @@
   },
   {
     "type": "function",
-    "name": "claimStaking",
-    "inputs": [],
+    "name": "claim",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "closedWindowFloor",
+    "name": "claimable",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "consumedRequest",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "cumulativeLoss",
     "inputs": [],
     "outputs": [
       {
@@ -384,11 +751,17 @@
   },
   {
     "type": "function",
-    "name": "currentLine",
-    "inputs": [],
+    "name": "cumulativeLossAfter",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
-        "name": "line",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -397,8 +770,14 @@
   },
   {
     "type": "function",
-    "name": "currentRound",
-    "inputs": [],
+    "name": "cumulativeLossBefore",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -423,14 +802,21 @@
   },
   {
     "type": "function",
-    "name": "exactEntries",
+    "name": "depositJackpot",
     "inputs": [
       {
-        "name": "k",
+        "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "earliestNotStartedWindow",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -442,27 +828,55 @@
   },
   {
     "type": "function",
-    "name": "exactGuess",
+    "name": "executeStakingRecipient",
     "inputs": [
       {
-        "name": "k",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "executeTipRecipient",
+    "inputs": [
       {
-        "name": "index",
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "feedHamster",
+    "inputs": [
+      {
+        "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
-    "outputs": [
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "finalize",
+    "inputs": [
       {
-        "name": "",
+        "name": "maxWindows",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -479,39 +893,43 @@
   },
   {
     "type": "function",
-    "name": "genesisTimestamp",
-    "inputs": [],
-    "outputs": [
+    "name": "guessAt",
+    "inputs": [
       {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "i",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "hasStarted",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "imdLiability",
-    "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "hasFeePayingActivity",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -537,7 +955,31 @@
   },
   {
     "type": "function",
-    "name": "jackpotLiability",
+    "name": "isWinningGuess",
+    "inputs": [
+      {
+        "name": "guess",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "result",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "jackpotInFlight",
     "inputs": [],
     "outputs": [
       {
@@ -550,13 +992,310 @@
   },
   {
     "type": "function",
-    "name": "jackpotToken",
+    "name": "jackpotOutstanding",
     "inputs": [],
     "outputs": [
       {
         "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "jackpotSeed",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "line",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lineFor",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lossOf",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nextFinalizeWindow",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nextLine",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nextLineFrom",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nextLineReadyAt",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "onOracleFailure",
+    "inputs": [
+      {
+        "name": "intakeRequestId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "reason",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "onOracleResult",
+    "inputs": [
+      {
+        "name": "intakeRequestId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "a",
+        "type": "tuple",
+        "internalType": "struct OracleAttestation.Attestation",
+        "components": [
+          {
+            "name": "requestId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "chainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "questionHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "answerType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "answer",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "figure",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "fromBlock",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "toBlock",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "blockHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "panelJobId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "panelSize",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "quorum",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "agreed",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "issuedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
+      },
+      {
+        "name": "signature",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "oracleRequestPending",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "oracleRequestedAt",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "stateMutability": "view"
@@ -576,20 +1315,45 @@
   },
   {
     "type": "function",
-    "name": "oracleVerifier",
-    "inputs": [],
+    "name": "pendingIntakeRequest",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",
-        "type": "address",
-        "internalType": "contract OracleVerifier"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "pendingConfig",
+    "name": "pendingJackpotDeposits",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingSetting",
     "inputs": [
       {
         "name": "",
@@ -613,14 +1377,21 @@
   },
   {
     "type": "function",
-    "name": "pendingStaking",
-    "inputs": [
+    "name": "pendingStakingFees",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingTips",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -653,33 +1424,43 @@
         "components": [
           {
             "name": "over",
-            "type": "uint256[2]",
-            "internalType": "uint256[2]"
+            "type": "uint128",
+            "internalType": "uint128"
           },
           {
-            "name": "sleep",
-            "type": "uint256[2]",
-            "internalType": "uint256[2]"
+            "name": "under",
+            "type": "uint128",
+            "internalType": "uint128"
           },
           {
-            "name": "exactAmount",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "yes",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "no",
+            "type": "uint128",
+            "internalType": "uint128"
           },
           {
             "name": "guess",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "hasTicket",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "jackpotPaid",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "paid",
             "type": "uint256",
             "internalType": "uint256"
-          },
-          {
-            "name": "imdClaimed",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "jackpotClaimed",
-            "type": "bool",
-            "internalType": "bool"
           }
         ]
       }
@@ -688,13 +1469,19 @@
   },
   {
     "type": "function",
-    "name": "preStakingReserve",
-    "inputs": [],
+    "name": "publicSettleHeld",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -716,7 +1503,7 @@
         "internalType": "string"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -778,10 +1565,10 @@
   },
   {
     "type": "function",
-    "name": "recentResults",
+    "name": "requestBody",
     "inputs": [
       {
-        "name": "",
+        "name": "k",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -789,96 +1576,50 @@
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "releaseTotal",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "releaseWindows",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "reserveReleased",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "scheduleGenesisTimestamp",
-    "inputs": [
-      {
-        "name": "genesis",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "scheduleJackpotToken",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "scheduleSourceUrl",
-    "inputs": [
-      {
-        "name": "source",
         "type": "string",
         "internalType": "string"
       }
     ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "requestOracle",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "intakeRequestId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "scheduleLine",
+    "inputs": [
+      {
+        "name": "newLine",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "scheduleStakingToken",
+    "name": "scheduleStakingRecipient",
     "inputs": [
       {
-        "name": "token",
+        "name": "recipient",
         "type": "address",
         "internalType": "address"
       }
@@ -888,49 +1629,10 @@
   },
   {
     "type": "function",
-    "name": "setGenesisTimestamp",
+    "name": "scheduleTipRecipient",
     "inputs": [
       {
-        "name": "genesis",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setJackpotToken",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setSourceUrl",
-    "inputs": [
-      {
-        "name": "source",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setStakingToken",
-    "inputs": [
-      {
-        "name": "token",
+        "name": "recipient",
         "type": "address",
         "internalType": "address"
       }
@@ -1040,36 +1742,23 @@
   },
   {
     "type": "function",
-    "name": "settledWindows",
+    "name": "stakingRecipient",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "sourceUrl",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "stake",
+    "name": "timeout",
     "inputs": [
       {
-        "name": "amount",
+        "name": "k",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1079,27 +1768,30 @@
   },
   {
     "type": "function",
-    "name": "stakes",
-    "inputs": [
+    "name": "tipRecipient",
+    "inputs": [],
+    "outputs": [
       {
         "name": "",
         "type": "address",
         "internalType": "address"
       }
     ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalEligibleLoss",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "index",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "pending",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1108,8 +1800,40 @@
   },
   {
     "type": "function",
-    "name": "stakingActivatedAt",
+    "name": "totalPendingJackpotDeposits",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "trackedLiabilities",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "windowEnd",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -1117,76 +1841,30 @@
         "internalType": "uint64"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
-    "name": "stakingToken",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "stakingUndistributed",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "totalStaked",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "unstake",
+    "name": "windowFunds",
     "inputs": [
       {
-        "name": "amount",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "voidWindow",
-    "inputs": [
+    "outputs": [
       {
-        "name": "k",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "window",
+    "name": "windowInfo",
     "inputs": [
       {
         "name": "k",
@@ -1196,10 +1874,15 @@
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "v",
         "type": "tuple",
-        "internalType": "struct HamsterHour.Window",
+        "internalType": "struct HamsterHour.WindowView",
         "components": [
+          {
+            "name": "index",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
           {
             "name": "status",
             "type": "uint8",
@@ -1216,14 +1899,19 @@
             "internalType": "uint64"
           },
           {
+            "name": "closesAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "timeoutAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "line",
             "type": "uint256",
             "internalType": "uint256"
-          },
-          {
-            "name": "source",
-            "type": "string",
-            "internalType": "string"
           },
           {
             "name": "result",
@@ -1231,109 +1919,89 @@
             "internalType": "uint256"
           },
           {
-            "name": "pools",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
             "name": "over",
-            "type": "uint256[2]",
-            "internalType": "uint256[2]"
-          },
-          {
-            "name": "sleep",
-            "type": "uint256[2]",
-            "internalType": "uint256[2]"
-          },
-          {
-            "name": "rewards",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
-            "name": "marketVoided",
-            "type": "bool[3]",
-            "internalType": "bool[3]"
-          },
-          {
-            "name": "paid",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
-            "name": "claimedWeight",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
-            "name": "distances",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
-            "name": "ties",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
-            "name": "rankRewards",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
-            "name": "rankClaimed",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
-            "name": "rankPaid",
-            "type": "uint256[3]",
-            "internalType": "uint256[3]"
-          },
-          {
-            "name": "rankCount",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "settler",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "teamCredit",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "reimbursement",
+            "name": "under",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "reimbursed",
+            "name": "yes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "no",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "tickets",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "ouVoid",
             "type": "bool",
             "internalType": "bool"
           },
           {
-            "name": "jackpotAsset",
-            "type": "address",
-            "internalType": "address"
+            "name": "snVoid",
+            "type": "bool",
+            "internalType": "bool"
           },
           {
-            "name": "jackpot",
+            "name": "feesAllocated",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "jackpotFinalized",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "jackpotPot",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "jackpotPaid",
+            "name": "jackpotWinners",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "jackpotClaimed",
+            "name": "jackpotShare",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "pendingJackpotDeposits",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "oracleRequested",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "oracleRequestPending",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "publicSettleHeld",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "intakeRequestId",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
             "name": "requestId",
@@ -1347,7 +2015,7 @@
   },
   {
     "type": "function",
-    "name": "windowTimes",
+    "name": "windowStart",
     "inputs": [
       {
         "name": "k",
@@ -1357,24 +2025,26 @@
     ],
     "outputs": [
       {
-        "name": "startsAt",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "endsAt",
+        "name": "",
         "type": "uint64",
         "internalType": "uint64"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "event",
-    "name": "Bet",
+    "name": "BinaryBet",
     "inputs": [
       {
-        "name": "windowId",
+        "name": "k",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -1389,13 +2059,13 @@
         "name": "market",
         "type": "uint8",
         "indexed": true,
-        "internalType": "enum HamsterHour.Market"
+        "internalType": "uint8"
       },
       {
-        "name": "selection",
-        "type": "uint256",
+        "name": "side",
+        "type": "bool",
         "indexed": false,
-        "internalType": "uint256"
+        "internalType": "bool"
       },
       {
         "name": "amount",
@@ -1411,7 +2081,7 @@
     "name": "Claimed",
     "inputs": [
       {
-        "name": "windowId",
+        "name": "k",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -1423,19 +2093,7 @@
         "internalType": "address"
       },
       {
-        "name": "imd",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "jackpotAsset",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "jackpot",
+        "name": "amount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1445,7 +2103,300 @@
   },
   {
     "type": "event",
-    "name": "ConfigChanged",
+    "name": "Fed",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FeesAllocated",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "stakers",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "jackpot",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "oracle",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "team",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "JackpotDeposited",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "k",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "JackpotFinalized",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "pot",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "winners",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "share",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "carried",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "LineApplied",
+    "inputs": [
+      {
+        "name": "line",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "fromWindow",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "LineScheduled",
+    "inputs": [
+      {
+        "name": "line",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "readyAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "fromWindow",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "LossHistory",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalEligibleLoss",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "cumulativeBefore",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "cumulativeAfter",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MarketVoided",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "market",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OracleFunded",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OracleRequestFailed",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "intakeRequestId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "status",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "reason",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OracleRequested",
+    "inputs": [
+      {
+        "name": "k",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "intakeRequestId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "withFailureHook",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SettingExecuted",
     "inputs": [
       {
         "name": "setting",
@@ -1464,7 +2415,7 @@
   },
   {
     "type": "event",
-    "name": "ConfigScheduled",
+    "name": "SettingScheduled",
     "inputs": [
       {
         "name": "setting",
@@ -1489,130 +2440,10 @@
   },
   {
     "type": "event",
-    "name": "JackpotReserved",
-    "inputs": [
-      {
-        "name": "windowId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "JackpotUnavailable",
-    "inputs": [
-      {
-        "name": "windowId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "MarketVoided",
-    "inputs": [
-      {
-        "name": "windowId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "market",
-        "type": "uint8",
-        "indexed": true,
-        "internalType": "enum HamsterHour.Market"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OracleFunded",
-    "inputs": [
-      {
-        "name": "funder",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OracleRewardDeferred",
-    "inputs": [
-      {
-        "name": "windowId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OracleRewardReserved",
-    "inputs": [
-      {
-        "name": "windowId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "settler",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "Settled",
     "inputs": [
       {
-        "name": "windowId",
+        "name": "k",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -1640,53 +2471,22 @@
   },
   {
     "type": "event",
-    "name": "Split",
+    "name": "TicketBought",
     "inputs": [
       {
-        "name": "windowId",
+        "name": "k",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
       },
       {
-        "name": "winners",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "stakers",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "oracle",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "team",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "Staked",
-    "inputs": [
-      {
-        "name": "account",
+        "name": "bettor",
         "type": "address",
         "indexed": true,
         "internalType": "address"
       },
       {
-        "name": "amount",
+        "name": "guess",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1696,62 +2496,12 @@
   },
   {
     "type": "event",
-    "name": "StakingClaimed",
+    "name": "TimedOut",
     "inputs": [
       {
-        "name": "account",
-        "type": "address",
+        "name": "k",
+        "type": "uint256",
         "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "StakingDistributed",
-    "inputs": [
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "accumulator",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "reserveRelease",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "Unstaked",
-    "inputs": [
-      {
-        "name": "account",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
         "internalType": "uint256"
       }
     ],
@@ -1762,7 +2512,7 @@
     "name": "WindowCreated",
     "inputs": [
       {
-        "name": "windowId",
+        "name": "k",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -1784,24 +2534,24 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
-      },
-      {
-        "name": "source",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
       }
     ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "WindowVoided",
+    "name": "Withdrawn",
     "inputs": [
       {
-        "name": "windowId",
-        "type": "uint256",
+        "name": "account",
+        "type": "address",
         "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
         "internalType": "uint256"
       }
     ],
@@ -1809,12 +2559,27 @@
   },
   {
     "type": "error",
-    "name": "AlreadyConfigured",
+    "name": "AlreadyConsumed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AlreadyRequested",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AlreadySet",
     "inputs": []
   },
   {
     "type": "error",
     "name": "AttestationPredatesEnd",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "BadSignature",
     "inputs": []
   },
   {
@@ -1829,17 +2594,7 @@
   },
   {
     "type": "error",
-    "name": "DuplicateExactBet",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ExactFull",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidAddress",
+    "name": "DuplicateTicket",
     "inputs": []
   },
   {
@@ -1849,22 +2604,42 @@
   },
   {
     "type": "error",
-    "name": "InvalidGenesis",
+    "name": "InvalidAnswer",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "InvalidSource",
+    "name": "InvalidGuess",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "InvalidWindow",
+    "name": "InvalidLine",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidValidity",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LineChangeInProgress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoFeePayingActivity",
     "inputs": []
   },
   {
     "type": "error",
     "name": "NotFinal",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotIntake",
     "inputs": []
   },
   {
@@ -1884,7 +2659,17 @@
   },
   {
     "type": "error",
+    "name": "NothingScheduled",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NothingToClaim",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PaidRequestPending",
     "inputs": []
   },
   {
@@ -1894,19 +2679,18 @@
   },
   {
     "type": "error",
-    "name": "ReentrancyGuardReentrantCall",
+    "name": "Reentrancy",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "SafeERC20FailedOperation",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
+    "name": "ReserveTooLow",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TicketsFull",
+    "inputs": []
   },
   {
     "type": "error",
@@ -1915,12 +2699,37 @@
   },
   {
     "type": "error",
-    "name": "TokenNotConfigured",
+    "name": "TransferFailed",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "UnsupportedToken",
+    "name": "UnknownRequest",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WeakPanel",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WindowTooFar",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WrongChain",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WrongQuestion",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
     "inputs": []
   }
 ]

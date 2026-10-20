@@ -1,314 +1,189 @@
-import { useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { useConnection } from "wagmi";
-import { same, loadWindow, useWindow, useToken } from "./data";
-import {
-  claimValue,
-  positionTotal,
-  walletWindows,
-  exactRank,
-} from "./portfolio";
-import { counted, units, type Position } from "./model";
-import { Action } from "./ui";
-import { useTransactions } from "./transactions";
-import { SeedConfetti, reducedMotion, shareIntent } from "./meme";
-import type { PageProps } from "./Bet";
-export const SITE = "https://hamster-hour-bet-on-the-wheel.sites.imd.fun";
-function positionLabels(p: Position) {
-  return [
-    ["OVER", p.over[1]],
-    ["UNDER", p.over[0]],
-    ["SLEEPING", p.sleep[1]],
-    ["RUNNING", p.sleep[0]],
-    [`EXACT ${p.guess}`, p.exactAmount],
-  ]
-    .filter(([, v]) => BigInt(v) > 0n)
-    .map(([name, v]) => `${name} · ${units(BigInt(v))} IMD`);
-}
-export function MyBets(props: PageProps & { liveProgress?: ReactNode }) {
-  const { r, g } = props,
-    { address } = useConnection();
-  const current = useWindow(r, g?.currentWindow, address),
-    next = useWindow(r, g?.candidate, address);
-  const events = useQuery({
-    queryKey: ["wallet-windows", address, g?.TEAM],
-    enabled: !!address && !!g,
-    queryFn: ({ signal }) =>
-      walletWindows(r, address!, same(address!, g!.TEAM), signal),
-    refetchInterval: 15000,
-    retry: 1,
-  });
-  const portfolio = useQuery({
-    queryKey: ["portfolio", address, events.data?.map(String).join(",")],
-    enabled: !!address && !!events.data && !!g,
-    queryFn: () =>
-      Promise.all(
-        events.data!.map(async (k) => ({
-          k,
-          ...(await loadWindow(r, k, address)),
-        })),
-      ),
-    refetchInterval: 12000,
-    retry: 1,
-  });
-  const rows = [
-    { label: "Current hour", k: g?.currentWindow, data: current.data },
-    { label: "Next hour", k: g?.candidate, data: next.data },
-  ].filter((v, i, all) => i === 0 || v.k !== all[0].k);
-  const claimable = portfolio.data?.filter(
-    (row) =>
-      row.position &&
-      g &&
-      (row.window.status >= 2 ||
-        (row.window.status === 1 &&
-          BigInt(Math.floor(props.now / 1000)) >= row.times[1])),
+import { useQueryClient } from "@tanstack/react-query";
+import type { Runtime } from "./config";
+import { usePositions, reader, type GameEvent } from "./data";
+import { imd, span, type Position } from "./model";
+import { useTransaction, TransactionStatus } from "./transactions";
+import { useWalletControl } from "./Wallet";
+import { CardHead, Empty } from "./ui";
+import { Confetti } from "./pixel";
+import { blip } from "./sound";
+const principal = (p: Position) =>
+  p.over + p.under + p.yes + p.no + (p.hasTicket ? 5000000000000000000n : 0n);
+export function MyBets({
+  r,
+  events,
+  eventError,
+}: {
+  r: Runtime;
+  events?: GameEvent[];
+  eventError: boolean;
+}) {
+  const cache = useQueryClient();
+  const { address } = useConnection(),
+    wallet = useWalletControl(),
+    tx = useTransaction(),
+    bets = usePositions(r, address, events);
+  const [note, setNote] = useState(""),
+    [flash, setFlash] = useState(false);
+  const celebrated = useRef("");
+  const rows = bets.data?.slice().sort((a, b) => (a.k > b.k ? -1 : 1));
+  const total = rows?.reduce((n, x) => n + x.claimable, 0n) ?? 0n;
+  const wins = rows?.filter(
+    (x) =>
+      x.claimable +
+        x.position.paid +
+        (x.position.jackpotPaid ? x.window.jackpotShare : 0n) >
+      principal(x.position),
   );
+  const winKey = wins?.map((x) => String(x.k)).join(",") ?? "";
+  useEffect(() => {
+    if (winKey && celebrated.current !== winKey) {
+      celebrated.current = winKey;
+      setFlash(true);
+      blip(true);
+      const timer = setTimeout(() => setFlash(false), 2600);
+      return () => clearTimeout(timer);
+    }
+  }, [winKey]);
+  async function claimAll() {
+    setNote("");
+    let count = 0;
+    for (const row of rows ?? []) {
+      const amount = await reader(r)<bigint>("claimable", [row.k, address]);
+      if (amount === 0n) continue;
+      setNote(`Claim ${count + 1}: confirm this hour in your wallet.`);
+      if (!(await tx.run("claim", [row.k]))) {
+        setNote(
+          `${count} ${count === 1 ? "hour" : "hours"} claimed. Remaining claims are still available.`,
+        );
+        return;
+      }
+      count++;
+    }
+    setNote(`${count} ${count === 1 ? "hour" : "hours"} claimed.`);
+    await bets.refetch();
+  }
   return (
-    <section className="my-bets section">
-      <div className="section-title">
-        <h2>My bets</h2>
-        <span className="small muted">Current + next hour</span>
-      </div>
+    <section className="card my-bets" id="my-bets">
+      <CardHead
+        title="My bets"
+        help="Only the connected wallet’s v2 bets appear here, discovered from on-chain events. Claim all submits a separate claim transaction for each payable hour. A jackpot can become claimable later, even after the original claim. Claims do not expire. Losses are recorded by lossOf; there is no HAMSTER reward token available yet."
+      />
       {!address ? (
-        <p className="muted">
-          Connect your wallet to see your bets and collect your winnings.
-        </p>
+        <Empty>
+          <span className="empty-seeds" aria-hidden="true">
+            ○ ○ ○
+          </span>
+          <h3>Your little stake in the wheel.</h3>
+          <p>Connect your wallet to see your bets and claim your IMD.</p>
+          <button onClick={wallet.open}>Connect wallet ↗</button>
+        </Empty>
+      ) : eventError || bets.isError ? (
+        <Empty>
+          <p>Your bets could not load. No balances have been changed.</p>
+          <button
+            onClick={() => {
+              void cache.invalidateQueries({ queryKey: ["events"] });
+              void bets.refetch();
+            }}
+          >
+            Try again
+          </button>
+        </Empty>
+      ) : !events || bets.isLoading ? (
+        <Empty>Finding your bets on Ethereum…</Empty>
+      ) : !rows?.length ? (
+        <Empty>
+          <h3>A fresh start.</h3>
+          <p>Your confirmed bets will appear here.</p>
+          <a className="button" href="#play">
+            Make your first pick ↗
+          </a>
+        </Empty>
       ) : (
         <>
-          <div className="positions-strip">
-            {rows.map((row) => (
-              <div className="position-item" key={row.label}>
-                <span className="small muted">
-                  {row.label} · #{row.k?.toString() ?? "…"}
-                </span>
-                {!row.data?.position ? (
-                  <p>Reading your bets…</p>
-                ) : positionTotal(row.data.position) === 0n ? (
-                  <p>No bets yet</p>
-                ) : (
-                  <ul>
-                    {positionLabels(row.data.position).map((label) => (
-                      <li key={label}>{label}</li>
-                    ))}
-                  </ul>
-                )}
-                {row.k === g?.currentWindow &&
-                  row.data?.position &&
-                  positionTotal(row.data.position) > 0n &&
-                  props.liveProgress}
-              </div>
-            ))}
+          {wins && wins.length > 0 && (
+            <div className="win-banner">
+              A little wheel, a lovely win. {flash && <Confetti />}
+            </div>
+          )}
+          <div className="claims-summary">
+            <div>
+              <span className="muted">Ready to claim</span>
+              <strong className="pixel">{imd(total)} IMD</strong>
+            </div>
+            <button
+              className="primary"
+              disabled={total === 0n || tx.busy}
+              onClick={() =>
+                void claimAll().catch(() =>
+                  setNote("The claim check failed. Refresh and try again."),
+                )
+              }
+            >
+              Claim all
+            </button>
           </div>
-          {(events.isPending || portfolio.isFetching) && (
-            <p className="small muted" role="status">
-              Looking for your earlier results…
-            </p>
-          )}
-          {(events.isError || portfolio.isError) && (
-            <p className="error">
-              Your earlier bets could not load.{" "}
-              <button
-                onClick={() => {
-                  void events.refetch();
-                  void portfolio.refetch();
-                }}
-              >
-                Retry my bets
-              </button>
-            </p>
-          )}
-          {claimable?.map((row) => (
-            <ResultCard key={String(row.k)} {...props} k={row.k} />
-          ))}
-          {!events.isPending &&
-            !portfolio.isPending &&
-            !events.isError &&
-            !portfolio.isError &&
-            claimable?.length === 0 && (
-              <p className="small muted">
-                Your results will appear here when a window closes.
-              </p>
-            )}
+          <p className="small muted">
+            One wallet confirmation and network fee per payable hour.
+          </p>
+          <ul className="bet-list" tabIndex={0} aria-label="Your bet history">
+            {rows.map((x) => (
+              <li key={String(x.k)}>
+                <div>
+                  <strong>{span(x.window)} your time</strong>
+                  <span>
+                    {[
+                      ["Over", x.position.over],
+                      ["Under", x.position.under],
+                      ["Snooze yes", x.position.yes],
+                      ["Snooze no", x.position.no],
+                    ]
+                      .filter(([, v]) => v !== 0n)
+                      .map(([s, v]) => `${s} · ${imd(v as bigint)} IMD`)
+                      .join(" / ")}
+                    {x.position.hasTicket
+                      ? ` · Ticket ${x.position.guess}`
+                      : ""}
+                  </span>
+                </div>
+                <div>
+                  <strong>
+                    {x.claimable > 0n
+                      ? `${imd(x.claimable)} IMD`
+                      : x.window.status === 3
+                        ? "Refunded"
+                        : x.window.status === 2
+                          ? x.position.paid > 0n
+                            ? "Claimed"
+                            : x.window.jackpotFinalized
+                              ? "Settled"
+                              : "Jackpot pending"
+                          : "Awaiting result"}
+                  </strong>
+                  {x.claimable > 0n && (
+                    <button
+                      disabled={tx.busy}
+                      onClick={() => void tx.run("claim", [x.k])}
+                    >
+                      Claim
+                    </button>
+                  )}
+                  {x.loss > 0n && (
+                    <small>{imd(x.loss)} IMD eligible loss</small>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         </>
       )}
-      {!address && g && g.currentWindow > 0n && (
-        <ResultCard {...props} k={g.currentWindow - 1n} />
-      )}
+      <TransactionStatus r={r} />
+      <p role="status" className="small">
+        {note}
+      </p>
     </section>
-  );
-}
-export function ResultCard({ r, g, ready, now, k }: PageProps & { k: bigint }) {
-  const { address } = useConnection(),
-    q = useWindow(r, k, address),
-    { send } = useTransactions();
-  const [includeJackpot, setIncludeJackpot] = useState(true);
-  const w = q.data?.window,
-    p = q.data?.position;
-  const token = useToken(r, w?.jackpot ? w.jackpotAsset : undefined);
-  if (!w || !g || w.status === 0) return null;
-  const timedOut =
-    w.status === 1 &&
-    BigInt(Math.floor(now / 1000)) >= q.data!.times[1] + g.TIMEOUT;
-  const final = w.status >= 2 || timedOut;
-  if (!final)
-    return (
-      <article className="result-card">
-        <img src="./favicon.svg" width="76" height="76" alt="Goggle hamster" />
-        <div className="result-body">
-          <span className="small muted">Window {k.toString()}</span>
-          <h3>Waiting for the result</h3>
-          <p>
-            The hour has ended. Your payout will appear here when the oracle
-            verifies the passes.
-          </p>
-          <p className="small muted">
-            If no result arrives within 48 hours, your bets can be refunded.
-          </p>
-        </div>
-      </article>
-    );
-  const value =
-    p && address
-      ? claimValue(w, p, address, g.TEAM, g.oracleReserve, timedOut)
-      : undefined;
-  const refunded = w.status === 3 || timedOut;
-  const canClaim =
-    !!value && (value.imd > 0n || (includeJackpot && value.jackpotEligible));
-  const won =
-    !!p &&
-    !refunded &&
-    ((!w.marketVoided[0] && p.over[w.result > w.line ? 1 : 0] > 0n) ||
-      (!w.marketVoided[2] && p.sleep[w.result === 0n ? 1 : 0] > 0n) ||
-      exactRank(w, p) >= 0);
-  const lost = !!p && !!address && !refunded && !won && positionTotal(p) > 0n;
-  const share = (outcome: "W" | "L") =>
-    shareIntent(
-      outcome === "W"
-        ? `W. The hamster ran ${counted(w.result, "pass", "passes")} in window ${k} and I called it. ${SITE}`
-        : `L. The hamster ran ${counted(w.result, "pass", "passes")} in window ${k} and I fed it. ${SITE}`,
-    );
-  return (
-    <article
-      className={`result-card${won ? " won" : ""}${lost ? " lost" : ""}`}
-    >
-      {won && <SeedConfetti />}
-      {lost ? (
-        <video
-          className="result-video"
-          src="./assets/hamster-chewing.mp4"
-          poster="./favicon.svg"
-          width="76"
-          height="76"
-          muted
-          loop
-          playsInline
-          autoPlay={!reducedMotion()}
-          aria-label="The hamster chewing your bet"
-        />
-      ) : (
-        <img
-          src={
-            won
-              ? "./assets/hamster-thumbs.svg"
-              : w.result === 0n && !refunded
-                ? "./assets/hamster-asleep.svg"
-                : "./favicon.svg"
-          }
-          width="76"
-          height="76"
-          alt={
-            won
-              ? "Goggle hamster giving a thumbs up"
-              : w.result === 0n && !refunded
-                ? "Sleeping hamster"
-                : "Goggle hamster"
-          }
-        />
-      )}
-      <div className="result-body">
-        <span className="small muted">
-          Window {k.toString()} ·{" "}
-          {refunded ? "Refund available" : "Verified result"}
-        </span>
-        <h3>
-          {refunded ? "No answer in time" : counted(w.result, "pass", "passes")}
-        </h3>
-        <p>
-          {refunded
-            ? "Everyone gets their bet back."
-            : `${w.result === w.line ? "OVER / UNDER refunded" : w.result > w.line ? "OVER won" : "UNDER won"} · ${w.result === 0n ? "SLEEPING won" : "RUNNING won"}`}
-        </p>
-        {w.status === 2 && (w.marketVoided[0] || w.marketVoided[2]) && (
-          <p className="small muted">Uncontested pools are refunded.</p>
-        )}
-        {lost && (
-          <>
-            <p className="fed">you fed the hamster</p>
-            <p className="small coming-soon">$HAMSTER mining coming soon</p>
-          </>
-        )}
-        {(won || lost) && (
-          <a
-            className="button share-button"
-            href={share(won ? "W" : "L")}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {won ? "share my W" : "share my L"} ↗
-          </a>
-        )}
-        {value && (
-          <p className="payout">
-            Your payout: {units(value.imd)} IMD
-            {value.jackpotEligible
-              ? token.data
-                ? ` + ${units(value.jackpot, token.data.decimals)} ${token.data.symbol}`
-                : " + jackpot token"
-              : ""}
-          </p>
-        )}
-        {address && (
-          <>
-            <Action
-              r={r}
-              id={`claim-${k}`}
-              label="Claim"
-              disabled={
-                !ready ||
-                !canClaim ||
-                q.isError ||
-                Date.now() - q.dataUpdatedAt > 45000
-              }
-              reason={
-                !canClaim ? "No unclaimed payout for this wallet." : undefined
-              }
-              onClick={() =>
-                void send(`claim-${k}`, {
-                  functionName: "claim",
-                  args: [k, includeJackpot],
-                })
-              }
-            />
-            {value?.jackpotEligible && (
-              <details>
-                <summary>Jackpot transfer options</summary>
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={includeJackpot}
-                    onChange={(e) => setIncludeJackpot(e.target.checked)}
-                  />
-                  Include jackpot token
-                </label>
-                <p className="small muted">
-                  Turn off to claim IMD separately if the prize token cannot
-                  transfer.
-                </p>
-              </details>
-            )}
-          </>
-        )}
-      </div>
-    </article>
   );
 }

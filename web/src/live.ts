@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { services } from "./config";
 /** The channel's last known stream, used only when the proxy cannot answer. */
@@ -207,75 +206,4 @@ export function windowProgress(
     approximate: !!baseline && !exact,
     percent,
   };
-}
-/** One wheel pass is about 21 cm, so a line of N passes per hour is N·210/3600 mm/s. */
-export const PASS_MM = 210;
-export const linePace = (line: bigint | undefined) =>
-  line === undefined ? undefined : (Number(line) * PASS_MM) / 3600;
-export type Mood =
-  "sleeping" | "stretching" | "cruising" | "zoomies" | "villain era";
-export function mood(
-  status: Status | undefined,
-  line: bigint | undefined,
-  windowPasses?: bigint,
-): Mood | undefined {
-  if (!status) return undefined;
-  const speed = status.speedMmPerSecond;
-  if (speed <= 0) return "sleeping";
-  const pace = linePace(line);
-  if (pace === undefined || pace <= 0) return "cruising";
-  if (
-    windowPasses !== undefined &&
-    line !== undefined &&
-    windowPasses > 2n * line
-  )
-    return "villain era";
-  if (speed > pace) return "zoomies";
-  if (speed < pace * 0.3) return "stretching";
-  return "cruising";
-}
-const passesKey = (k: bigint) => `hamster-hour:window-start:${k}`;
-/**
- * Passes counted in the current window, from the first status sample seen in it.
- * Only this visitor's observations are used; the counter itself comes from /status.
- */
-export function useWindowPasses(
-  status: Status | undefined,
-  currentWindow: bigint | undefined,
-) {
-  const [value, setValue] = useState<bigint>();
-  useEffect(() => {
-    if (!status || currentWindow === undefined) return;
-    const total = BigInt(status.cumulativeWorkUnits);
-    try {
-      const key = passesKey(currentWindow);
-      let start = localStorage.getItem(key);
-      if (!start || !/^\d+$/.test(start)) {
-        start = total.toString();
-        localStorage.setItem(key, start);
-        localStorage.removeItem(passesKey(currentWindow - 1n));
-      }
-      const s = BigInt(start);
-      setValue(total >= s ? total - s : undefined);
-    } catch {
-      setValue(undefined);
-    }
-  }, [status, currentWindow]);
-  return value;
-}
-/** True for 3 s after the stream turns from not live to live during this visit. */
-export function useWentLive(isLive: boolean | undefined) {
-  const previous = useRef<boolean | undefined>(undefined);
-  const [flash, setFlash] = useState(false);
-  useEffect(() => {
-    if (isLive === undefined) return;
-    const was = previous.current;
-    previous.current = isLive;
-    if (was === false && isLive) {
-      setFlash(true);
-      const id = setTimeout(() => setFlash(false), 3000);
-      return () => clearTimeout(id);
-    }
-  }, [isLive]);
-  return flash;
 }

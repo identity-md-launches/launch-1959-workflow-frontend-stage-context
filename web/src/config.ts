@@ -11,20 +11,39 @@ import {
   toBytes,
   type Abi,
   type Address,
+  type Hex,
 } from "viem";
+export const services = {
+  proxy: "https://hamster-hour.hamsterhour562.workers.dev",
+  statsProxy: "https://hamster-hour.hamsterhour562.workers.dev",
+  source: "https://sepolia.squeekchain.com",
+};
+export function canonical(v: unknown): unknown {
+  return Array.isArray(v)
+    ? v.map(canonical)
+    : v && typeof v === "object"
+      ? Object.fromEntries(
+          Object.entries(v)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, x]) => [k, canonical(x)]),
+        )
+      : v;
+}
+export const abiHash = (abi: unknown) =>
+  keccak256(toBytes(JSON.stringify(canonical(abi)))).slice(2);
 export interface Deployment {
   version: number;
-  launchId: string;
   chainId: number;
   sourceCommit: string;
-  attestationHash: string;
+  repoUrl: string;
   contracts: {
     name: string;
     address: Address;
     abiHash: string;
     abiPath: string;
+    runtimeCodeHash: Hex;
+    deploymentBlock: string;
   }[];
-  assets: { path: string; sha256: string }[];
   network: {
     chainId: number;
     name: string;
@@ -32,103 +51,49 @@ export interface Deployment {
     rpcUrls: string[];
     explorer: string;
     nativeCurrency: { name: string; symbol: string; decimals: number };
-    [key: string]: unknown;
+    pairToken: { address: Address; symbol: string; decimals: number };
   };
-  walletAddChain?: Record<string, unknown>;
+  walletAddChain: Record<string, unknown>;
 }
-export const services = {
-  /** Same-origin-friendly mirror of Squeekchain's live/status feeds and the wheel chat. */
-  proxy: "https://hamster-hour.hamsterhour562.workers.dev",
-  source: "https://sepolia.squeekchain.com",
-  oracleAPI: "https://api.imd.fun",
-  oracleExplorer: "https://explorer.imd.fun",
-};
-export function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-        .map(([k, v]) => [k, canonical(v)]),
-    );
-  return value;
-}
-export const abiHash = (a: unknown) =>
-  keccak256(toBytes(JSON.stringify(canonical(a)))).slice(2);
 export async function loadRuntime() {
-  const configURL = new URL("imd-deployment.json", document.baseURI);
-  const response = await fetch(configURL, { cache: "no-cache" });
+  const url = new URL("imd-deployment.json", document.baseURI);
+  const response = await fetch(url, { cache: "no-cache" });
   if (!response.ok)
-    throw Error("Deployment configuration could not load. Reload this page.");
+    throw Error("Game configuration could not load. Retry loading.");
   const d: Deployment = await response.json();
-  const keys = [
-    "version",
-    "launchId",
-    "chainId",
-    "sourceCommit",
-    "attestationHash",
-    "contracts",
-    "assets",
-    "poolKey",
-    "network",
-    "walletAddChain",
-  ];
+  const c = d.contracts?.find((x) => x.name === "HamsterHour");
   if (
-    Object.keys(d).some((k) => !keys.includes(k)) ||
     d.version !== 1 ||
-    !d.network ||
-    d.chainId !== d.network.chainId ||
-    !d.network.rpcUrls?.length ||
-    d.contracts.length !== 2 ||
-    !["HamsterHour", "OracleVerifier"].every((name) =>
-      d.contracts.some((c) => c.name === name),
-    )
+    d.chainId !== 1 ||
+    d.network.chainId !== 1 ||
+    !c ||
+    !isAddress(c.address) ||
+    !d.network.rpcUrls.every((x) => x.startsWith("https://")) ||
+    !/^abi\/[A-Za-z]+\.json$/.test(c.abiPath)
   )
-    throw Error(
-      "Deployment configuration failed validation. Transactions are unavailable.",
-    );
-  if (d.network.rpcUrls.some((u) => !/^https:\/\//.test(u)))
-    throw Error("Public HTTPS RPC configuration required.");
-  const contracts = await Promise.all(
-    d.contracts.map(async (c) => {
-      if (
-        !isAddress(c.address) ||
-        !/^[a-zA-Z0-9_/-]+\.json$/.test(c.abiPath) ||
-        c.abiPath.startsWith("/") ||
-        c.abiPath.includes("..")
-      )
-        throw Error("Invalid contract configuration.");
-      const r = await fetch(new URL(c.abiPath, configURL));
-      if (!r.ok) throw Error("A deployed contract ABI could not load.");
-      const abi: Abi = await r.json();
-      if (!Array.isArray(abi) || abiHash(abi) !== c.abiHash)
-        throw Error(
-          "Contract ABI verification failed. Transactions are unavailable.",
-        );
-      return { ...c, abi };
-    }),
-  );
+    throw Error("Game configuration failed verification.");
+  const res = await fetch(new URL(c.abiPath, url));
+  if (!res.ok) throw Error("The game ABI could not load.");
+  const abi: Abi = await res.json();
+  if (abiHash(abi) !== c.abiHash) throw Error("Game ABI failed verification.");
   const chain = defineChain({
-    id: d.chainId,
+    id: 1,
     name: d.network.name,
     nativeCurrency: d.network.nativeCurrency,
     rpcUrls: { default: { http: d.network.rpcUrls } },
-    blockExplorers: {
-      default: { name: d.network.name, url: d.network.explorer },
-    },
-    testnet: d.network.testnet,
+    blockExplorers: { default: { name: "Etherscan", url: d.network.explorer } },
   });
   const transport = () =>
     fallback(
       d.network.rpcUrls.map((url) =>
-        http(url, { batch: { wait: 20 }, timeout: 10000, retryCount: 1 }),
+        http(url, { batch: { wait: 30 }, timeout: 10000, retryCount: 1 }),
       ),
       { rank: false, retryCount: 0 },
     );
   const client = createPublicClient({
     chain,
     transport: transport(),
-    pollingInterval: 4000,
+    pollingInterval: 12000,
   });
   const wagmi = createConfig({
     chains: [chain],
@@ -147,8 +112,8 @@ export async function loadRuntime() {
     chain,
     client,
     wagmi,
-    game: contracts.find((c) => c.name === "HamsterHour")!,
-    verifier: contracts.find((c) => c.name === "OracleVerifier")!,
+    game: { ...c, abi },
+    token: d.network.pairToken,
   };
 }
 export type Runtime = Awaited<ReturnType<typeof loadRuntime>>;

@@ -1,0 +1,49 @@
+{
+  "results": [
+    {
+      "name": "390px first screen, reflow, local fonts, theme, onboarding, keyboard help",
+      "passed": true
+    },
+    {
+      "name": "exact approval, review, rejected signature, confirmed v2 bet, PNG share",
+      "passed": true
+    },
+    {
+      "name": "ticket and feed use exact IMD approvals and v2 calls",
+      "passed": true
+    },
+    {
+      "name": "My bets discovers indexed wallet bets and claims all payable hours sequentially",
+      "passed": true
+    },
+    {
+      "name": "stats ranges, dated fallback, chat signed message, cam pause, upcoming hour",
+      "passed": true
+    },
+    {
+      "name": "live speed drives night theme, stale/error telemetry does not pretend running, reduced motion",
+      "passed": true
+    },
+    {
+      "name": "contract bytecode mismatch blocks transaction before wallet send",
+      "passed": true
+    },
+    {
+      "name": "reverted approval receipt restores the approval button and links failed receipt",
+      "passed": true
+    },
+    {
+      "name": "mobile wallet picker offers four wallet browsers and Coinbase Smart Wallet",
+      "passed": true
+    },
+    {
+      "name": "automated accessibility in day/night on play, stats and wallet sheet",
+      "passed": true
+    },
+    {
+      "name": "320/800/1440 reflow, all navigation routes and no page script errors",
+      "passed": true
+    }
+  ],
+  "pageErrors": []
+}
