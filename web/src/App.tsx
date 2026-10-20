@@ -14,6 +14,7 @@ import { BetPanel, type BetReceipt } from "./Bet";
 import { Jackpot } from "./Jackpot";
 import { MyBets } from "./MyBets";
 import { Stats } from "./Stats";
+import { HamsterPage } from "./Hamster";
 import { Stream } from "./Stream";
 import { ChatDrawer } from "./Chat";
 import { Seed } from "./pixel";
@@ -29,6 +30,7 @@ const tabs = [
   ["stats", "Stats"],
   ["my-bets", "My bets"],
   ["agents", "Agents"],
+  ["hamster", "$HAMSTER"],
 ] as const;
 const currentTab = () =>
   tabs.some(([id]) => location.hash === `#${id}`)
@@ -192,6 +194,11 @@ function Game({ r }: { r: Runtime }) {
   useEffect(() => {
     document.querySelector(".site")?.scrollTo({ top: 0, behavior: "instant" });
     window.scrollTo({ top: 0, behavior: "instant" });
+    const nav = document.querySelector(".site-header nav"),
+      active = nav?.querySelector<HTMLElement>("a.active");
+    if (nav && active && nav.scrollWidth > nav.clientWidth)
+      nav.scrollLeft =
+        active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
   }, [tab]);
   useEffect(() => {
     if (
@@ -332,6 +339,13 @@ function Game({ r }: { r: Runtime }) {
             events={events.data}
             eventError={events.isError}
             now={now}
+          />
+        ) : tab === "hamster" ? (
+          <HamsterPage
+            r={r}
+            now={now}
+            events={events.data}
+            eventError={events.isError}
           />
         ) : tab === "jackpot" ? (
           <div className="jackpot-page">

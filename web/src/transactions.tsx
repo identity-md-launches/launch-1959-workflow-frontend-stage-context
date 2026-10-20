@@ -11,6 +11,7 @@ import {
   createWalletClient,
   custom,
   erc20Abi,
+  type Abi,
   type Hex,
   type Address,
 } from "viem";
@@ -18,6 +19,13 @@ import { type Runtime } from "./config";
 import { verifyDeployment } from "./data";
 import { errorText } from "./model";
 import { useWalletControl } from "./Wallet";
+export interface TransactionTarget {
+  address: Address;
+  abi: Abi;
+  token: Address;
+  symbol: string;
+  verify: () => Promise<unknown>;
+}
 const Context = createContext<{
   busy: boolean;
   message: string;
@@ -27,6 +35,7 @@ const Context = createContext<{
     fn: string,
     args: readonly unknown[],
     approval?: boolean,
+    target?: TransactionTarget,
   ) => Promise<boolean>;
 }>({ busy: false, message: "", error: "", run: async () => false });
 export const useTransaction = () => useContext(Context);
@@ -45,7 +54,12 @@ export function TransactionProvider({
     [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [hash, setHash] = useState<Hex>();
-  async function run(fn: string, args: readonly unknown[], approval = false) {
+  async function run(
+    fn: string,
+    args: readonly unknown[],
+    approval = false,
+    other?: TransactionTarget,
+  ) {
     if (locked.current) return false;
     if (!address || !connector) {
       open();
@@ -62,16 +76,19 @@ export function TransactionProvider({
     setMessage("Checking the transaction…");
     try {
       await verifyDeployment(r);
+      if (other) await other.verify();
       const provider = await connector.getProvider();
       const wallet = createWalletClient({
         account: address,
         chain: r.chain,
         transport: custom(provider as any),
       });
-      const target: Address = approval ? r.token.address : r.game.address;
+      const target: Address = approval
+        ? (other?.token ?? r.token.address)
+        : (other?.address ?? r.game.address);
       const simulation = await r.client.simulateContract({
         address: target,
-        abi: approval ? erc20Abi : r.game.abi,
+        abi: approval ? erc20Abi : (other?.abi ?? r.game.abi),
         functionName: fn,
         args,
         account: address,
@@ -89,7 +106,7 @@ export function TransactionProvider({
         throw Error("The transaction reverted. You can try again.");
       setMessage(
         approval
-          ? "IMD approved. Confirm your action next."
+          ? `${other?.symbol ?? "IMD"} approved. Confirm your action next.`
           : fn === "claim"
             ? "Your IMD has been claimed."
             : "Confirmed on Ethereum.",

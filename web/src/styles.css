@@ -3137,3 +3137,213 @@ dialog::backdrop {
   width: max-content;
   min-width: 158px;
 }
+
+/* $HAMSTER tab: token, mining, staking and vault stats. */
+.hamster-page {
+  min-height: 60vh;
+}
+.hamster-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.hamster-grid > .hamster-how {
+  grid-column: 1 / -1;
+}
+.hamster-grid .card {
+  display: grid;
+  gap: 16px;
+}
+.hamster-grid .card-head {
+  margin-bottom: 0;
+}
+.ca-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 14px;
+  padding: 6px 6px 6px 14px;
+  min-width: 0;
+}
+.ca-row code {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--label);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.ca-row .button {
+  flex-shrink: 0;
+}
+.ca-warning {
+  font-size: var(--label);
+  font-weight: 600;
+  color: var(--error);
+}
+.tax-live {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--hover);
+}
+.tax-live > div {
+  display: grid;
+  gap: 4px;
+}
+.tax-live span {
+  font-size: var(--label);
+  color: var(--muted);
+}
+.tax-live strong,
+.mine-total {
+  font-size: var(--heading);
+  font-variant-numeric: tabular-nums;
+}
+.tax-live p {
+  grid-column: 1 / -1;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.mine-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mine-head > div {
+  display: grid;
+  gap: 4px;
+}
+.grant-block {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.table-scroll {
+  overflow-x: auto;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.hamster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+.hamster-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 8px 8px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.hamster-table td {
+  padding: 10px 8px 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.hamster-table th:last-child,
+.hamster-table td:last-child {
+  text-align: right;
+  padding-right: 0;
+}
+.stake-figures,
+.hamster-figures {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.hamster-figures {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 24px;
+}
+.stake-figures dt,
+.hamster-figures dt {
+  font-size: var(--label);
+  color: var(--muted);
+}
+.stake-figures dd,
+.hamster-figures dd {
+  margin: 4px 0 0;
+  font-size: var(--heading);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.hamster-figures dd.small {
+  font-size: var(--small);
+  font-weight: 400;
+  margin-top: 2px;
+}
+.stake-form {
+  display: grid;
+  gap: 8px;
+}
+.stake-form .amount-label {
+  margin-bottom: 0;
+}
+.stake-form .primary {
+  justify-self: start;
+}
+.lot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.lot-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--label);
+}
+.lot-list li > div {
+  display: grid;
+  gap: 2px;
+}
+.unstake-block {
+  display: grid;
+  gap: 12px;
+}
+.unstake-block > .button {
+  justify-self: start;
+}
+.how-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+@media (max-width: 800px) {
+  .hamster-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+}
+@media (max-width: 680px) {
+  /* Six tabs stay on one row; at the narrowest widths the row scrolls. */
+  .site-header nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .site-header nav a {
+    padding-inline: 6px;
+  }
+  .hamster-grid .card {
+    padding: 20px;
+  }
+  .stake-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
