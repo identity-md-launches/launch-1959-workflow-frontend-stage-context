@@ -39,12 +39,16 @@ export interface Position {
   paid: bigint;
 }
 export const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+export const number = (
+  n: number | bigint,
+  options?: Intl.NumberFormatOptions,
+) => new Intl.NumberFormat("en-US", options).format(n);
 export const counted = (n: number | bigint, word: string) =>
-  `${n.toLocaleString()} ${word}${n === 1 || n === 1n ? "" : "s"}`;
+  `${number(n)} ${word}${n === 1 || n === 1n ? "" : "s"}`;
 export const imd = (n: bigint | undefined, digits = 2) =>
   n === undefined
     ? "—"
-    : Number(formatUnits(n, 18)).toLocaleString(undefined, {
+    : Number(formatUnits(n, 18)).toLocaleString("en-US", {
         maximumFractionDigits: digits,
       });
 export const time = (seconds: bigint | number) =>

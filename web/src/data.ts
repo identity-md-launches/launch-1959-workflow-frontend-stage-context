@@ -100,9 +100,12 @@ export const useResults = (r: Runtime, g: GlobalState | undefined) =>
   useQuery({
     queryKey: ["results", g?.currentWindow.toString()],
     queryFn: async () => {
+      // Derive the completed boundary from chain time, not a betting cursor.
+      const completed =
+        g!.timestamp > g!.GENESIS ? (g!.timestamp - g!.GENESIS) / 3600n : 0n;
       const ks = Array.from(
-        { length: Number(g!.currentWindow < 24n ? g!.currentWindow : 24n) },
-        (_, i) => g!.currentWindow - BigInt(i) - 1n,
+        { length: Number(completed < 24n ? completed : 24n) },
+        (_, i) => completed - BigInt(i) - 1n,
       );
       return Promise.all(
         ks.map((k) => reader(r)<GameWindow>("windowInfo", [k], g!.blockNumber)),

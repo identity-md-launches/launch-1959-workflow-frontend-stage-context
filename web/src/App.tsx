@@ -4,7 +4,6 @@ import type { Runtime } from "./config";
 import {
   useGlobal,
   useWindow,
-  useResults,
   useEvents,
   useVerification,
   type GameEvent,
@@ -14,16 +13,27 @@ import { useStats, wakeEstimate } from "./telemetry";
 import { BetPanel, type BetReceipt } from "./Bet";
 import { Jackpot } from "./Jackpot";
 import { MyBets } from "./MyBets";
-import { Stats, Activity } from "./Stats";
+import { Stats } from "./Stats";
 import { Stream } from "./Stream";
-import { Chat } from "./Chat";
-import { Hamster, Seed } from "./pixel";
+import { ChatDrawer } from "./Chat";
+import { Seed } from "./pixel";
 import { WalletProvider, WalletControl } from "./Wallet";
-import { TransactionProvider, TransactionStatus } from "./transactions";
+import { TransactionProvider } from "./transactions";
 import { CardHead, Help, Icon } from "./ui";
 import { Share } from "./Share";
-import { imd, shortAddress, time, span } from "./model";
+import { imd, shortAddress, number } from "./model";
 import { blip } from "./sound";
+const tabs = [
+  ["play", "The wheel"],
+  ["jackpot", "Jackpot"],
+  ["stats", "Stats"],
+  ["my-bets", "My bets"],
+  ["agents", "Agents"],
+] as const;
+const currentTab = () =>
+  tabs.some(([id]) => location.hash === `#${id}`)
+    ? location.hash.slice(1)
+    : "play";
 const stored = (key: string, fallback: string) => {
   try {
     return localStorage.getItem(key) ?? fallback;
@@ -64,7 +74,7 @@ function Onboarding() {
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
       >
-        {step >= 0 ? `New here? ${step + 1}/3` : "How to play"}{" "}
+        {step >= 0 ? `New here? ${step + 1}/3` : "New here?"}{" "}
         <span aria-hidden="true">{expanded ? "−" : "+"}</span>
       </button>
       {expanded && (
@@ -118,14 +128,19 @@ function Ticker({ events, error }: { events?: GameEvent[]; error: boolean }) {
         : e.eventName === "Fed"
           ? `${shortAddress(e.args.from)} fed ${imd(e.args.amount)} IMD`
           : e.eventName === "TicketBought"
-            ? `${shortAddress(e.args.bettor)} guessed ${e.args.guess} passes`
+            ? `${shortAddress(e.args.bettor)} guessed ${number(e.args.guess)} passes`
             : `Jackpot ${e.args.winners > 0n ? "hit" : "rolled over"} · ${imd(e.args.pot)} IMD`;
   return (
     <div className="event-ticker">
       <span className="ticker-label">
         <i className="status-dot" /> Around the wheel
       </span>
-      <div className="ticker-items" aria-label="Recent on-chain activity">
+      <div
+        className="ticker-items"
+        tabIndex={0}
+        role="region"
+        aria-label="Recent on-chain activity"
+      >
         {recent.length ? (
           recent.map((e) => (
             <a
@@ -154,20 +169,13 @@ function Game({ r }: { r: Runtime }) {
   const global = useGlobal(r),
     verification = useVerification(r),
     events = useEvents(r),
-    results = useResults(r, global.data),
     status = useStatus(),
     rounds = useRounds(),
     stats = useStats(7),
     cache = useQueryClient();
   const [selected, setSelected] = useState<bigint>(),
     [now, setNow] = useState(() => Math.floor(Date.now() / 1000)),
-    [tab, setTab] = useState(() =>
-      location.hash === "#stats"
-        ? "stats"
-        : location.hash === "#my-bets"
-          ? "bets"
-          : "play",
-    ),
+    [tab, setTab] = useState(currentTab),
     [theme, setTheme] = useState(() => stored("hh-theme", "auto")),
     [sound, setSound] = useState(() => stored("hh-sound", "off") === "on"),
     [paused, setPaused] = useState(false),
@@ -177,17 +185,14 @@ function Game({ r }: { r: Runtime }) {
     return () => clearInterval(id);
   }, []);
   useEffect(() => {
-    const listener = () =>
-      setTab(
-        location.hash === "#stats"
-          ? "stats"
-          : location.hash === "#my-bets"
-            ? "bets"
-            : "play",
-      );
+    const listener = () => setTab(currentTab());
     addEventListener("hashchange", listener);
     return () => removeEventListener("hashchange", listener);
   }, []);
+  useEffect(() => {
+    document.querySelector(".site")?.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [tab]);
   useEffect(() => {
     if (
       global.data &&
@@ -221,7 +226,7 @@ function Game({ r }: { r: Runtime }) {
         rounds.data,
       )
     : undefined;
-  const wake = wakeEstimate(stats.data);
+  const wake = wakeEstimate(stats.data, new Date(now * 1000));
   const seeds = Array.from({ length: 6 }, (_, i) => {
     if (!current.data || !rounds.data) return undefined;
     const first = (current.data.window.startsAt - 1791847800n) / 600n + 1n;
@@ -250,8 +255,17 @@ function Game({ r }: { r: Runtime }) {
     return undefined;
   });
   return (
-    <div className={paused ? "site motion-paused" : "site"}>
-      <a className="skip" href="#main">
+    <div
+      className={`${paused ? "site motion-paused" : "site"} ${tab === "play" ? "wheel-page" : ""}`}
+    >
+      <a
+        className="skip"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById("main")?.focus();
+        }}
+      >
         Skip to content
       </a>
       <header className="site-header">
@@ -263,16 +277,12 @@ function Game({ r }: { r: Runtime }) {
           </span>
         </a>
         <nav aria-label="Main navigation">
-          {[
-            ["play", "The wheel"],
-            ["stats", "Stats"],
-            ["bets", "My bets"],
-          ].map(([id, label]) => (
+          {tabs.map(([id, label]) => (
             <a
               key={id}
               className={tab === id ? "active" : ""}
               aria-current={tab === id ? "page" : undefined}
-              href={id === "bets" ? "#my-bets" : `#${id}`}
+              href={`#${id}`}
             >
               {label}
             </a>
@@ -314,10 +324,55 @@ function Game({ r }: { r: Runtime }) {
           <WalletControl r={r} />
         </div>
       </header>
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         {tab === "stats" ? (
-          <Stats r={r} events={events.data} eventError={events.isError} />
-        ) : tab === "bets" ? (
+          <Stats
+            r={r}
+            g={global.data}
+            events={events.data}
+            eventError={events.isError}
+            now={now}
+          />
+        ) : tab === "jackpot" ? (
+          <div className="jackpot-page">
+            <div className="section-intro">
+              <div>
+                <h1>The jackpot jar.</h1>
+                <p>Guess the passes, or feed the next prize.</p>
+              </div>
+            </div>
+            <Jackpot
+              r={r}
+              g={global.data}
+              k={selected}
+              events={events.data}
+              eventError={events.isError}
+              setK={setSelected}
+            />
+          </div>
+        ) : tab === "agents" ? (
+          <div className="agents-page">
+            <div className="section-intro">
+              <div>
+                <h1>AI agents can play.</h1>
+                <p>
+                  Same wheel. Same rules. A skill for your agent’s next guess.
+                </p>
+              </div>
+            </div>
+            <section className="agents-section">
+              <a
+                className="button"
+                href="./SKILL.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Read the skill ↗
+              </a>
+              <code>npx skills add https://hamsterhour.fun</code>
+            </section>
+          </div>
+        ) : tab === "my-bets" ? (
           <div className="bets-page">
             <div className="section-intro">
               <div>
@@ -334,7 +389,7 @@ function Game({ r }: { r: Runtime }) {
                 <h1>
                   Bet on the hamster<span className="headline-period">.</span>
                 </h1>
-                <p>A real hamster. One hour. How far will he go?</p>
+                <p>A real hamster. Bets in IMD.</p>
               </div>
               <Onboarding />
             </div>
@@ -351,7 +406,7 @@ function Game({ r }: { r: Runtime }) {
               <div className="wheel-column">
                 <section className="card habitat">
                   <CardHead
-                    title="Meet the entire team"
+                    title="Live from the wheel"
                     help="The pixel hamster follows live wheel speed, not whether the camera is online. An unavailable or stale speed is shown as unknown. Live counters are informational; the oracle’s settled passes determine the result."
                   >
                     <span className={`mood-pill ${running ? "awake" : ""}`}>
@@ -363,27 +418,14 @@ function Game({ r }: { r: Runtime }) {
                           : "Taking a snooze"}
                     </span>
                   </CardHead>
-                  <div className="habitat-art">
-                    <Hamster running={running} />
-                    <span className="scene-note">
-                      {!telemetryFresh
-                        ? "Waiting for fresh telemetry"
-                        : running
-                          ? "night shift, tiny legs"
-                          : wake
-                            ? `usually wakes in ~${wake}h`
-                            : "on his own little schedule"}
-                    </span>
-                    <button
-                      className="motion-button"
-                      onClick={() => setPaused(!paused)}
-                      aria-label={
-                        paused ? "Resume animations" : "Pause animations"
-                      }
-                    >
-                      {paused ? "Resume" : "Pause"}
-                    </button>
-                  </div>
+                  <Stream
+                    running={running}
+                    fresh={telemetryFresh}
+                    wake={wake}
+                    paused={paused}
+                    setPaused={setPaused}
+                    now={now}
+                  />
                   <div className="hour-progress">
                     <div className="odometer">
                       <span>
@@ -397,7 +439,7 @@ function Game({ r }: { r: Runtime }) {
                       </span>
                       <strong className="pixel">
                         {telemetryFresh && progress?.passes !== undefined
-                          ? `${progress.approximate ? "≈" : ""}${progress.passes.toLocaleString()}`
+                          ? `${progress.approximate ? "≈" : ""}${number(progress.passes)}`
                           : "—"}
                       </strong>
                     </div>
@@ -412,7 +454,7 @@ function Game({ r }: { r: Runtime }) {
                             title={
                               n === undefined
                                 ? `Interval ${i + 1}: no exact telemetry`
-                                : `Interval ${i + 1}: ${n} passes`
+                                : `Interval ${i + 1}: ${number(n!)} passes`
                             }
                           >
                             <Seed
@@ -438,7 +480,6 @@ function Game({ r }: { r: Runtime }) {
                     </div>
                   </div>
                 </section>
-                <Activity compact />
               </div>
               <BetPanel
                 r={r}
@@ -449,175 +490,72 @@ function Game({ r }: { r: Runtime }) {
                 onBet={setShared}
               />
             </div>
+            <Jackpot
+              r={r}
+              g={global.data}
+              k={selected}
+              compact
+              events={events.data}
+              eventError={events.isError}
+            />
             <Ticker events={events.data} error={events.isError} />
-            <section className="card results">
-              <CardHead
-                title="The last 24 hours"
-                help="The last 24 completed hours from windowInfo, each compared with its own frozen line. Unsettled hours stay pending. An hour with no bets has no oracle result, so it is shown as no bets rather than zero passes."
-              />
-              <div
-                className="result-ribbon"
-                tabIndex={0}
-                role="region"
-                aria-label="Results from the last 24 hours; scroll horizontally for more"
-              >
-                {results.data
-                  ?.slice()
-                  .reverse()
-                  .map((w) => (
-                    <div
-                      key={String(w.index)}
-                      className={`result-item ${w.status === 2 ? (w.result < 100n ? "snooze" : w.result > w.line ? "over" : "under") : "pending"}`}
-                      title={`${span(w)} · line ${w.line} · ${w.status === 2 ? w.result + " passes" : w.status === 3 ? "timed out" : w.status === 0 ? "no bets" : "awaiting oracle"}`}
-                    >
-                      <span>{time(w.startsAt)}</span>
-                      <strong className="pixel">
-                        {w.status === 2
-                          ? w.result.toLocaleString()
-                          : w.status === 0
-                            ? "·"
-                            : "—"}
-                      </strong>
-                      <small>
-                        {w.status === 2
-                          ? w.result < 100n
-                            ? "Snooze"
-                            : w.result > w.line
-                              ? "Over"
-                              : "Under"
-                          : w.status === 0
-                            ? "No bets"
-                            : w.status === 3
-                              ? "Refund"
-                              : "Pending"}
-                      </small>
-                      <span className="result-line">
-                        line {w.line.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                {!results.data && (
-                  <p className="muted">
-                    {results.isError
-                      ? "Results could not load. Try refreshing the page."
-                      : "Reading settled results…"}
-                  </p>
-                )}
-              </div>
-            </section>
-            <div className="lower-grid">
-              <Stream />
-              <Jackpot
-                r={r}
-                g={global.data}
-                k={selected}
-                events={events.data}
-                eventError={events.isError}
-              />
-            </div>
-            <div className="community-grid">
-              <section className="card chat-card">
-                <div className="card-head">
-                  <h2>By the wheel</h2>
-                  <Help label="chat">
-                    Messages are signed by your wallet, with no transaction and
-                    no gas. 200 characters maximum, no links, one message every
-                    5 seconds. The existing Hamster Hour worker stores and
-                    verifies messages.
-                  </Help>
-                </div>
-                <details className="chat-disclosure" open>
-                  <summary>
-                    <Icon name="chat" /> Wheel chat <span>Open / close</span>
-                  </summary>
-                  <Chat r={r} g={global.data} />
-                </details>
-              </section>
-              <MyBets r={r} events={events.data} eventError={events.isError} />
-            </div>
-            <div className="mining-teaser">
-              <Icon name="seed" />
-              <p>
-                Lose a bet, mine <strong>$HAMSTER.</strong> <span>Soon.</span>
-              </p>
-              <span>Losses already count.</span>
-            </div>
-            <section className="agents-section">
-              <div>
-                <span className="pixel agent-icon" aria-hidden="true">
-                  [•_•]
-                </span>
-                <div>
-                  <h2>AI agents can play.</h2>
-                  <p>
-                    Same wheel. Same rules. A skill for your agent’s next guess.
-                  </p>
-                </div>
-              </div>
-              <a
-                className="button"
-                href="./SKILL.md"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Read the skill ↗
-              </a>
-              <code>npx skills add https://hamsterhour.fun</code>
-            </section>
           </>
         )}
       </main>
-      <footer>
-        <a className="footer-brand" href="#play">
-          hamster hour <span>Small animal. Actual stakes.</span>
-        </a>
-        <div>
-          <a
-            href="https://x.com/hamsterhourgame"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Follow on X ↗
+      {tab !== "play" && (
+        <footer>
+          <a className="footer-brand" href="#play">
+            hamster hour <span>Small animal. Actual stakes.</span>
           </a>
-          <a
-            href={`${r.deployment.network.explorer}/address/${r.game.address}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Contract ↗
-          </a>
-          <button
-            className="text-button"
-            onClick={() => {
-              save("hh-sound", !sound ? "on" : "off");
-              setSound(!sound);
-              if (!sound) blip();
-            }}
-          >
-            {sound ? "Sound on" : "Sound off"}
-          </button>
-          <button
-            className="text-button"
-            onClick={() => {
-              setTheme("auto");
-              save("hh-theme", "auto");
-            }}
-          >
-            Auto theme {theme === "auto" ? "✓" : ""}
-          </button>
-        </div>
-        <p>
-          Settled by the IMD oracle, data from{" "}
-          <a
-            href="https://sepolia.squeekchain.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Squeekchain
-          </a>
-          .
-        </p>
-      </footer>
+          <div>
+            <a
+              href="https://x.com/hamsterhourgame"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Follow on X ↗
+            </a>
+            <a
+              href={`${r.deployment.network.explorer}/address/${r.game.address}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Contract ↗
+            </a>
+            <button
+              className="text-button"
+              onClick={() => {
+                save("hh-sound", !sound ? "on" : "off");
+                setSound(!sound);
+                if (!sound) blip();
+              }}
+            >
+              {sound ? "Sound on" : "Sound off"}
+            </button>
+            <button
+              className="text-button"
+              onClick={() => {
+                setTheme("auto");
+                save("hh-theme", "auto");
+              }}
+            >
+              Auto theme {theme === "auto" ? "✓" : ""}
+            </button>
+          </div>
+          <p>
+            Settled by the IMD oracle, data from{" "}
+            <a
+              href="https://sepolia.squeekchain.com"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Squeekchain
+            </a>
+            .
+          </p>
+        </footer>
+      )}
+      <ChatDrawer r={r} g={global.data} />
       {shared && <Share bet={shared} close={() => setShared(undefined)} />}
     </div>
   );

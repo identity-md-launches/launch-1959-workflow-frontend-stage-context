@@ -9,6 +9,8 @@ const positionTotal = (p: Position) =>
   p.over + p.under + p.yes + p.no + (p.hasTicket ? 1n : 0n);
 import { counted, shortAddress, type Position } from "./model";
 import { useWalletControl } from "./Wallet";
+import { Sheet } from "./Sheet";
+import { Icon, Help } from "./ui";
 export type ChatMessage = {
   id: string;
   address: string;
@@ -353,5 +355,39 @@ export function Chat({ r, g }: { r: Runtime; g?: GlobalState }) {
         {error}
       </p>
     </section>
+  );
+}
+
+export function ChatDrawer({ r, g }: { r: Runtime; g?: GlobalState }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className="chat-launcher"
+        aria-label="Open wheel chat"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="chat" />
+        <span>Chat</span>
+      </button>
+      {open && (
+        <Sheet
+          title="Wheel chat"
+          close={() => setOpen(false)}
+          className="chat-drawer"
+        >
+          <p className="small muted">
+            Messages are signed by your wallet. No transaction or gas.{" "}
+            <Help label="chat rules">
+              200 characters maximum, no links, one message every 5 seconds. The
+              Hamster Hour worker stores and verifies messages.
+            </Help>
+          </p>
+          <Chat r={r} g={g} />
+        </Sheet>
+      )}
+    </>
   );
 }

@@ -1,31 +1,33 @@
 import { useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Runtime } from "./config";
-import type { GameEvent } from "./data";
+import { useResults, type GameEvent, type GlobalState } from "./data";
+import { useRounds } from "./live";
+import { completedWindows, observedPasses, winningSides } from "./history";
 import { useStats, hourly } from "./telemetry";
-import { CardHead, Empty } from "./ui";
-import { imd, dateLabel } from "./model";
-export function Activity({ compact = false }: { compact?: boolean }) {
-  const s = useStats(7),
+import { CardHead } from "./ui";
+import { imd, dateLabel, span, number } from "./model";
+export function Activity({ range = 7 }: { range?: 7 | 30 }) {
+  const s = useStats(range),
     values = hourly(s.data),
     max = Math.max(1, ...values.map((x) => x.value)),
     hour = new Date().getHours();
   return (
-    <section className={`card activity ${compact ? "compact" : ""}`}>
+    <section className="card activity">
       <CardHead
         title="A hamster’s usual day"
-        help="Mean passes by your local hour, from Squeekchain’s last 7 days of observed telemetry. Gaps are unknown, never zero. The marker is your local time. Past activity is not a promise of future running."
+        help={`Mean passes by your local hour, from Squeekchain’s last ${range} days of observed telemetry. Gaps are unknown, never zero. The marker is your local time. Past activity is not a promise of future running.`}
       />
       <div
         className="activity-bars"
         role="img"
-        aria-label={`Typical daily activity in your local time. You are here at ${hour}:00. ${s.data ? "Based on 7 days of Squeekchain telemetry." : "Telemetry has not loaded."}`}
+        aria-label={`Typical daily activity in your local time. You are here at ${hour}:00. ${s.data ? `Based on ${range} days of Squeekchain telemetry. ${values.map((x) => `${x.hour}:00: ${x.observed ? number(Math.round(x.value)) + " mean passes" : "unknown"}`).join("; ")}` : "Telemetry has not loaded."}`}
       >
         {values.map((x) => (
           <div
             key={x.hour}
             className={`activity-hour ${`${x.hour === hour ? "here" : ""} ${x.observed ? "" : "is-unknown"}`}`}
-            title={`${String(x.hour).padStart(2, "0")}:00 · ${x.observed ? Math.round(x.value).toLocaleString() + " mean passes" : "unknown"}`}
+            title={`${String(x.hour).padStart(2, "0")}:00 · ${x.observed ? number(Math.round(x.value)) + " mean passes" : "unknown"}`}
             style={
               {
                 "--height": `${Math.max(5, (x.value / max) * 100)}%`,
@@ -49,7 +51,7 @@ export function Activity({ compact = false }: { compact?: boolean }) {
         {s.isError
           ? "Activity couldn’t load. The service will retry."
           : s.data
-            ? `${s.data.savedSnapshot ? "Saved " : ""}7-day average · ${new Date(s.data.generatedAt).toLocaleDateString()} · your local time`
+            ? `${s.data.savedSnapshot ? "Saved telemetry · refresh unavailable · " : ""}Observed ${range}-day averages · updated ${dateLabel(Date.parse(s.data.generatedAt) / 1000)} · your local time`
             : "Reading Squeekchain telemetry…"}
       </p>
     </section>
@@ -57,23 +59,22 @@ export function Activity({ compact = false }: { compact?: boolean }) {
 }
 export function Stats({
   r,
+  g,
+  now,
   events,
   eventError,
 }: {
   r: Runtime;
+  g?: GlobalState;
+  now: number;
   events?: GameEvent[];
   eventError: boolean;
 }) {
   const [range, setRange] = useState<7 | 30>(7),
     s = useStats(range);
-  const values = hourly(s.data),
-    max = Math.max(1, ...values.map((x) => x.value));
-  const bets = (events ?? []).filter((e) => e.eventName === "BinaryBet"),
-    tickets = (events ?? []).filter((e) => e.eventName === "TicketBought"),
-    claimed = (events ?? []).filter((e) => e.eventName === "Claimed"),
-    hits = (events ?? []).filter(
-      (e) => e.eventName === "JackpotFinalized" && e.args.winners > 0n,
-    );
+  const results = useResults(r, g),
+    rounds = useRounds();
+  const windows = completedWindows(results.data ?? [], BigInt(now));
   const sum = (es: GameEvent[]) => es.reduce((n, e) => n + e.args.amount, 0n);
   const cutoff = useQuery({
     queryKey: ["stats-event-cutoff", range, events?.length],
@@ -117,46 +118,95 @@ export function Stats({
           ))}
         </div>
       </div>
-      <section className="card">
+      <Activity range={range} />
+      <section className="card results">
         <CardHead
-          title="A typical day, by hour"
-          help="Observed mean passes for each local hour, aggregated from Squeekchain’s half-hour buckets for the selected date range. No observed data means unknown. Partial historical coverage is reported by the upstream service."
+          title="The last 24 hours"
+          help="Finished windows, newest first. Passes are actual complete observations from worker rounds or dated stats; gaps stay unknown. The frozen line and winning sides come from the game. Only the oracle determines payouts."
         />
-        {s.isError ? (
-          <Empty>
-            <p>Stats could not load.</p>
-            <button onClick={() => void s.refetch()}>Try again</button>
-          </Empty>
-        ) : (
-          <>
-            <div
-              className="typical-chart"
-              role="img"
-              aria-label={values
-                .map(
-                  (x) =>
-                    `${String(x.hour).padStart(2, "0")}:00: ${x.observed ? `${Math.round(x.value)} mean passes` : "unknown"}`,
-                )
-                .join("; ")}
-            >
-              {values.map((x) => (
-                <div
-                  key={x.hour}
-                  title={`${x.hour}:00 · ${x.observed ? Math.round(x.value) + " mean passes" : "unknown"}`}
+        <p className="small muted history-note">
+          Your local time. Passes are observed telemetry; winning sides are
+          oracle results.
+        </p>
+        <div
+          className="result-ribbon"
+          tabIndex={0}
+          role="region"
+          aria-label="Results from the last 24 hours; scroll horizontally for more"
+        >
+          {windows.map((w) => {
+            const observed = observedPasses(
+              w,
+              s.data,
+              rounds.isError ? undefined : rounds.data,
+            );
+            const passes = observed ?? (w.status === 2 ? w.result : undefined);
+            const outcome = winningSides(w);
+            return (
+              <div
+                key={String(w.index)}
+                className={`result-item ${w.status === 2 ? (w.result < 100n ? "snooze" : w.result > w.line ? "over" : "under") : "pending"}`}
+                data-ended-at={String(w.endsAt)}
+              >
+                <span>
+                  {new Date(Number(w.startsAt) * 1000).toLocaleDateString(
+                    undefined,
+                    { month: "short", day: "numeric" },
+                  )}
+                </span>
+                <span>{span(w)}</span>
+                <strong className="pixel">
+                  {passes !== undefined ? number(passes) : "—"}
+                </strong>
+                <span>
+                  {passes !== undefined
+                    ? observed !== undefined
+                      ? "observed passes"
+                      : "oracle passes"
+                    : "No observation"}
+                </span>
+                <span className="result-line">line {number(w.line)}</span>
+                <small>{outcome}</small>
+                {w.status === 2 &&
+                  observed !== undefined &&
+                  observed !== w.result && (
+                    <small>Oracle: {number(w.result)}</small>
+                  )}
+              </div>
+            );
+          })}
+          {!results.data && (
+            <p className="muted">
+              {results.isError
+                ? "Results could not load."
+                : "Reading completed hours…"}
+              {results.isError && (
+                <button
+                  className="text-button"
+                  onClick={() => void results.refetch()}
                 >
-                  <i
-                    style={{ height: `${Math.max(2, (x.value / max) * 100)}%` }}
-                  />
-                  <span>{String(x.hour).padStart(2, "0")}</span>
-                </div>
-              ))}
-            </div>
-            <p className="small muted">
-              {s.data
-                ? `${s.data.savedSnapshot ? "Saved telemetry · refresh unavailable · " : ""}Observed ${range}-day averages · your time · updated ${dateLabel(Date.parse(s.data.generatedAt) / 1000)}`
-                : "Loading observed telemetry…"}
+                  Try again
+                </button>
+              )}
             </p>
-          </>
+          )}
+          {results.data && !windows.length && (
+            <p className="muted">No completed windows in the last 24 hours.</p>
+          )}
+        </div>
+        {windows.some(
+          (w) =>
+            w.status !== 2 &&
+            observedPasses(
+              w,
+              s.data,
+              rounds.isError ? undefined : rounds.data,
+            ) === undefined,
+        ) && (
+          <p className="small muted">
+            Some hours have no complete telemetry yet. Missing passes stay
+            unknown.
+          </p>
         )}
       </section>
       <div className="stats-grid">
@@ -173,7 +223,7 @@ export function Stats({
                   ? (
                       Number(s.data.activity.summary.observedDistanceMm ?? 0) /
                       1e6
-                    ).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                    ).toLocaleString("en-US", { maximumFractionDigits: 2 })
                   : "—"}
                 <small> km</small>
               </dd>
@@ -184,7 +234,7 @@ export function Stats({
                 {s.data
                   ? Number(
                       s.data.activity.summary.observedWorkUnits,
-                    ).toLocaleString()
+                    ).toLocaleString("en-US")
                   : "—"}
               </dd>
             </div>
@@ -192,7 +242,7 @@ export function Stats({
               <dt>Observed active intervals</dt>
               <dd>
                 {s.data
-                  ? `${s.data.rounds.activeCount} / ${s.data.rounds.observedCount}`
+                  ? `${number(s.data.rounds.activeCount)} / ${number(s.data.rounds.observedCount)}`
                   : "—"}
               </dd>
             </div>
@@ -226,7 +276,7 @@ export function Stats({
                       ? (
                           Number(record.value) /
                           (unit === "km" ? 1e6 : unit === "m/s" ? 1000 : 1)
-                        ).toLocaleString(undefined, {
+                        ).toLocaleString("en-US", {
                           maximumFractionDigits: 2,
                         })
                       : "—"}{" "}
@@ -257,7 +307,7 @@ export function Stats({
               [
                 "Bets placed",
                 filtered && cutoff.data !== undefined
-                  ? String(fb.length + ft.length)
+                  ? number(fb.length + ft.length)
                   : "—",
               ],
               [
@@ -269,7 +319,7 @@ export function Stats({
               [
                 "Jackpot hits",
                 filtered && cutoff.data !== undefined
-                  ? String(
+                  ? number(
                       filtered.filter(
                         (e) =>
                           e.eventName === "JackpotFinalized" &&

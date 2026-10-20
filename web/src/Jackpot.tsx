@@ -2,12 +2,20 @@ import { useState } from "react";
 import { useConnection } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import type { Runtime } from "./config";
-import { reader, useToken, type GlobalState, type GameEvent } from "./data";
+import {
+  reader,
+  useToken,
+  useWindow,
+  type GlobalState,
+  type GameEvent,
+} from "./data";
 import {
   imd,
   amountValue,
   dateLabel,
   shortAddress,
+  span,
+  time,
   type GameWindow,
   type Position,
 } from "./model";
@@ -23,12 +31,16 @@ export function Jackpot({
   k,
   events,
   eventError = false,
+  compact = false,
+  setK,
 }: {
   r: Runtime;
   g?: GlobalState;
   k?: bigint;
   events?: GameEvent[];
   eventError?: boolean;
+  compact?: boolean;
+  setK?: (k: bigint) => void;
 }) {
   const [mode, setMode] = useState<"ticket" | "feed">(),
     [guess, setGuess] = useState("2100"),
@@ -36,6 +48,7 @@ export function Jackpot({
     [error, setError] = useState("");
   const { address, chainId } = useConnection(),
     token = useToken(r, address),
+    selected = useWindow(r, k),
     tx = useTransaction(),
     wallet = useWalletControl();
   const feeds = (events ?? [])
@@ -133,109 +146,164 @@ export function Jackpot({
     ? g.jackpotSeed + (next.data?.pendingJackpotDeposits ?? 0n)
     : undefined;
   return (
-    <section className="card jackpot">
-      <CardHead
-        title="The jackpot jar"
-        help="A ticket costs 5 IMD. Guess within ±0.5% of the final passes: winners split 80% of the pot, with 20% carried. No winner or fewer than 100 passes carries everything. A timeout refunds tickets. One ticket per wallet per hour, 256 tickets maximum. Final prizes are fixed only after ordered finalization."
-      />
-      <div className="jackpot-main">
-        <div>
-          <span className="jackpot-label">Waiting for a lucky guess</span>
-          <strong className="jackpot-counter pixel">
-            {imd(pot)}
-            <small> IMD</small>
-          </strong>
-          <span className="jackpot-sub">
-            Carried seed + next hour’s deposits
-          </span>
-        </div>
-        <Jar
-          fill={
-            pot === undefined
-              ? 0
-              : Math.min(1, Number(pot / 1000000000000000000n) / 100)
-          }
-        />
-      </div>
-      <p className="jackpot-rule">
-        Get within ±0.5%. Share <strong>80% of the jar.</strong>
-      </p>
-      <div className="jackpot-details">
-        <div>
-          <span>Next fixed prize</span>
-          <strong>
-            {next.data?.jackpotFinalized
-              ? `${imd(next.data.jackpotShare)} IMD per winner`
-              : "Fixes after the result"}
-          </strong>
-        </div>
-        <div>
-          <span>Last winner</span>
-          <strong>
-            {hit.data ? (
-              <>
-                <span>
-                  {hit.data.winner
-                    ? shortAddress(hit.data.winner)
-                    : `${hit.data.w.jackpotWinners} winning tickets`}
-                </span>
-                <small>{dateLabel(hit.data.at)}</small>
-              </>
-            ) : eventError ? (
-              "History unavailable"
-            ) : !events ? (
-              "Reading history…"
-            ) : (
-              "No jackpot hit yet"
-            )}
-          </strong>
-        </div>
-      </div>
-      <div className="jackpot-actions">
-        <button
-          className="butter-button"
-          onClick={() => {
-            setMode("ticket");
-            setError("");
-          }}
-        >
-          <Icon name="seed" /> Get a ticket · 5 IMD
-        </button>
-        <button
-          className="feed-button"
-          onClick={() => {
-            setMode("feed");
-            setError("");
-          }}
-        >
-          Feed the hamster ↗
-        </button>
-      </div>
-      <p className="carry-note">No winner? It grows. Asleep? It rolls over.</p>
-      <div className="fed-list">
-        <span>With a little help from</span>
-        {feeds.length ? (
-          feeds.map((e) => (
-            <a
-              href={`${r.deployment.network.explorer}/tx/${e.transactionHash}`}
-              target="_blank"
-              rel="noreferrer"
-              key={e.transactionHash + e.logIndex}
-            >
-              Fed by {shortAddress(e.args.from)}{" "}
-              <strong>+{imd(e.args.amount)} IMD</strong>
-            </a>
-          ))
-        ) : (
-          <p>
-            {eventError
-              ? "Feeds could not load."
-              : !events
-                ? "Reading the latest feeds…"
-                : "No feeds yet. Every seed counts."}
+    <section
+      className={compact ? "jackpot-strip" : "card jackpot"}
+      aria-label={compact ? "Jackpot" : undefined}
+    >
+      {compact ? (
+        <>
+          <div>
+            <span>Jackpot</span>
+            <strong className="pixel">
+              {imd(pot)} <small>IMD</small>
+            </strong>
+          </div>
+          <button
+            className="butter-button"
+            onClick={() => {
+              setMode("ticket");
+              setError("");
+            }}
+          >
+            Guess the exact number · 5 IMD
+          </button>
+          <a href="#jackpot">See jackpot ↗</a>
+        </>
+      ) : (
+        <>
+          {g && setK && (
+            <div className="jackpot-hour">
+              <label htmlFor="jackpot-hour">Betting hour · your time</label>
+              <select
+                id="jackpot-hour"
+                value={k?.toString() ?? ""}
+                onChange={(e) => setK(BigInt(e.target.value))}
+              >
+                {Array.from(
+                  { length: 24 },
+                  (_, i) => g.earliestNotStartedWindow + BigInt(i),
+                ).map((n, i) => {
+                  const start = g.GENESIS + n * 3600n;
+                  return (
+                    <option key={String(n)} value={String(n)}>
+                      {i === 0 ? "Next · " : ""}
+                      {new Date(Number(start) * 1000).toLocaleDateString(
+                        undefined,
+                        { weekday: "short" },
+                      )}{" "}
+                      {time(start)}–{time(start + 3600n)}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+          <CardHead
+            title="The jackpot jar"
+            help="A ticket costs 5 IMD. Guess within ±0.5% of the final passes: winners split 80% of the pot, with 20% carried. No winner or fewer than 100 passes carries everything. A timeout refunds tickets. One ticket per wallet per hour, 256 tickets maximum. Final prizes are fixed only after ordered finalization."
+          />
+          <div className="jackpot-main">
+            <div>
+              <span className="jackpot-label">Waiting for a lucky guess</span>
+              <strong className="jackpot-counter pixel">
+                {imd(pot)}
+                <small> IMD</small>
+              </strong>
+              <span className="jackpot-sub">
+                Carried seed + next hour’s deposits
+              </span>
+            </div>
+            <Jar
+              fill={
+                pot === undefined
+                  ? 0
+                  : Math.min(1, Number(pot / 1000000000000000000n) / 100)
+              }
+            />
+          </div>
+          <p className="jackpot-rule">
+            Get within ±0.5%. Share <strong>80% of the jar.</strong>
           </p>
-        )}
-      </div>
+          <div className="jackpot-details">
+            <div>
+              <span>Next fixed prize</span>
+              <strong>
+                {next.data?.jackpotFinalized
+                  ? `${imd(next.data.jackpotShare)} IMD per winner`
+                  : "Fixes after the result"}
+              </strong>
+            </div>
+            <div>
+              <span>Last winner</span>
+              <strong>
+                {hit.data ? (
+                  <>
+                    <span>
+                      {hit.data.winner
+                        ? shortAddress(hit.data.winner)
+                        : `${hit.data.w.jackpotWinners} winning tickets`}
+                    </span>
+                    <small>{dateLabel(hit.data.at)}</small>
+                  </>
+                ) : eventError ? (
+                  "History unavailable"
+                ) : !events ? (
+                  "Reading history…"
+                ) : (
+                  "No jackpot hit yet"
+                )}
+              </strong>
+            </div>
+          </div>
+          <div className="jackpot-actions">
+            <button
+              className="butter-button"
+              onClick={() => {
+                setMode("ticket");
+                setError("");
+              }}
+            >
+              <Icon name="seed" /> Get a ticket · 5 IMD
+            </button>
+            <button
+              className="feed-button"
+              onClick={() => {
+                setMode("feed");
+                setError("");
+              }}
+            >
+              Feed the hamster ↗
+            </button>
+          </div>
+          <p className="carry-note">
+            No winner? It grows. Asleep? It rolls over.
+          </p>
+          <div className="fed-list">
+            <span>With a little help from</span>
+            {feeds.length ? (
+              feeds.map((e) => (
+                <a
+                  href={`${r.deployment.network.explorer}/tx/${e.transactionHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  key={e.transactionHash + e.logIndex}
+                >
+                  Fed by {shortAddress(e.args.from)}{" "}
+                  <strong>+{imd(e.args.amount)} IMD</strong>
+                </a>
+              ))
+            ) : (
+              <p>
+                {eventError
+                  ? "Feeds could not load."
+                  : !events
+                    ? "Reading the latest feeds…"
+                    : "No feeds yet. Every seed counts."}
+              </p>
+            )}
+          </div>
+        </>
+      )}
       {mode && (
         <Sheet
           title={mode === "feed" ? "Feed the hamster" : "Make your lucky guess"}
@@ -259,8 +327,12 @@ export function Jackpot({
           ) : (
             <>
               <p>
-                A 5 IMD ticket for the selected betting hour. Your guess wins
-                within ±0.5% of the settled count. One ticket per wallet.
+                A 5 IMD ticket for{" "}
+                {selected.data
+                  ? `${span(selected.data.window)} your time`
+                  : "the selected betting hour"}
+                . Your guess wins within ±0.5% of the settled count. One ticket
+                per wallet.
               </p>
               <label htmlFor="ticket-guess">Your guess, in passes</label>
               <input
@@ -272,7 +344,7 @@ export function Jackpot({
               {position.data?.hasTicket && (
                 <p className="error">
                   You already have a ticket for this hour:{" "}
-                  {position.data.guess.toLocaleString()} passes.
+                  {position.data.guess.toLocaleString("en-US")} passes.
                 </p>
               )}
             </>

@@ -1,0 +1,20 @@
+{
+  "candidateBytesBeforeThisReport": 7916724,
+  "limitBytes": 8388608,
+  "runtimeAssetBytes": 1182888,
+  "runtimeAssets": 25,
+  "protectedPathsUnchanged": true,
+  "exportMatchesTestedBuild": true,
+  "browserScenariosPassed": 13,
+  "axeAudits": 14,
+  "axeViolations": 0,
+  "probePassed": 14,
+  "probeTotal": 16,
+  "liveEthereum": {
+    "chainId": 1,
+    "blockNumber": "26232604",
+    "runtimeMatches": true,
+    "tokenMatches": true,
+    "genesis": "1791847200"
+  }
+}

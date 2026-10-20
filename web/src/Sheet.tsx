@@ -4,11 +4,13 @@ export function Sheet({
   close,
   locked = false,
   children,
+  className = "",
 }: {
   title: string;
   close: () => void;
   locked?: boolean;
   children: ReactNode;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -21,7 +23,7 @@ export function Sheet({
   return (
     <dialog
       ref={ref}
-      className="amount-sheet"
+      className={`amount-sheet ${className}`}
       aria-label={title}
       onCancel={(e) => {
         e.preventDefault();
@@ -33,11 +35,7 @@ export function Sheet({
     >
       <div className="sheet-head">
         <h2>{title}</h2>
-        <button
-          onClick={close}
-          disabled={locked}
-          aria-label="Close amount sheet"
-        >
+        <button onClick={close} disabled={locked} aria-label={`Close ${title}`}>
           ×
         </button>
       </div>

@@ -1,0 +1,72 @@
+[
+  {
+    "theme": "day",
+    "tab": "The wheel",
+    "violations": []
+  },
+  {
+    "theme": "day",
+    "tab": "Jackpot",
+    "violations": []
+  },
+  {
+    "theme": "day",
+    "tab": "Stats",
+    "violations": []
+  },
+  {
+    "theme": "day",
+    "tab": "My bets",
+    "violations": []
+  },
+  {
+    "theme": "day",
+    "tab": "Agents",
+    "violations": []
+  },
+  {
+    "theme": "night",
+    "tab": "The wheel",
+    "violations": []
+  },
+  {
+    "theme": "night",
+    "tab": "Jackpot",
+    "violations": []
+  },
+  {
+    "theme": "night",
+    "tab": "Stats",
+    "violations": []
+  },
+  {
+    "theme": "night",
+    "tab": "My bets",
+    "violations": []
+  },
+  {
+    "theme": "night",
+    "tab": "Agents",
+    "violations": []
+  },
+  {
+    "theme": "night",
+    "tab": "Chat drawer",
+    "violations": []
+  },
+  {
+    "theme": "night",
+    "tab": "Wallet sheet",
+    "violations": []
+  },
+  {
+    "theme": "day",
+    "tab": "Desktop play and results",
+    "violations": []
+  },
+  {
+    "theme": "night",
+    "tab": "Desktop play and results",
+    "violations": []
+  }
+]

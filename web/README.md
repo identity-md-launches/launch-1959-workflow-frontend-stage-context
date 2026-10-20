@@ -6,4 +6,6 @@ The app uses the v2 ABI from `contracts/HamsterHour.json` and identity from `dep
 
 `worker/index.ts` implements the additive API routes. `scripts/build-worker.mjs` creates the standalone `../worker/worker.mjs`; no worker is published by a build. See [worker handoff](../worker/README.md).
 
-`npm test` runs amount, payout, telemetry, chat and worker tests. `node tests/browser.mjs` runs the production bundle with controlled wallet and RPC fixtures. Name Playwright using `IMD_PLAYWRIGHT` and browsers using `PLAYWRIGHT_BROWSERS_PATH`. A foreground preview and browser are created and closed inside that script. Screenshots and JSON results go only to root `test/scratch/browser-v2/`.
+`npm test` runs amount, payout, telemetry, chat and worker tests. `node tests/browser.mjs` runs the production bundle with controlled wallet and RPC fixtures. Name Playwright using `IMD_PLAYWRIGHT` and browsers using `PLAYWRIGHT_BROWSERS_PATH`. A foreground preview and browser are created and closed inside that script. Screenshots and JSON results go only to root `test/scratch/browser-polish/`.
+
+The polish adds five hash tabs, one leased live-camera/mascot frame, a shared chat drawer and exact finished-window history helpers. Current evidence and service limitations are in [POLISH-VALIDATION.md](../docs/frontend/POLISH-VALIDATION.md). Browser checks accept `HH_BROWSER=webkit` when that optional engine is installed; Chromium is the supplied usable engine.

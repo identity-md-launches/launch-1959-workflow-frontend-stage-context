@@ -176,11 +176,10 @@ export function BetPanel({
         <div>
           <span className="muted">The line to beat</span>
           <strong className="pixel">
-            {v?.line.toLocaleString() ?? "—"}
+            {v?.line.toLocaleString("en-US") ?? "—"}
             <span> passes</span>
           </strong>
         </div>
-        <span className="hour-pill">1 hour</span>
       </div>
       <div className="sides" aria-label="Choose your bet">
         {(["over", "under", "snooze"] as const).map((s) => (
@@ -201,7 +200,7 @@ export function BetPanel({
               {s === "over"
                 ? "More passes"
                 : s === "under"
-                  ? "Fewer passes"
+                  ? "At or below"
                   : "Under 100"}
             </small>
           </button>
@@ -276,6 +275,16 @@ export function BetPanel({
             ))}
           </div>
         </div>
+        <button
+          className={`primary bet-submit ${side}`}
+          type="submit"
+          disabled={
+            tx.busy || (!!address && chainId === 1 && (!opens || w.isError))
+          }
+        >
+          {label}
+          <Icon name="arrow" />
+        </button>
         <div className="bet-stepper">
           <span className={approved ? "done" : "current"}>
             {approved ? "✓" : "1"} Approve IMD
@@ -290,16 +299,6 @@ export function BetPanel({
             Get IMD ↗
           </a>
         </div>
-        <button
-          className={`primary bet-submit ${side}`}
-          type="submit"
-          disabled={
-            tx.busy || (!!address && chainId === 1 && (!opens || w.isError))
-          }
-        >
-          {label}
-          <Icon name="arrow" />
-        </button>
       </form>
       <TransactionStatus r={r} />
       <p className="error" id="bet-error" role="status">
@@ -351,30 +350,6 @@ export function BetPanel({
       <p className="bet-footnote">
         Pools can change. Bet only what you can lose.
       </p>
-      <div className="mobile-bet-bar">
-        <div>
-          <strong>
-            {side === "snooze" ? "Snooze" : side === "over" ? "Over" : "Under"}{" "}
-            {v?.line.toLocaleString() ?? "the line"}
-          </strong>
-          <span>
-            {v ? span(v) : "Next hour"} · {amount || "0"} IMD
-          </span>
-        </div>
-        <button
-          className="primary"
-          form="bet-form"
-          type="submit"
-          disabled={tx.busy || (!!address && chainId === 1 && !opens)}
-        >
-          {!address
-            ? "Connect to bet"
-            : !approved
-              ? "Approve IMD"
-              : "Place bet"}
-          <Icon name="arrow" />
-        </button>
-      </div>
       {review && (
         <Sheet
           title="Review your bet"
@@ -395,7 +370,7 @@ export function BetPanel({
             </div>
             <div>
               <dt>Line</dt>
-              <dd>{BigInt(review.line).toLocaleString()} passes</dd>
+              <dd>{BigInt(review.line).toLocaleString("en-US")} passes</dd>
             </div>
             <div>
               <dt>You spend</dt>

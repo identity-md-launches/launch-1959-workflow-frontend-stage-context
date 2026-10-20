@@ -82,13 +82,16 @@ export function hourly(
   }
   return result;
 }
-export function wakeEstimate(s: Stats | undefined) {
-  if (!s || Date.now() - Date.parse(s.generatedAt) > 86400000) return undefined;
-  const hours = hourly(s);
-  const now = new Date().getHours();
-  const peak = Math.max(...hours.map((h) => h.value));
-  if (peak <= 0) return undefined;
+export function wakeEstimate(s: Stats | undefined, now = new Date()) {
+  if (!s || now.getTime() - Date.parse(s.generatedAt) > 86400000)
+    return undefined;
+  const hours = hourly(s, -now.getTimezoneOffset());
+  const hour = now.getHours();
   for (let i = 1; i <= 24; i++)
-    if (hours[(now + i) % 24].value > peak * 0.25) return i;
+    if (
+      hours[(hour + i) % 24].observed > 0 &&
+      hours[(hour + i) % 24].value >= 100
+    )
+      return i;
   return undefined;
 }

@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { services } from "./config";
-/** The channel's last known stream, used only when the proxy cannot answer. */
-export const FALLBACK_STREAM = "6K_uF2s-LSw";
-const lastLiveKey = "hamster-hour:last-live-id";
 export type Live = {
   state: string;
   kind?: string;
   publicId?: string;
+  observedAt?: string;
+  validUntil?: string;
 };
 export type Status = {
   speedMmPerSecond: number;
@@ -31,6 +30,8 @@ export function parseLive(data: unknown): Live {
     state: typeof d.state === "string" ? d.state : "unknown",
     kind: typeof playback.kind === "string" ? playback.kind : undefined,
     publicId,
+    observedAt: typeof d.observedAt === "string" ? d.observedAt : undefined,
+    validUntil: typeof d.validUntil === "string" ? d.validUntil : undefined,
   };
 }
 export function parseStatus(data: unknown): Status {
@@ -63,32 +64,25 @@ async function getJSON(path: string) {
   if (!r.ok) throw Error(`The proxy returned ${r.status}.`);
   return r.json();
 }
-export function rememberLiveId(id: string) {
-  try {
-    localStorage.setItem(lastLiveKey, id);
-  } catch {
-    /* memory is optional */
-  }
-}
-export function lastKnownStream() {
-  try {
-    const id = localStorage.getItem(lastLiveKey);
-    if (validId(id)) return id;
-  } catch {
-    /* fall through */
-  }
-  return FALLBACK_STREAM;
+export function isLiveStream(live: Live | undefined, now = Date.now()) {
+  if (live?.state !== "live" || live.kind !== "youtube" || !live.publicId)
+    return false;
+  const observed = Date.parse(live.observedAt ?? "");
+  const expires = Date.parse(live.validUntil ?? "");
+  // An ID alone is not evidence that the recording is still live.
+  return (
+    Number.isFinite(observed) &&
+    Number.isFinite(expires) &&
+    observed <= now + 30000 &&
+    now - observed < 180000 &&
+    expires > now
+  );
 }
 /** GET /live every 20 s through the project's proxy. */
 export function useLive() {
   return useQuery({
     queryKey: ["live"],
-    queryFn: async () => {
-      const live = parseLive(await getJSON("/live"));
-      if (live.state === "live" && live.kind === "youtube" && live.publicId)
-        rememberLiveId(live.publicId);
-      return live;
-    },
+    queryFn: async () => parseLive(await getJSON("/live")),
     refetchInterval: 20000,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -121,7 +115,7 @@ export function parseRounds(data: unknown): Settlement[] {
     "cumulativeWork",
     "workAdded",
   ] as const;
-  return list.slice(0, 10).flatMap((entry) => {
+  const settlements: Settlement[] = list.slice(0, 2000).flatMap((entry) => {
     if (
       !entry ||
       typeof entry !== "object" ||
@@ -139,6 +133,34 @@ export function parseRounds(data: unknown): Settlement[] {
       },
     ];
   });
+  // Mining checkpoints also cover quiet intervals omitted from active settlements.
+  const checkpoints = (data as any).mining?.recentCheckpoints;
+  if (Array.isArray(checkpoints)) {
+    const counters = new Map(
+      settlements.map((s) => [String(s.settledThroughRound), s.cumulativeWork]),
+    );
+    for (const c of checkpoints)
+      if (/^\d+$/.test(c?.throughRound) && /^\d+$/.test(c?.cumulativeWork))
+        counters.set(c.throughRound, BigInt(c.cumulativeWork));
+    for (const c of checkpoints) {
+      if (
+        !/^\d+$/.test(c?.afterRound) ||
+        !/^\d+$/.test(c?.throughRound) ||
+        !/^\d+$/.test(c?.cumulativeWork)
+      )
+        continue;
+      const before = counters.get(c.afterRound),
+        after = BigInt(c.cumulativeWork);
+      if (before !== undefined && after >= before)
+        settlements.push({
+          previousSettledThroughRound: BigInt(c.afterRound),
+          settledThroughRound: BigInt(c.throughRound),
+          cumulativeWork: after,
+          workAdded: after - before,
+        });
+    }
+  }
+  return settlements;
 }
 /** GET /rounds uses the same worker as /live and /status, never Squeekchain. */
 export function useRounds() {

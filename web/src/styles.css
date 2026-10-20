@@ -2616,3 +2616,524 @@ dialog::backdrop {
   border-style: dotted;
   background: transparent;
 }
+
+/* The wheel is a compact betting page; supporting tools live on hash tabs. */
+.site-header nav {
+  gap: 2px;
+}
+.site-header nav a {
+  padding-inline: 13px;
+}
+.habitat-art {
+  height: 340px;
+  margin-inline: 0;
+  border-radius: 16px;
+  isolation: isolate;
+}
+.habitat-art .pixel-cage {
+  height: 100%;
+  width: 100%;
+}
+.habitat-art iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: #17141f;
+}
+.habitat-art .scene-note {
+  left: 10px;
+  bottom: 10px;
+  font-family: Geist, Arial, sans-serif;
+}
+.habitat-art .motion-button {
+  right: 10px;
+  bottom: 10px;
+}
+.habitat .card-head {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.habitat .card-head .row {
+  min-width: 0;
+}
+.jackpot-strip {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding: 16px 22px;
+  border: 1px solid #453a54;
+  border-radius: 22px;
+  background: #29233d;
+  color: #fff5e6;
+}
+.jackpot-strip > div {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.jackpot-strip > div > span {
+  color: #c4b6cf;
+  font-size: var(--label);
+}
+.jackpot-strip strong {
+  color: var(--butter);
+  font-size: var(--heading);
+  overflow-wrap: anywhere;
+}
+.jackpot-strip strong small {
+  font-family: Geist, Arial, sans-serif;
+}
+.jackpot-strip > a {
+  font-size: var(--label);
+  padding-block: 8px;
+}
+.jackpot-page {
+  max-width: 760px;
+  margin-inline: auto;
+}
+.jackpot-hour {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--label);
+}
+.jackpot-hour select {
+  background: #29233d;
+  color: #fff5e6;
+}
+.jackpot-counter {
+  overflow-wrap: anywhere;
+}
+.jackpot-strip dialog {
+  color: var(--ink);
+}
+.event-ticker {
+  margin-bottom: 0;
+  flex-wrap: nowrap;
+  gap: 12px;
+  padding-block: 12px;
+}
+.ticker-items {
+  width: auto;
+  padding-block: 4px;
+}
+.ticker-items:focus-visible,
+.result-ribbon:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+.wheel-page {
+  padding-bottom: 90px;
+}
+.history-note {
+  margin-bottom: 18px;
+}
+.result-item {
+  flex-basis: 158px;
+  gap: 6px;
+  font-size: var(--small);
+}
+.result-item > span:first-child {
+  color: var(--ink);
+}
+.result-item > strong {
+  font-size: var(--heading);
+}
+.result-item > small {
+  white-space: normal;
+}
+.results > p:last-child {
+  margin-top: 14px;
+}
+.stats-page > .activity {
+  padding-top: 24px;
+}
+.activity-hour:first-child > span {
+  left: 0;
+  transform: none;
+}
+.activity-hour:last-child > span {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.agents-section {
+  margin-block: 0;
+  padding-top: 0;
+  justify-content: flex-start;
+}
+.agents-section code {
+  padding-left: 0;
+  overflow-wrap: anywhere;
+}
+.chat-launcher {
+  position: fixed;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  right: max(18px, calc((100vw - 1280px) / 2 + 40px));
+  z-index: 45;
+  background: var(--ink);
+  color: var(--bg);
+  border: 0;
+  min-height: 44px;
+}
+.chat-drawer {
+  position: fixed;
+  inset: 12px 12px 12px auto;
+  margin: 0;
+  width: min(420px, calc(100vw - 24px));
+  max-width: none;
+  height: calc(100dvh - 24px);
+  max-height: none;
+  border-radius: 26px;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain;
+}
+.chat-drawer:not([open]) {
+  display: none;
+}
+.chat-drawer .chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.chat-drawer .chat-list {
+  flex: 1;
+  height: auto;
+  margin-top: 16px;
+}
+.chat-drawer .sheet-head {
+  margin-bottom: 12px;
+}
+.chat-drawer .chat-form {
+  flex-shrink: 0;
+}
+@media (max-width: 1100px) {
+  .site-header {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-block: 12px;
+  }
+  .site-header nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+  .hero h1 {
+    white-space: normal;
+  }
+  .hero {
+    padding-block: 24px;
+  }
+  .habitat-art {
+    height: 290px;
+  }
+}
+@media (max-width: 680px) {
+  body {
+    height: auto;
+    overflow: visible;
+  }
+  .site {
+    padding-bottom: 88px;
+  }
+  .site-header {
+    min-height: 0;
+    padding-block: 10px 8px;
+    row-gap: 8px;
+  }
+  .site-header nav {
+    justify-content: space-between;
+    gap: 0;
+    padding: 0;
+  }
+  .site-header nav a {
+    font-size: var(--small);
+    padding: 8px 9px;
+    min-height: 34px;
+  }
+  .hero {
+    display: flex;
+    flex-wrap: wrap;
+    padding-block: 14px 12px;
+    gap: 4px;
+  }
+  .hero h1 {
+    font-size: var(--number);
+    max-width: none;
+  }
+  .hero p {
+    font-size: var(--small);
+    margin-top: 7px;
+    max-width: 100%;
+  }
+  .hero .onboarding {
+    position: static;
+    margin: 0 0 0 auto;
+  }
+  .intro-toggle {
+    min-height: 26px;
+    padding: 2px 0;
+  }
+  .intro-content {
+    left: 0;
+    right: auto;
+    top: 100%;
+  }
+  .play-grid {
+    gap: 12px;
+  }
+  .habitat {
+    order: 0;
+    padding: 12px 14px;
+  }
+  .habitat .card-head {
+    margin-bottom: 2px;
+    flex-wrap: nowrap;
+  }
+  .habitat .card-head .row {
+    gap: 6px;
+  }
+  .habitat-art {
+    height: 124px;
+    border-radius: 12px;
+  }
+  .habitat-art .scene-note {
+    font-size: var(--small);
+    bottom: 4px;
+    left: 3px;
+    padding: 2px 4px;
+  }
+  .habitat-art .motion-button {
+    min-height: 26px;
+    bottom: 4px;
+    right: 3px;
+    padding: 2px 6px;
+  }
+  .hour-progress {
+    margin-top: 6px;
+    gap: 8px;
+  }
+  .seed-progress > span {
+    margin-top: 2px;
+  }
+  .seeds {
+    gap: 5px;
+  }
+  .seed {
+    width: 14px;
+    height: 20px;
+  }
+  .odometer > strong {
+    line-height: 1.2;
+  }
+  .bet-panel {
+    order: 1;
+    padding: 14px;
+  }
+  .bet-panel .card-head {
+    margin-bottom: 7px;
+  }
+  .bet-panel .card-head h2 {
+    font-size: var(--label);
+  }
+  .bet-time {
+    font-size: var(--small);
+  }
+  .line-display {
+    margin-block: 8px;
+  }
+  .line-display .pixel {
+    font-size: var(--number);
+    line-height: 1.1;
+  }
+  .side {
+    padding: 7px 9px;
+  }
+  .side > span {
+    font-size: var(--body);
+  }
+  .payout-preview {
+    margin-block: 10px 8px;
+  }
+  .amount-label {
+    font-size: var(--small);
+    margin-bottom: 5px;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+  .amount-control {
+    padding-block: 6px;
+  }
+  .bet-stepper {
+    margin-block: 8px;
+  }
+  .primary {
+    min-height: 44px;
+    padding-block: 9px;
+  }
+  .timeline {
+    margin-top: 16px;
+    padding-top: 12px;
+    flex-wrap: wrap;
+  }
+  .timeline select {
+    max-width: 100%;
+  }
+  .jackpot-strip {
+    padding: 14px;
+    gap: 10px;
+    margin-top: 12px;
+    border-radius: 22px;
+  }
+  .jackpot-strip > div {
+    flex: 1 1 100%;
+  }
+  .jackpot-strip .butter-button {
+    font-size: var(--small);
+    padding-inline: 12px;
+  }
+  .jackpot-strip > a {
+    font-size: var(--small);
+    margin-left: auto;
+  }
+  .event-ticker {
+    margin-top: 14px;
+  }
+  .ticker-label {
+    font-size: var(--small);
+  }
+  .jackpot-hour {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .jackpot-hour select {
+    max-width: 100%;
+    font-size: var(--body);
+  }
+  .agents-section > .button {
+    margin-left: 0;
+  }
+  .agents-section code {
+    flex-basis: 100%;
+  }
+  .result-item {
+    flex-basis: 148px;
+  }
+  .chat-drawer {
+    inset: 0 0 0 auto;
+    width: min(420px, 100%);
+    height: 100dvh;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+    border-radius: 26px 0 0 26px;
+    border-bottom: 1px solid var(--line);
+  }
+  .chat-launcher {
+    right: 16px;
+  }
+}
+@media (max-width: 359px) {
+  .site-header nav a {
+    padding-inline: 7px;
+  }
+  .habitat .card-head {
+    flex-wrap: wrap;
+  }
+  .mood-pill {
+    margin-left: auto;
+  }
+  .seed-progress > span {
+    max-width: 110px;
+  }
+  .jackpot-strip .butter-button {
+    width: 100%;
+  }
+  .brand {
+    font-size: var(--label);
+  }
+}
+@media (max-width: 680px) {
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .site {
+    height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+    overflow-y: auto;
+    padding-bottom: 24px;
+    scroll-padding-bottom: 24px;
+  }
+  .hero > div:first-child {
+    display: contents;
+  }
+  .hero h1 {
+    width: 100%;
+  }
+  .hero p {
+    flex: 1;
+    margin: 0;
+    align-self: center;
+  }
+  .hero .onboarding {
+    margin: 0;
+  }
+  .bet-time {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  .closing {
+    display: inline;
+    margin: 0 0 0 auto;
+  }
+  .line-display > div {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .line-display .pixel {
+    font-size: var(--number);
+  }
+  .side > span {
+    display: none;
+  }
+  .bet-stepper {
+    margin-bottom: 0;
+  }
+  .chat-launcher {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+}
+/* Keep large counters complete without letting them overlap neighbouring data. */
+.hour-progress {
+  flex-wrap: wrap;
+}
+.odometer,
+.jackpot-main > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.odometer > strong,
+.big-stats dd,
+.game-stats strong {
+  overflow-wrap: anywhere;
+}
+.result-item {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 158px;
+}

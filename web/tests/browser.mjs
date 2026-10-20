@@ -16,9 +16,9 @@ import {
 const web = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
   root = resolve(web, ".."),
   dist = resolve(root, "dist"),
-  out = resolve(root, "test/scratch/browser-v2");
+  out = resolve(root, "test/scratch/browser-polish");
 await mkdir(out, { recursive: true });
-const { chromium } = await import(
+const { chromium, webkit } = await import(
   pathToFileURL(
     process.env.IMD_PLAYWRIGHT ??
       "/opt/imd-tools/playwright-mcp/node_modules/playwright/index.mjs",
@@ -72,7 +72,9 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const url = `http://127.0.0.1:${server.address().port}/preview/`;
-const browser = await chromium.launch({ headless: true });
+const browser = await (
+  process.env.HH_BROWSER === "webkit" ? webkit : chromium
+).launch({ headless: true });
 const results = [],
   errors = [];
 let state;
@@ -94,6 +96,9 @@ function reset() {
     badCode: false,
     statusFailure: false,
     statsFailure: false,
+    liveState: "live",
+    liveFailure: false,
+    expiredLive: false,
   };
   addLog(
     "BinaryBet",
@@ -162,17 +167,17 @@ function position(k) {
 function windowInfo(k) {
   return {
     index: k,
-    status: k < current ? 2 : 1,
+    status: k < current - 2n ? 0 : k < current ? 2 : 1,
     startsAt: GENESIS + k * 3600n,
     endsAt: GENESIS + (k + 1n) * 3600n,
     closesAt: GENESIS + k * 3600n,
     timeoutAt: GENESIS + (k + 1n) * 3600n + 172800n,
     line: 2100n,
     result: k < current ? 2300n : 0n,
-    over: 10n * W,
-    under: 10n * W,
-    yes: 2n * W,
-    no: 8n * W,
+    over: k < current - 2n ? 0n : 10n * W,
+    under: k < current - 2n ? 0n : 10n * W,
+    yes: k < current - 2n ? 0n : 2n * W,
+    no: k < current - 2n ? 0n : 8n * W,
     tickets: 0n,
     ouVoid: false,
     snVoid: false,
@@ -400,12 +405,16 @@ async function pageFor({
   mobile = false,
   codeMismatch = false,
   statsFailure = false,
+  liveState = "live",
+  locale = "en-US",
 } = {}) {
   reset();
   state.badCode = codeMismatch;
   state.statsFailure = statsFailure;
+  state.liveState = liveState;
   const context = await browser.newContext({
     viewport: { width, height: width < 600 ? 844 : 1000 },
+    locale,
     isMobile: mobile,
     hasTouch: mobile,
     reducedMotion: "reduce",
@@ -535,8 +544,13 @@ async function pageFor({
       }
       if (u.pathname === "/live")
         return route.fulfill({
+          status: state.liveFailure ? 503 : 200,
           json: {
-            state: "live",
+            state: state.liveState,
+            observedAt: new Date(Number(NOW) * 1000).toISOString(),
+            validUntil: new Date(
+              Number(NOW) * 1000 + (state.expiredLive ? -1000 : 120000),
+            ).toISOString(),
             playback: { kind: "youtube", publicId: "BWkC7PAYORA" },
           },
         });
@@ -637,9 +651,17 @@ try {
           .querySelector("header")
           .getBoundingClientRect()
           .toJSON(),
+        habitat: document
+          .querySelector(".habitat")
+          .getBoundingClientRect()
+          .toJSON(),
+        panel: document
+          .querySelector(".bet-panel")
+          .getBoundingClientRect()
+          .toJSON(),
         side: document.querySelector(".sides").getBoundingClientRect().toJSON(),
         bar: document
-          .querySelector(".mobile-bet-bar")
+          .querySelector(".bet-submit")
           .getBoundingClientRect()
           .toJSON(),
         overflow: document.documentElement.scrollWidth > innerWidth,
@@ -647,9 +669,35 @@ try {
       assert.equal(geometry.overflow, false);
       assert.ok(
         geometry.side.bottom < geometry.bar.top,
-        "All three choices should appear above bottom action",
+        "All three choices should appear above the primary action",
+      );
+      assert.ok(
+        geometry.bar.bottom <= 780,
+        `Primary action is below the fold: ${geometry.bar.bottom}`,
+      );
+      assert.ok(
+        geometry.habitat.bottom < geometry.panel.top,
+        "The frame precedes the bet panel on mobile",
+      );
+      assert.ok(await page.locator(".habitat iframe").count());
+      assert.ok(
+        (await page.locator(".habitat iframe").getAttribute("src")).includes(
+          "autoplay=0",
+        ),
+      );
+      assert.equal(
+        await page
+          .locator(
+            "#main .results, #main .activity, #main .agents-section, #main .my-bets, #main .camera, #main .fed-list, #main .mining-teaser",
+          )
+          .count(),
+        0,
       );
       await page.screenshot({ path: resolve(out, "390-play.png") });
+      await page.screenshot({
+        path: resolve(out, "390-play.jpg"),
+        quality: 75,
+      });
       await page.getByRole("button", { name: "Switch to night theme" }).click();
       assert.equal(
         await page.locator("html").getAttribute("data-theme"),
@@ -666,7 +714,9 @@ try {
         "done",
       );
       await page.reload();
-      await page.getByRole("button", { name: "How to play" }).waitFor();
+      await page
+        .getByRole("button", { name: "New here?", exact: false })
+        .waitFor();
       await page.locator('summary[aria-label="About Make your pick"]').click();
       await page
         .getByText("Bets close at the start of the hour.", { exact: false })
@@ -688,7 +738,7 @@ try {
     async () => {
       const { page, context } = await pageFor({ connected: true });
       await page.getByRole("button", { name: "10", exact: true }).click();
-      await page.getByRole("button", { name: "UNDER Fewer passes" }).click();
+      await page.getByRole("button", { name: "UNDER At or below" }).click();
       await page
         .locator("#bet-form")
         .getByRole("button", { name: "Approve IMD", exact: true })
@@ -734,7 +784,9 @@ try {
     "ticket and feed use exact IMD approvals and v2 calls",
     async () => {
       const { page, context } = await pageFor({ connected: true });
-      await page.getByRole("button", { name: "Get a ticket · 5 IMD" }).click();
+      await page
+        .getByRole("button", { name: "Guess the exact number · 5 IMD" })
+        .click();
       const ticket = page.getByRole("dialog", {
         name: "Make your lucky guess",
       });
@@ -744,6 +796,7 @@ try {
       await ticket.waitFor({ state: "hidden" });
       assert.deepEqual(state.txs.at(-1).args, [next, 2210n]);
       assert.equal(state.txs.at(-1).fn, "buyTicket");
+      await page.getByRole("link", { name: "Jackpot", exact: true }).click();
       await page.getByRole("button", { name: "Feed the hamster" }).click();
       const feed = page.getByRole("dialog", { name: "Feed the hamster" });
       await feed.getByLabel("Amount in IMD").fill("2.5");
@@ -802,15 +855,16 @@ try {
           { exact: false },
         )
         .waitFor();
+      await page.getByRole("button", { name: "Open wheel chat" }).click();
       await page.getByLabel("Message", { exact: true }).fill("A tiny champion");
       await page.getByRole("button", { name: "Send", exact: true }).click();
       await page.getByText("A tiny champion", { exact: true }).waitFor();
-      await page.getByRole("button", { name: "Play wheel cam" }).click();
+      await page.keyboard.press("Escape");
       await page
         .getByRole("button", { name: "Pause video", exact: true })
         .click();
       assert.equal(await page.locator("iframe").count(), 0);
-      await page.getByRole("button", { name: "Play wheel cam" }).click();
+      await page.getByRole("button", { name: "Watch live" }).click();
       assert.equal(await page.locator("iframe").count(), 1);
       await context.close();
     },
@@ -820,6 +874,7 @@ try {
     async () => {
       const { page, context } = await pageFor();
       state.running = true;
+      state.liveState = "offline";
       await page.clock.fastForward(21000);
       await page.waitForFunction(
         () => document.documentElement.dataset.theme === "night",
@@ -934,6 +989,119 @@ try {
     },
   );
   await check(
+    "all tabs, direct hashes, chat drawer on every tab, and comma formatting in a French browser",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        locale: "fr-FR",
+        liveState: "offline",
+      });
+      assert.ok(
+        await page
+          .locator(".line-display .pixel")
+          .innerText()
+          .then((t) => t.includes("2,100")),
+      );
+      for (const tab of [
+        "Jackpot",
+        "Stats",
+        "My bets",
+        "Agents",
+        "The wheel",
+      ]) {
+        await page.getByRole("link", { name: tab, exact: true }).click();
+        await page.getByRole("button", { name: "Open wheel chat" }).click();
+        const drawer = page.getByRole("dialog", {
+          name: "Wheel chat",
+          exact: true,
+        });
+        await drawer.waitFor();
+        await drawer.getByText("Go little guy!", { exact: true }).waitFor();
+        await page.keyboard.press("Escape");
+        assert.equal(await drawer.count(), 0);
+        assert.equal(
+          await page.evaluate(() =>
+            document.activeElement?.getAttribute("aria-label"),
+          ),
+          "Open wheel chat",
+        );
+      }
+      await page.getByRole("link", { name: "Stats", exact: true }).click();
+      await page.locator(".result-item").first().waitFor();
+      const ended = await page
+        .locator(".result-item")
+        .evaluateAll((es) => es.map((e) => Number(e.dataset.endedAt)));
+      assert.equal(ended.length, 24);
+      assert.ok(
+        ended.every((t, i) => t <= Number(NOW) && (!i || t < ended[i - 1])),
+      );
+      await page.reload();
+      await page.getByRole("heading", { name: "The last 24 hours" }).waitFor();
+      assert.equal(
+        await page.locator("nav a[aria-current=page]").innerText(),
+        "Stats",
+      );
+      await page.locator(".skip").focus();
+      await page.keyboard.press("Enter");
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.id),
+        "main",
+      );
+      assert.equal(
+        await page.locator("nav a[aria-current=page]").innerText(),
+        "Stats",
+      );
+      await page.locator(".result-item").first().waitFor();
+      await page.getByRole("link", { name: "Jackpot", exact: true }).click();
+      await page.goBack();
+      await page
+        .getByRole("heading", { name: "The last 24 hours", exact: true })
+        .waitFor();
+      await page.goForward();
+      await page
+        .getByRole("heading", { name: "The jackpot jar.", exact: true })
+        .waitFor();
+      await page.getByRole("link", { name: "Stats", exact: true }).click();
+      await page.locator(".result-item").first().waitFor();
+      await page.screenshot({ path: resolve(out, "390-stats.png") });
+      await page.screenshot({
+        path: resolve(out, "390-stats.jpg"),
+        quality: 75,
+      });
+      await context.close();
+    },
+  );
+  await check(
+    "offline, expired and failed live feeds never replay a remembered recording",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        liveState: "offline",
+      });
+      await page.evaluate(() =>
+        localStorage.setItem("hamster-hour:last-live-id", "6K_uF2s-LSw"),
+      );
+      assert.equal(await page.locator("iframe").count(), 0);
+      assert.equal(await page.locator(".habitat .pixel-cage").count(), 1);
+      await page.screenshot({ path: resolve(out, "390-offline.png") });
+      state.liveState = "live";
+      await page.clock.fastForward(21000);
+      await page.locator(".habitat iframe").waitFor();
+      state.expiredLive = true;
+      await page.clock.fastForward(21000);
+      await page.locator(".habitat .pixel-cage").waitFor();
+      assert.equal(await page.locator("iframe").count(), 0);
+      state.expiredLive = false;
+      await page.clock.fastForward(21000);
+      await page.locator(".habitat iframe").waitFor();
+      state.liveFailure = true;
+      await page.clock.fastForward(41000);
+      await page.locator(".habitat .pixel-cage").waitFor();
+      assert.equal(await page.locator("iframe").count(), 0);
+      await context.close();
+    },
+  );
+  await check(
     "automated accessibility in day/night on play, stats and wallet sheet",
     async () => {
       const { default: AxeBuilder } = await import("@axe-core/playwright");
@@ -944,7 +1112,13 @@ try {
           await page
             .getByRole("button", { name: "Switch to night theme" })
             .click();
-        for (const tab of ["The wheel", "Stats", "My bets"]) {
+        for (const tab of [
+          "The wheel",
+          "Jackpot",
+          "Stats",
+          "My bets",
+          "Agents",
+        ]) {
           await page.getByRole("link", { name: tab, exact: true }).click();
           const r = await new AxeBuilder({ page })
             .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
@@ -963,6 +1137,16 @@ try {
           });
         }
       }
+      await page.getByRole("button", { name: "Open wheel chat" }).click();
+      const chatAudit = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze();
+      audits.push({
+        theme: "night",
+        tab: "Chat drawer",
+        violations: chatAudit.violations,
+      });
+      await page.keyboard.press("Escape");
       await page.locator(".wallet-button").click();
       const modalAudit = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
@@ -993,6 +1177,9 @@ try {
           await desktop.page
             .getByRole("button", { name: "Switch to night theme" })
             .click();
+        await desktop.page
+          .getByRole("link", { name: "Stats", exact: true })
+          .click();
         await desktop.page.locator(".result-ribbon").scrollIntoViewIfNeeded();
         const r = await new AxeBuilder({ page: desktop.page })
           .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
@@ -1027,7 +1214,13 @@ try {
     async () => {
       for (const width of [320, 800, 1440]) {
         const { page, context } = await pageFor({ width });
-        for (const tab of ["The wheel", "Stats", "My bets"]) {
+        for (const tab of [
+          "The wheel",
+          "Jackpot",
+          "Stats",
+          "My bets",
+          "Agents",
+        ]) {
           await page.getByRole("link", { name: tab, exact: true }).click();
           assert.equal(
             await page.evaluate(
