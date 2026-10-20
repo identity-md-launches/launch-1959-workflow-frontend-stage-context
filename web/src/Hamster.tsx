@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { RewardsPool } from "./RewardsPool";
 import { formatUnits } from "viem";
 import { useConnection } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
@@ -369,6 +370,7 @@ function Stake({
         title="Stake"
         help="Staked HAMSTER starts earning after a 24 hour warm-up. Unstaking stops rewards at once; the tokens release 24 hours later. Rewards are paid in IMD."
       />
+      <RewardsPool r={r} />
       {!address ? (
         <Empty>
           <h3>Stake HAMSTER, earn IMD.</h3>
@@ -549,6 +551,7 @@ function HamsterStats({ r }: { r: Runtime }) {
         title="Stats"
         help="Read live from the HAMSTER vault. The mining rate halves every 18,750 IMD lost across all players."
       />
+      <RewardsPool r={r} />
       <dl className="hamster-figures">
         <div>
           <dt>Mining rate</dt>

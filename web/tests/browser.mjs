@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname, extname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import AxeBuilder from "@axe-core/playwright";
 import {
   decodeFunctionData,
   encodeFunctionResult,
@@ -12,6 +13,7 @@ import {
   keccak256,
   getAbiItem,
   toHex,
+  parseAbi,
 } from "viem";
 const web = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
   root = resolve(web, ".."),
@@ -32,6 +34,22 @@ const config = JSON.parse(
 );
 const game = config.contracts[0].address,
   token = config.network.pairToken.address;
+const hamster = "0x8e7c7936b4f2d4475dc4bacd174dc228d4d24e86",
+  vault = "0x1dceb78b36b5f18ac4a130f1ffc76eba0e73d183",
+  hook = "0x82f636a92364d13754d7b3e72d460f0be20a28cc";
+const vaultAbi = JSON.parse(
+  await readFile(resolve(web, "contracts/HamsterVault.json"), "utf8"),
+);
+const hookAbi = parseAbi([
+  "function token() view returns (address)",
+  "function VAULT() view returns (address)",
+  "function startedAt() view returns (uint256)",
+  "function poolId() view returns (bytes32)",
+]);
+const stateViewAbi = parseAbi([
+  "function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
+]);
+const RAY = 10n ** 27n;
 const account = "0x1111111111111111111111111111111111111111",
   other = "0x2222222222222222222222222222222222222222";
 const GENESIS = 1791847200n,
@@ -99,6 +117,9 @@ function reset() {
     liveState: "live",
     liveFailure: false,
     expiredLive: false,
+    priceFailure: false,
+    previewFailure: false,
+    noEarningStake: false,
   };
   addLog(
     "BinaryBet",
@@ -261,6 +282,90 @@ function rpc(method, params) {
   }
   if (method === "eth_call") {
     const call = params[0];
+    const target = call.to.toLowerCase();
+    const contractAbi =
+      target === vault
+        ? vaultAbi
+        : target === hook
+          ? hookAbi
+          : target === config.network.uniswapV4.stateView
+            ? stateViewAbi
+            : undefined;
+    if (contractAbi) {
+      const { functionName: fn, args } = decodeFunctionData({
+        abi: contractAbi,
+        data: call.data,
+      });
+      const rewardState = {
+        wallTime: NOW,
+        clock: 10000n,
+        weight: state.noEarningStake ? 0n : 1000n * W,
+        index: 0n,
+        hookRate: (7n * W * RAY) / 86400n,
+        gameRate: (3n * W * RAY) / 86400n,
+        hookCursor: 0n,
+        gameCursor: 0n,
+        activationCursor: 10n,
+        hookReleased: 0n,
+        gameReleased: 0n,
+        dripPrincipal: 1200n * W,
+        dripStart: 0n,
+        dripReleased: 200n * W,
+        dripEmitted: 200n * W,
+        dustScaled: 0n,
+      };
+      if (fn === "rewardState" && state.previewFailure)
+        throw Error("CheckpointRequired");
+      const values = {
+        token: hamster,
+        GAME_V2: game,
+        VAULT: vault,
+        startedAt: NOW - 86400n,
+        poolId: "0x" + "ab".repeat(32),
+        getSlot0: [2n ** 95n, 0, 0, 12500],
+        currentMiningState: [0n, 1000n * W, 0n],
+        bucketsLeft: [500000000n * W, 0n, 100000000n * W, 0n],
+        totalStaked: 800n * W,
+        totalGrantBalance: 200n * W,
+        rewardsPaid: 200n * W,
+        dripDeposited: 1200n * W,
+        hookDeposited: 700n * W,
+        gameDeposited: 300n * W,
+        rewardState,
+        accounts: [state.noEarningStake ? 0n : 100n * W, 0n, 0n, 0n, 1n],
+        positionCounts: [3n, 0n, 0n],
+        stakedBalance: 200n * W,
+        grantBalance: 150n * W,
+        pendingIMD: 5n * W,
+        activations: [NOW - 86400n, 1000n * W, 0n],
+      };
+      let result = values[fn];
+      if (fn === "lots")
+        result =
+          args[1] === 0n
+            ? [100n * W, 9n, false]
+            : args[1] === 1n
+              ? [150n * W, 9n, true]
+              : [200n * W, 10n, false];
+      if (state.noEarningStake && fn === "lots") result = [0n, 10n, false];
+      return encodeFunctionResult({
+        abi: contractAbi,
+        functionName: fn,
+        result,
+      });
+    }
+    if (target === hamster) {
+      const { functionName: fn } = decodeFunctionData({
+        abi: erc20Abi,
+        data: call.data,
+      });
+      return encodeFunctionResult({
+        abi: erc20Abi,
+        functionName: fn,
+        result:
+          fn === "symbol" ? "HAMSTER" : fn === "balanceOf" ? 1000n * W : 0n,
+      });
+    }
     const isToken = call.to.toLowerCase() === token.toLowerCase();
     const d = decodeFunctionData({
       abi: isToken ? erc20Abi : abi,
@@ -293,7 +398,7 @@ function rpc(method, params) {
         jackpotInFlight: 3n * W,
         jackpotOutstanding: 80n * W,
         nextFinalizeWindow: current,
-        totalPendingJackpotDeposits: 3n * W,
+        totalPendingJackpotDeposits: 33n * W,
       };
       result =
         fn in globals
@@ -407,6 +512,7 @@ async function pageFor({
   statsFailure = false,
   liveState = "live",
   locale = "en-US",
+  walletAvailable = true,
 } = {}) {
   reset();
   state.badCode = codeMismatch;
@@ -414,6 +520,7 @@ async function pageFor({
   state.liveState = liveState;
   const context = await browser.newContext({
     viewport: { width, height: width < 600 ? 844 : 1000 },
+    timezoneId: "UTC",
     locale,
     isMobile: mobile,
     hasTouch: mobile,
@@ -450,7 +557,7 @@ async function pageFor({
       return null;
     return rpc(method, params);
   });
-  if (!mobile)
+  if (!mobile && walletAvailable)
     await page.addInitScript(() => {
       const listeners = {};
       const p = {
@@ -490,6 +597,20 @@ async function pageFor({
   await page.route("**/*", async (route) => {
     const req = route.request(),
       u = new URL(req.url());
+    if (u.host === "api.dexscreener.com")
+      return route.fulfill({
+        status: state.priceFailure ? 503 : 200,
+        json: {
+          pairs: [
+            {
+              chainId: "ethereum",
+              baseToken: { address: token },
+              priceUsd: "2",
+              liquidity: { usd: 1000000 },
+            },
+          ],
+        },
+      });
     if (u.pathname.endsWith("/imd-deployment.json"))
       return route.fulfill({ json: config });
     if (config.network.rpcUrls.some((x) => req.url().startsWith(x))) {
@@ -640,6 +761,175 @@ async function check(name, fn) {
   }
 }
 try {
+  await check(
+    "jackpot total includes deposits from all hours in strip and tab",
+    async () => {
+      const { page, context } = await pageFor({ width: 390 });
+      await page
+        .locator(".jackpot-strip strong")
+        .filter({ hasText: "158" })
+        .waitFor();
+      assert.ok(
+        (await page.locator(".jackpot-strip").innerText()).includes(
+          "Next hour’s fixed prize:",
+        ),
+      );
+      await page.getByRole("link", { name: "Jackpot", exact: true }).click();
+      await page
+        .locator(".jackpot-counter")
+        .filter({ hasText: "158" })
+        .waitFor();
+      await page
+        .getByLabel("Betting hour · your time")
+        .selectOption(String(next + 5n));
+      assert.ok(
+        (await page.locator(".jackpot-counter").innerText()).includes("158"),
+      );
+      assert.ok(
+        (await page.locator(".jackpot-details").innerText()).includes(
+          "Next hour’s fixed prize",
+        ),
+      );
+      await context.close();
+    },
+  );
+  await check(
+    "rewards pool appears in Stake and HAMSTER Stats across responsive themes",
+    async () => {
+      for (const width of [320, 390, 800, 1440]) {
+        const { page, context } = await pageFor({
+          width,
+          liveState: "offline",
+          walletAvailable: false,
+        });
+        await page.getByRole("link", { name: "$HAMSTER", exact: true }).click();
+        const pools = page.getByRole("group", {
+          name: "Rewards pool",
+          exact: true,
+        });
+        assert.equal(await pools.count(), 2);
+        for (const pool of await pools.all()) {
+          await pool.getByText("≈ $4,000.00", { exact: true }).waitFor();
+          const text = await pool.innerText();
+          for (const value of [
+            "2,000 IMD",
+            "20 IMD / day",
+            "2,920%",
+            "Changes with stake and price",
+          ])
+            assert.ok(text.includes(value), value);
+          assert.ok(!text.includes("Your stake share"));
+        }
+        for (const theme of ["day", "night"]) {
+          await page.evaluate(
+            (t) => (document.documentElement.dataset.theme = t),
+            theme,
+          );
+          assert.equal(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth > innerWidth,
+            ),
+            false,
+          );
+          const audit = await new AxeBuilder({ page })
+            .include(".rewards-pool")
+            .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+            .analyze();
+          await writeFile(
+            resolve(out, `rewards-axe-${width}-${theme}.json`),
+            JSON.stringify(
+              {
+                violations: audit.violations,
+                passes: audit.passes.map((p) => p.id),
+              },
+              null,
+              2,
+            ),
+          );
+          assert.deepEqual(
+            audit.violations,
+            [],
+            `${width} ${theme} rewards accessibility`,
+          );
+          if (width === 390 || width === 1440)
+            await page.screenshot({
+              path: resolve(out, `rewards-${width}-${theme}.png`),
+              fullPage: true,
+            });
+        }
+        await context.close();
+      }
+    },
+  );
+  await check(
+    "connected rewards share includes mature grants and excludes warm-up",
+    async () => {
+      const { page, context } = await pageFor({ connected: true, width: 390 });
+      await page.getByRole("link", { name: "$HAMSTER", exact: true }).click();
+      const pool = page.locator(".hamster-stake .rewards-pool");
+      await pool.getByText("25%", { exact: true }).waitFor();
+      await pool.getByText("5 IMD / day", { exact: true }).waitFor();
+      const help = pool.getByText("?", { exact: true });
+      await help.focus();
+      await page.keyboard.press("Enter");
+      assert.equal(await pool.locator("details[open]").count(), 1);
+      await page.keyboard.press("Enter");
+      assert.equal(await pool.locator("details[open]").count(), 0);
+      assert.equal(
+        await page.locator(".hamster-stake #stake-amount").count(),
+        1,
+      );
+      assert.equal(state.txs.length, 0);
+      await context.close();
+    },
+  );
+  await check(
+    "reward price failure leaves IMD visible and retries recover USD and APR",
+    async () => {
+      const { page, context } = await pageFor({ width: 390 });
+      state.priceFailure = true;
+      await page.getByRole("link", { name: "$HAMSTER", exact: true }).click();
+      const pool = page.locator(".hamster-stake .rewards-pool");
+      await pool.getByText("USD price unavailable", { exact: true }).waitFor();
+      await pool.getByRole("button", { name: "Retry rewards" }).waitFor();
+      assert.ok((await pool.innerText()).includes("2,000 IMD"));
+      assert.ok((await pool.innerText()).includes("20 IMD / day"));
+      state.priceFailure = false;
+      await pool.getByRole("button", { name: "Retry rewards" }).click();
+      await pool.getByText("≈ $4,000.00", { exact: true }).waitFor();
+      await pool.getByText("2,920%", { exact: true }).waitFor();
+      await context.close();
+    },
+  );
+  await check(
+    "reward checkpoint and no-earning states avoid invented release or wallet earnings",
+    async () => {
+      const { page, context } = await pageFor({ width: 390, connected: true });
+      state.previewFailure = true;
+      await page.getByRole("link", { name: "$HAMSTER", exact: true }).click();
+      const pool = page.locator(".hamster-stake .rewards-pool");
+      await pool.getByRole("button", { name: "Retry rewards" }).waitFor();
+      assert.ok((await pool.innerText()).includes("2,000 IMD"));
+      assert.equal(
+        await pool.getByText("— IMD / day", { exact: true }).count(),
+        2,
+      );
+      state.previewFailure = false;
+      state.noEarningStake = true;
+      await pool.getByRole("button", { name: "Retry rewards" }).click();
+      await pool
+        .getByText("Paused · no earning stake", { exact: true })
+        .waitFor();
+      await pool.getByText("0%", { exact: true }).first().waitFor();
+      assert.equal(
+        await pool.getByText("0 IMD / day", { exact: true }).count(),
+        2,
+      );
+      assert.ok(!(await pool.innerText()).includes("NaN"));
+      assert.ok(!(await pool.innerText()).includes("Infinity"));
+      await context.close();
+    },
+  );
   await check(
     "390px first screen, reflow, local fonts, theme, onboarding, keyboard help",
     async () => {

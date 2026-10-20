@@ -1,6 +1,6 @@
 # Hamster Hour
 
-A cozy pixel betting app for the live HamsterHour v2 contract on Ethereum, with a compact betting home and five top tabs. The finished static site is in [`dist/`](dist/); editable React/TypeScript source is in [`web/src/`](web/src/). The existing `hamsterhour.fun` domain and worker hostname are retained. Nothing is deployed, published, re-minted or signed by this repository update.
+A cozy pixel betting app for the live HamsterHour v2 contract on Ethereum, with a compact betting home and six top tabs. The finished static site is in [`dist/`](dist/); editable React/TypeScript source is in [`web/src/`](web/src/). The existing `hamsterhour.fun` domain and worker hostname are retained. Nothing is deployed, published, re-minted or signed by this repository update.
 
 ## Install, preview and rebuild
 
@@ -14,7 +14,7 @@ npm run preview -- --host 127.0.0.1
 
 Open the URL printed by Vite. The build typechecks TypeScript, bundles local assets using the existing relative `base: './'`, writes repository-root `dist/`, and verifies the ABI and asset inventory. `npm run dev` starts the existing development server. Navigation uses hashes; no server rewrite is required. The source package manifest, lockfile, Vite/TypeScript configuration and all existing contract build configuration/dependencies are preserved. The protected lockfile requires `--legacy-peer-deps`: plain `npm ci` reports a missing peer `playwright-core@1.64.1`.
 
-For an environment that must not create repository `node_modules`, run `node web/scripts/sandbox-build.mjs` from the repository root. It installs the same protected lockfile in a temporary project and copies the site and bundled worker back. That is the method used for this delivery. No dependency directory or npm archive is delivered.
+For an environment that must not create repository `node_modules`, run `node web/scripts/sandbox-build.mjs` from the repository root. It installs the same protected lockfile in a temporary project and copies the site and bundled worker back. This delivery likewise used a disposable copy with the unchanged lockfile. No dependency directory or npm archive is delivered.
 
 Useful checks, from an installed `web/`:
 
@@ -49,11 +49,19 @@ Live wheel video, hardware status, settlement telemetry and signed chat retain t
 
 ## Pages and live data
 
-The wheel has the headline and “New here?”, one shared camera/hamster frame, this hour’s passes and six seeds, the bet form, a compact jackpot strip and one-line live activity. On phones the frame precedes the form; its amount and main action are on the first 390×844 screen. Jackpot contains the full jar, hour selector, ticket purchase, feeding and feeds. Stats contains the usual-day chart and completed-window history. My bets retains claims, and Agents contains the skill. Chat opens from the small bottom-right button on every tab. All five pages use hash links, including direct links and browser back/forward.
+The wheel has the headline and “New here?”, one shared camera/hamster frame, this hour’s passes and six seeds, the bet form, a compact jackpot strip and one-line live activity. On phones the frame precedes the form; its amount and main action are on the first 390×844 screen. Jackpot contains the full jar, hour selector, ticket purchase, feeding and feeds. Stats contains the usual-day chart and completed-window history. My bets retains claims, and Agents contains the skill. Chat opens from the small bottom-right button on every tab. All six pages use hash links, including direct links and browser back/forward.
 
 The camera is embedded only when `/live` explicitly says live, supplies a supported ID, and its `observedAt` and `validUntil` establish freshness. Expired/offline/failed checks show the existing telemetry-driven pixel hamster in the same frame. Remembered stream IDs and the old hard-coded recording fallback are gone. The wake note chooses the first future local hour whose 7-day mean is at least 100 passes. Pass counts, amounts and records use comma grouping independent of browser locale; times remain local.
 
 Stats filters out unfinished/future windows and orders the last 24 finished windows newest first. Observed passes use exact `/rounds` cumulative boundaries, quiet mining checkpoints, or complete dated stats buckets, including no-bet hours. The game’s :20 boundaries cannot be inferred by prorating positive half-hour buckets. Missing observations remain unknown; settled oracle counts are separately labelled as a fallback. Winning sides/refunds use each frozen line and the game’s independent pools. This preserves the distinction between informational telemetry and settlement.
+
+## Rewards pool and jackpot totals
+
+The $HAMSTER tab shows the same Rewards pool block at the top of Stake and in its Stats card. Waiting IMD is `dripDeposited + hookDeposited + gameDeposited - rewardsPaid`. The current daily estimate combines about 1% of remaining drip with the active hook/game stream rates from `rewardState()`. Emissions pause when no stake is earning. Hook streams last 7 active days; game streams use the vault's 30-day schedule.
+
+HAMSTER is priced from the hook's actual Uniswap v4 pool ID and the network's StateView `getSlot0`. USD uses DexScreener's most liquid Ethereum pair with IMD as the base token, refreshed each minute. APR annualizes daily USD release over the USD value of total staked HAMSTER, including vesting grants. A connected wallet sees its share of earning stake and estimated IMD/day; warming lots earn after 24 hours. Missing prices or checkpoint previews leave dependent estimates unknown with a retry control. These are changing estimates, not promised returns.
+
+The home strip and Jackpot tab both show `jackpotSeed + totalPendingJackpotDeposits`, across all hours. Next hour's fixed prize remains a separate secondary line and stays unfixed until the contract finalizes it. Choosing a different ticket hour does not change the total.
 
 ## Worker and agent handoff
 
@@ -63,6 +71,6 @@ Stats filters out unfinished/future windows and orders the last 24 finished wind
 
 ## Validation and limits
 
-Current local results, requirement coverage, six-domain Better Interface review, previous critic issue coverage and limitations are recorded in [docs/frontend/POLISH-VALIDATION.md](docs/frontend/POLISH-VALIDATION.md). [DESIGN.md](DESIGN.md) describes the final source. The preceding implementation’s evidence remains in [V2-VALIDATION.md](docs/frontend/V2-VALIDATION.md).
+Current rewards/jackpot results, calculation definitions, six-domain Better Interface coverage and limitations are recorded in [docs/frontend/REWARDS-VALIDATION.md](docs/frontend/REWARDS-VALIDATION.md). Earlier polish evidence remains in [POLISH-VALIDATION.md](docs/frontend/POLISH-VALIDATION.md). [DESIGN.md](DESIGN.md) describes the final source. The preceding implementation’s evidence remains in [V2-VALIDATION.md](docs/frontend/V2-VALIDATION.md).
 
-The production build, separate typecheck, 24 unit/worker tests and production browser interactions are checked for this revision. Tests use controlled wallets/services, with no real spending or production chat posts. Real read-only Ethereum verification also confirmed the unchanged runtime and IMD identity. WebKit was attempted but its executable is unavailable; Chromium performs the rendered checks. Physical phone wallets, passkeys and actual YouTube playback remain unverified. The current public worker still supplies only recent rounds and has no live stats routes: incomplete historical observations stay explicitly unknown, with dated snapshots retained. No worker or website is published by this task.
+The production build, separate typecheck, 36 unit/worker tests and 18 production Chromium interaction scenarios pass for this revision. Eight targeted rewards accessibility audits and fourteen existing app audits report no violations for the selected WCAG A/AA rules. Tests use controlled wallets/services, with no real spending or production chat posts. Real read-only Ethereum verification also confirmed the unchanged runtime and IMD identity. WebKit launch was attempted but unavailable; Chromium performs the rendered checks. Physical phone wallets, passkeys and actual YouTube playback remain unverified. The current public worker still supplies only recent rounds and has no live stats routes: incomplete historical observations stay explicitly unknown, with dated snapshots retained. No worker or website is published by this task.

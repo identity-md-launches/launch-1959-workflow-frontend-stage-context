@@ -143,8 +143,11 @@ export function Jackpot({
     }
   }
   const pot = g
-    ? g.jackpotSeed + (next.data?.pendingJackpotDeposits ?? 0n)
+    ? g.jackpotSeed + g.totalPendingJackpotDeposits
     : undefined;
+  const fixedPrize = next.data?.jackpotFinalized
+    ? `${imd(next.data.jackpotShare)} IMD per winner`
+    : "Fixes after the result";
   return (
     <section
       className={compact ? "jackpot-strip" : "card jackpot"}
@@ -157,6 +160,7 @@ export function Jackpot({
             <strong className="pixel">
               {imd(pot)} <small>IMD</small>
             </strong>
+            <span className="jackpot-next-prize">Next hour’s fixed prize: {fixedPrize}</span>
           </div>
           <button
             className="butter-button"
@@ -210,7 +214,7 @@ export function Jackpot({
                 <small> IMD</small>
               </strong>
               <span className="jackpot-sub">
-                Carried seed + next hour’s deposits
+                Carried seed + all pending jackpot deposits
               </span>
             </div>
             <Jar
@@ -226,11 +230,9 @@ export function Jackpot({
           </p>
           <div className="jackpot-details">
             <div>
-              <span>Next fixed prize</span>
+              <span>Next hour’s fixed prize</span>
               <strong>
-                {next.data?.jackpotFinalized
-                  ? `${imd(next.data.jackpotShare)} IMD per winner`
-                  : "Fixes after the result"}
+                {fixedPrize}
               </strong>
             </div>
             <div>

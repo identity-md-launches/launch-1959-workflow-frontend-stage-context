@@ -3283,6 +3283,33 @@ dialog::backdrop {
   font-weight: 400;
   margin-top: 2px;
 }
+.rewards-pool {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.rewards-pool > .row {
+  gap: 8px;
+  justify-content: space-between;
+}
+.rewards-pool h3 {
+  margin: 0;
+  font-size: var(--body);
+}
+.rewards-pool p,
+.rewards-pool [role="status"]:empty {
+  margin: 0;
+}
+.rewards-pool [role="status"]:empty {
+  display: none;
+}
+.rewards-figures {
+  gap: 16px;
+}
+.jackpot-strip > div > .jackpot-next-prize {
+  flex-basis: 100%;
+  font-size: var(--small);
+}
 .stake-form {
   display: grid;
   gap: 8px;
