@@ -15,6 +15,7 @@ import {
   toHex,
   parseAbi,
 } from "viem";
+import { mainnet } from "viem/chains";
 const web = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
   root = resolve(web, ".."),
   dist = resolve(root, "dist"),
@@ -58,8 +59,22 @@ const GENESIS = 1791847200n,
   next = current + 1n,
   W = 10n ** 18n;
 const fixtureCode = "0x6001600055";
+const deploymentBlock = 26229405n,
+  blockOffset = deploymentBlock - 1000n;
+const leaderboardRpcs = [
+  "https://ethereum.public.blockpi.network/v1/rpc/public",
+  "https://rpc.mevblocker.io",
+  "https://ethereum-rpc.publicnode.com",
+  "https://eth.llamarpc.com",
+  "https://eth.drpc.org",
+  "https://cloudflare-eth.com",
+];
+const ensAbi = parseAbi([
+  "function reverseWithGateways(bytes reverseName, uint256 coinType, string[] gateways) view returns (string resolvedName, address resolver, address reverseResolver)",
+  "function resolveWithGateways(bytes name, bytes data, string[] gateways) view returns (bytes result, address resolver)",
+]);
 config.contracts[0].runtimeCodeHash = keccak256(fixtureCode);
-config.contracts[0].deploymentBlock = "1000";
+config.contracts[0].deploymentBlock = String(deploymentBlock);
 const types = {
   ".html": "text/html",
   ".js": "text/javascript",
@@ -79,10 +94,11 @@ const server = createServer(async (req, res) => {
     if (!pathname.startsWith("/preview/")) throw Error();
     const path = resolve(dist, pathname.slice(9) || "index.html");
     if (!path.startsWith(dist + "/")) throw Error();
+    const bytes = await readFile(path);
     res.writeHead(200, {
       "content-type": types[extname(path)] ?? "application/octet-stream",
     });
-    res.end(await readFile(path));
+    res.end(bytes);
   } catch {
     res.writeHead(404);
     res.end("not found");
@@ -120,6 +136,14 @@ function reset() {
     priceFailure: false,
     previewFailure: false,
     noEarningStake: false,
+    boardAllFail: false,
+    boardPrimaryFail: false,
+    boardEmpty: false,
+    boardDelay: 0,
+    boardRequests: [],
+    head: blockOffset + 3000n,
+    ensName: "tiny-athlete.eth",
+    ensMismatch: false,
   };
   addLog(
     "BinaryBet",
@@ -150,6 +174,7 @@ function reset() {
   );
 }
 function addLog(eventName, args, block) {
+  block += blockOffset;
   const item = getAbiItem({ abi, name: eventName });
   const data = encodeAbiParameters(
     item.inputs.filter((x) => !x.indexed),
@@ -217,7 +242,7 @@ function windowInfo(k) {
 }
 function block() {
   return {
-    number: "0xbb8",
+    number: toHex(state.head),
     hash: "0x" + "b".repeat(64),
     parentHash: "0x" + "a".repeat(64),
     nonce: "0x0000000000000000",
@@ -242,9 +267,15 @@ function block() {
 }
 function rpc(method, params) {
   if (method === "eth_chainId") return "0x1";
-  if (method === "eth_blockNumber") return "0xbb8";
+  if (method === "eth_blockNumber") return toHex(state.head);
   if (method === "eth_getBlockByNumber" || method === "eth_getBlockByHash")
-    return block();
+    return {
+      ...block(),
+      number:
+        params[0]?.startsWith("0x") && method === "eth_getBlockByNumber"
+          ? params[0]
+          : toHex(state.head),
+    };
   if (method === "eth_getCode") return state.badCode ? "0x6000" : fixtureCode;
   if (method === "eth_getBalance") return toHex(100n * W);
   if (method === "eth_gasPrice") return "0x3b9aca00";
@@ -254,10 +285,14 @@ function rpc(method, params) {
     const from = BigInt(params[0].fromBlock ?? "0x0"),
       to =
         params[0].toBlock === "latest"
-          ? 3000n
-          : BigInt(params[0].toBlock ?? 3000);
+          ? state.head
+          : BigInt(params[0].toBlock ?? state.head);
     return state.logs.filter(
-      (x) => BigInt(x.blockNumber) >= from && BigInt(x.blockNumber) <= to,
+      (x) =>
+        BigInt(x.blockNumber) >= from &&
+        BigInt(x.blockNumber) <= to &&
+        (!Array.isArray(params[0].topics?.[0]) ||
+          (!state.boardEmpty && params[0].topics[0].includes(x.topics[0]))),
     );
   }
   if (method === "eth_getTransactionReceipt") {
@@ -267,7 +302,7 @@ function rpc(method, params) {
       transactionHash: params[0],
       transactionIndex: "0x0",
       blockHash: block().hash,
-      blockNumber: "0xbb8",
+      blockNumber: toHex(state.head),
       from: account,
       to: t.to,
       cumulativeGasUsed: "0x30d40",
@@ -283,6 +318,32 @@ function rpc(method, params) {
   if (method === "eth_call") {
     const call = params[0];
     const target = call.to.toLowerCase();
+    if (
+      target === mainnet.contracts.ensUniversalResolver.address.toLowerCase()
+    ) {
+      const { functionName, args } = decodeFunctionData({
+        abi: ensAbi,
+        data: call.data,
+      });
+      return encodeFunctionResult({
+        abi: ensAbi,
+        functionName,
+        result:
+          functionName === "reverseWithGateways"
+            ? [
+                args[0].toLowerCase() === account ? state.ensName : "",
+                game,
+                game,
+              ]
+            : [
+                encodeAbiParameters(
+                  [{ type: "address" }],
+                  [state.ensMismatch ? other : account],
+                ),
+                game,
+              ],
+      });
+    }
     const contractAbi =
       target === vault
         ? vaultAbi
@@ -513,11 +574,14 @@ async function pageFor({
   liveState = "live",
   locale = "en-US",
   walletAvailable = true,
+  initialTab = "play",
+  prepare = () => {},
 } = {}) {
   reset();
   state.badCode = codeMismatch;
   state.statsFailure = statsFailure;
   state.liveState = liveState;
+  prepare();
   const context = await browser.newContext({
     viewport: { width, height: width < 600 ? 844 : 1000 },
     timezoneId: "UTC",
@@ -613,9 +677,34 @@ async function pageFor({
       });
     if (u.pathname.endsWith("/imd-deployment.json"))
       return route.fulfill({ json: config });
-    if (config.network.rpcUrls.some((x) => req.url().startsWith(x))) {
+    if (leaderboardRpcs.some((x) => req.url().startsWith(x))) {
       try {
         const payload = req.postDataJSON();
+        const boardLog =
+          !Array.isArray(payload) &&
+          payload.method === "eth_getLogs" &&
+          Array.isArray(payload.params[0]?.topics?.[0]);
+        if (boardLog) {
+          state.boardRequests.push({ url: req.url(), ...payload.params[0] });
+          if (state.boardDelay)
+            await new Promise((r) => setTimeout(r, state.boardDelay));
+          if (
+            state.boardAllFail ||
+            (state.boardPrimaryFail && req.url().startsWith(leaderboardRpcs[0]))
+          )
+            return route.fulfill({
+              json: {
+                jsonrpc: "2.0",
+                id: payload.id,
+                error: {
+                  code: -32005,
+                  message: state.boardAllFail
+                    ? "RPC offline"
+                    : "block range refused",
+                },
+              },
+            });
+        }
         const one = (x) => ({
           jsonrpc: "2.0",
           id: x.id,
@@ -725,12 +814,18 @@ async function pageFor({
       });
     return route.abort();
   });
-  await page.goto(url);
-  await page.getByRole("heading", { name: "Bet on the hamster." }).waitFor();
+  await page.goto(url + `#${initialTab}`);
   await page
-    .locator(".line-display .pixel")
-    .filter({ hasText: "2,100" })
+    .getByRole("heading", {
+      name:
+        initialTab === "leaderboard" ? "Leaderboard." : "Bet on the hamster.",
+    })
     .waitFor();
+  if (initialTab === "play")
+    await page
+      .locator(".line-display .pixel")
+      .filter({ hasText: "2,100" })
+      .waitFor();
   await page.waitForTimeout(120);
   if (connected) {
     if (!(await page.locator(".account-menu").count()))
@@ -761,6 +856,378 @@ async function check(name, fn) {
   }
 }
 try {
+  await check(
+    "leaderboard navigation, Top 5 preview, ENS, copy and wallet-free viewing",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        walletAvailable: false,
+        liveState: "offline",
+      });
+      await page.locator(".leaderboard-preview-list li").first().waitFor();
+      assert.equal(
+        await page.locator(".leaderboard-preview-list li").count(),
+        2,
+      );
+      assert.ok(
+        (
+          await page.locator(".leaderboard-preview-list li").first().innerText()
+        ).includes("10.00 IMD"),
+      );
+      await page
+        .locator(".leaderboard-preview")
+        .screenshot({ path: resolve(out, "390-top5-preview.png") });
+      await page.getByRole("link", { name: "Full leaderboard" }).click();
+      await page.getByRole("heading", { name: "Leaderboard." }).waitFor();
+      await page
+        .locator(".leaderboard-table a")
+        .filter({ hasText: "tiny-athlete.eth" })
+        .waitFor();
+      const rows = page.locator(".leaderboard-table tbody tr");
+      assert.equal(await rows.count(), 2);
+      assert.ok((await rows.first().innerText()).includes("≈ $20.00"));
+      assert.ok((await rows.nth(1).innerText()).includes("1 EXACT"));
+      assert.equal(await page.locator(".leaderboard-your-row").count(), 0);
+      await page.evaluate(() => {
+        window.copiedAddress = "";
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: {
+            writeText: async (text) => {
+              window.copiedAddress = text;
+            },
+          },
+        });
+      });
+      await page
+        .getByRole("button", {
+          name: `Copy wallet address ${account}`,
+          exact: true,
+        })
+        .click();
+      assert.equal(await page.evaluate(() => window.copiedAddress), account);
+      assert.equal(
+        await page.locator(".leaderboard-table a").first().getAttribute("href"),
+        `https://etherscan.io/address/${account}`,
+      );
+      assert.equal(
+        await page
+          .getByRole("link", { name: "Leaderboard", exact: true })
+          .getAttribute("aria-current"),
+        "page",
+      );
+      await page.screenshot({ path: resolve(out, "390-leaderboard.png") });
+      await page.getByRole("link", { name: "Back to the wheel" }).click();
+      await page
+        .getByRole("heading", { name: "Bet on the hamster." })
+        .waitFor();
+      await context.close();
+    },
+  );
+  await check(
+    "leaderboard top 50 pagination and pinned rank outside top 50",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 1440,
+        connected: true,
+        initialTab: "leaderboard",
+        prepare: () => {
+          for (let i = 1; i <= 60; i++)
+            addLog(
+              "BinaryBet",
+              {
+                k: current,
+                bettor: `0x${(i + 200).toString(16).padStart(40, "0")}`,
+                market: 1,
+                side: false,
+                amount: BigInt(i + 100) * W,
+              },
+              1010n + BigInt(i),
+            );
+        },
+      });
+      await page.locator(".leaderboard-yours").waitFor();
+      assert.ok(
+        (await page.locator(".leaderboard-your-row").innerText()).includes(
+          "#61",
+        ),
+      );
+      assert.ok(
+        (await page.locator(".leaderboard-your-row").innerText()).includes(
+          "10.00 IMD",
+        ),
+      );
+      assert.equal(
+        await page
+          .locator(".leaderboard-table tbody:not(.leaderboard-yours) tr")
+          .count(),
+        10,
+      );
+      assert.equal(await page.locator(".leaderboard-top").count(), 5);
+      await page.evaluate(() => scrollTo(0, 0));
+      await page.screenshot({ path: resolve(out, "1440-leaderboard.png") });
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      assert.ok(
+        (
+          await page
+            .locator(".leaderboard-table tbody:not(.leaderboard-yours) tr")
+            .first()
+            .innerText()
+        ).includes("#11"),
+      );
+      for (let i = 0; i < 3; i++)
+        await page.getByRole("button", { name: "Next", exact: true }).click();
+      assert.ok(
+        (await page.locator(".leaderboard-pagination").innerText()).includes(
+          "41–50 of 50",
+        ),
+      );
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Next", exact: true })
+          .isDisabled(),
+        true,
+      );
+      assert.equal(await page.locator(".leaderboard-your-row").count(), 1);
+      await page.getByRole("button", { name: "Previous", exact: true }).click();
+      await context.close();
+    },
+  );
+  await check(
+    "leaderboard loading progress, range fallback, error recovery and empty action",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        initialTab: "leaderboard",
+        prepare: () => {
+          state.boardDelay = 300;
+          state.boardPrimaryFail = true;
+        },
+      });
+      await page.getByText("Counting bets…", { exact: true }).waitFor();
+      await page
+        .getByRole("progressbar", { name: "Bet history blocks scanned" })
+        .waitFor();
+      await page.getByRole("button", { name: "Pause animation" }).click();
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Resume animation" })
+          .getAttribute("aria-pressed"),
+        "true",
+      );
+      await page.locator(".leaderboard-table").waitFor();
+      assert.ok(
+        state.boardRequests.some((x) => x.url.startsWith(leaderboardRpcs[1])),
+      );
+      assert.ok(
+        state.boardRequests.every(
+          (x) => BigInt(x.toBlock) - BigInt(x.fromBlock) + 1n <= 2000n,
+        ),
+      );
+      await context.close();
+      const empty = await pageFor({
+        width: 390,
+        initialTab: "leaderboard",
+        prepare: () => {
+          state.boardEmpty = true;
+        },
+      });
+      await empty.page
+        .getByText("No bets yet. Be the first name on the board 🐹", {
+          exact: true,
+        })
+        .waitFor();
+      await empty.page.getByRole("link", { name: "Place a bet" }).click();
+      await empty.page
+        .getByRole("heading", { name: "Bet on the hamster." })
+        .waitFor();
+      await empty.context.close();
+      const error = await pageFor({
+        width: 390,
+        initialTab: "leaderboard",
+        prepare: () => {
+          state.boardAllFail = true;
+        },
+      });
+      await error.page
+        .getByText("Couldn't load the leaderboard, retrying…", { exact: true })
+        .waitFor();
+      assert.equal(await error.page.locator(".leaderboard-table").count(), 0);
+      state.boardAllFail = false;
+      await error.page
+        .getByRole("button", { name: "Retry now", exact: true })
+        .click();
+      await error.page.locator(".leaderboard-table").waitFor();
+      await error.context.close();
+    },
+  );
+  await check(
+    "leaderboard minute refresh and reload use only new logs; inactive tabs stop polling",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        initialTab: "leaderboard",
+      });
+      await page.locator(".leaderboard-table").waitFor();
+      assert.ok(
+        (
+          await page.locator(".leaderboard-table tbody tr").first().innerText()
+        ).includes("10.00 IMD"),
+      );
+      state.boardRequests.length = 0;
+      state.head += 2n;
+      addLog(
+        "TicketBought",
+        { k: current, bettor: account, guess: 99n },
+        3001n,
+      );
+      await page.clock.fastForward(60_100);
+      await page
+        .locator(".leaderboard-table tbody tr")
+        .first()
+        .filter({ hasText: "15.00 IMD" })
+        .waitFor();
+      assert.equal(state.boardRequests.length, 1);
+      assert.equal(
+        BigInt(state.boardRequests[0].fromBlock),
+        blockOffset + 3001n,
+      );
+      state.boardRequests.length = 0;
+      await page.reload();
+      await page.locator(".leaderboard-table").waitFor();
+      assert.ok(
+        (
+          await page.locator(".leaderboard-table tbody tr").first().innerText()
+        ).includes("15.00 IMD"),
+      );
+      await page.waitForTimeout(200);
+      assert.equal(state.boardRequests.length, 0);
+      await page.getByRole("link", { name: "Stats", exact: true }).click();
+      state.head++;
+      await page.clock.fastForward(61_000);
+      assert.equal(state.boardRequests.length, 0);
+      await context.close();
+    },
+  );
+  await check(
+    "leaderboard responsive themes, long ENS, huge amounts, keyboard and accessibility",
+    async () => {
+      const audits = [];
+      const { page, context } = await pageFor({
+        width: 390,
+        connected: true,
+        initialTab: "leaderboard",
+        prepare: () => {
+          state.ensName =
+            "a-very-long-hamster-wallet-name-that-needs-to-wrap.eth";
+          addLog(
+            "BinaryBet",
+            {
+              k: current,
+              bettor: account,
+              market: 0,
+              side: true,
+              amount: 2n ** 128n - 1n,
+            },
+            1011n,
+          );
+        },
+      });
+      await page.locator(".leaderboard-table").waitFor();
+      await page
+        .locator(".leaderboard-table bdi")
+        .filter({ hasText: "a-very-long" })
+        .first()
+        .waitFor();
+      for (const width of [320, 390, 800, 1440]) {
+        await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
+        for (const theme of ["day", "night"]) {
+          await page.evaluate((t) => {
+            document.documentElement.dataset.theme = t;
+          }, theme);
+          assert.equal(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth > innerWidth,
+            ),
+            false,
+            `${width} ${theme}`,
+          );
+          const overflow = await page
+            .locator(".leaderboard-table")
+            .evaluate((e) => e.scrollWidth > e.clientWidth + 1);
+          assert.equal(overflow, false, `table overflow ${width} ${theme}`);
+          const audit = await new AxeBuilder({ page })
+            .include(".leaderboard-card")
+            .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+            .analyze();
+          audits.push({ width, theme, violations: audit.violations });
+          if (width === 390 && theme === "night")
+            await page.screenshot({
+              path: resolve(out, "390-leaderboard-night.png"),
+            });
+        }
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.locator(".leaderboard-copy").first().focus();
+      await page.keyboard.press("Tab");
+      assert.ok(
+        await page.evaluate(
+          () =>
+            getComputedStyle(document.activeElement).outlineStyle !== "none",
+        ),
+      );
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      assert.equal(await page.locator(".leaderboard-table").count(), 1);
+      await writeFile(
+        resolve(out, "leaderboard-accessibility.json"),
+        JSON.stringify(audits, null, 2),
+      );
+      assert.deepEqual(
+        audits.flatMap((a) => a.violations),
+        [],
+      );
+      await context.close();
+    },
+  );
+  await check(
+    "leaderboard failed refresh keeps saved totals and recovers automatically",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        initialTab: "leaderboard",
+      });
+      await page.locator(".leaderboard-table").waitFor();
+      state.boardAllFail = true;
+      state.head++;
+      await page.clock.fastForward(60_100);
+      await page
+        .getByText("Couldn't load the leaderboard, retrying…", { exact: true })
+        .waitFor();
+      await page.clock.fastForward(1_000);
+      await page
+        .locator(".leaderboard-card progress")
+        .waitFor({ state: "detached" });
+      assert.ok(
+        (
+          await page.locator(".leaderboard-table tbody tr").first().innerText()
+        ).includes("10.00 IMD"),
+      );
+      await page.getByText(/Showing saved totals through block/).waitFor();
+      state.boardAllFail = false;
+      addLog(
+        "TicketBought",
+        { k: current, bettor: account, guess: 99n },
+        3001n,
+      );
+      await page.clock.fastForward(16_000);
+      await page
+        .locator(".leaderboard-table tbody tr")
+        .first()
+        .filter({ hasText: "15.00 IMD" })
+        .waitFor();
+      await context.close();
+    },
+  );
   await check(
     "jackpot total includes deposits from all hours in strip and tab",
     async () => {
@@ -807,6 +1274,7 @@ try {
           name: "Rewards pool",
           exact: true,
         });
+        await pools.nth(1).waitFor();
         assert.equal(await pools.count(), 2);
         for (const pool of await pools.all()) {
           await pool.getByText("≈ $4,000.00", { exact: true }).waitFor();
@@ -886,8 +1354,12 @@ try {
   await check(
     "reward price failure leaves IMD visible and retries recover USD and APR",
     async () => {
-      const { page, context } = await pageFor({ width: 390 });
-      state.priceFailure = true;
+      const { page, context } = await pageFor({
+        width: 390,
+        prepare: () => {
+          state.priceFailure = true;
+        },
+      });
       await page.getByRole("link", { name: "$HAMSTER", exact: true }).click();
       const pool = page.locator(".hamster-stake .rewards-pool");
       await pool.getByText("USD price unavailable", { exact: true }).waitFor();

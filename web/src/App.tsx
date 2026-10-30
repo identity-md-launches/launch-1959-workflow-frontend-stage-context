@@ -14,6 +14,8 @@ import { BetPanel, type BetReceipt } from "./Bet";
 import { Jackpot } from "./Jackpot";
 import { MyBets } from "./MyBets";
 import { Stats } from "./Stats";
+import { Leaderboard, LeaderboardPreview } from "./Leaderboard";
+import { useLeaderboard } from "./useLeaderboard";
 import { HamsterPage } from "./Hamster";
 import { Stream } from "./Stream";
 import { ChatDrawer } from "./Chat";
@@ -28,6 +30,7 @@ const tabs = [
   ["play", "The wheel"],
   ["jackpot", "Jackpot"],
   ["stats", "Stats"],
+  ["leaderboard", "Leaderboard"],
   ["my-bets", "My bets"],
   ["agents", "Agents"],
   ["hamster", "$HAMSTER"],
@@ -182,6 +185,10 @@ function Game({ r }: { r: Runtime }) {
     [sound, setSound] = useState(() => stored("hh-sound", "off") === "on"),
     [paused, setPaused] = useState(false),
     [shared, setShared] = useState<BetReceipt>();
+  const leaderboard = useLeaderboard(
+    r,
+    tab === "play" || tab === "leaderboard",
+  );
   useEffect(() => {
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(id);
@@ -340,6 +347,8 @@ function Game({ r }: { r: Runtime }) {
             eventError={events.isError}
             now={now}
           />
+        ) : tab === "leaderboard" ? (
+          <Leaderboard r={r} data={leaderboard} />
         ) : tab === "hamster" ? (
           <HamsterPage
             r={r}
@@ -513,6 +522,7 @@ function Game({ r }: { r: Runtime }) {
               eventError={events.isError}
             />
             <Ticker events={events.data} error={events.isError} />
+            <LeaderboardPreview r={r} data={leaderboard} />
           </>
         )}
       </main>
