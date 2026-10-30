@@ -1,18 +1,21 @@
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import {
   encodeAbiParameters,
   encodeEventTopics,
+  getEventSelector,
   toHex,
   type AbiEvent,
   type Address,
   type Hex,
 } from "viem";
 import {
-  aggregateBets,
+  aggregateEvents,
   createRpcPool,
-  decodeVolumeBet,
+  decodeVolumeEvent,
   rankWallets,
+  walletVolumes,
   volumeImd,
   VolumeScanner,
   type RawVolumeLog,
@@ -21,6 +24,8 @@ import {
 import {
   LEADERBOARD_EVENTS,
   LEADERBOARD_TICKET_PRICE,
+  LEADERBOARD_TEAM,
+  LEADERBOARD_CACHE_VERSION,
 } from "../src/leaderboard-config";
 
 const game: Address = "0xe33ab493249a2df0d8c4a71ac54f46d1f7778367";
@@ -30,7 +35,7 @@ const W = 10n ** 18n;
 const hash = (n: bigint) => `0x${n.toString(16).padStart(64, "0")}` as Hex;
 const signal = () => new AbortController().signal;
 function event(
-  name: "BinaryBet" | "TicketBought",
+  name: "BinaryBet" | "TicketBought" | "Settled" | "MarketVoided" | "TimedOut",
   args: Record<string, any>,
   block: bigint,
   index = 0,
@@ -69,6 +74,23 @@ const binary = (
   );
 const ticket = (who = alice, block = 101n, hour = 1n) =>
   event("TicketBought", { k: hour, bettor: who, guess: 0n }, block);
+const settled = (hour = 1n, block = 102n) =>
+  event(
+    "Settled",
+    {
+      k: hour,
+      result: 1000n,
+      requestId: hash(hour),
+      settler: bob,
+    },
+    block,
+  );
+const decode = (logs: RawVolumeLog[]) =>
+  logs.map((l) =>
+    decodeVolumeEvent(LEADERBOARD_EVENTS, l, LEADERBOARD_TICKET_PRICE),
+  );
+const totals = (logs: RawVolumeLog[]) =>
+  walletVolumes(aggregateEvents(decode(logs)));
 function harness() {
   let head = 4_102n,
     failAt: bigint | undefined,
@@ -78,6 +100,8 @@ function harness() {
     ticket(),
     binary(bob, 2_100n),
     binary(alice, 4_100n, 3n * W, 2n),
+    settled(),
+    settled(2n, 4101n),
   ];
   const ranges: [bigint, bigint][] = [],
     memory = new Map<string, string>();
@@ -94,7 +118,7 @@ function harness() {
       ranges.push([from, to]);
       assert.ok(to - from + 1n <= 2_000n);
       assert.equal(p.address, game);
-      assert.equal(p.topics[0].length, 2);
+      assert.equal(p.topics[0].length, 5);
       if (failAt !== undefined && from >= failAt) throw Error("Disconnected");
       return logs.filter(
         (l) => BigInt(l.blockNumber) >= from && BigInt(l.blockNumber) <= to,
@@ -115,10 +139,11 @@ function harness() {
       deploymentBlock: 100n,
       abi: LEADERBOARD_EVENTS,
       decode: (l) =>
-        decodeVolumeBet(LEADERBOARD_EVENTS, l, LEADERBOARD_TICKET_PRICE),
+        decodeVolumeEvent(LEADERBOARD_EVENTS, l, LEADERBOARD_TICKET_PRICE),
       rpc,
       storage,
-      cacheVersion: "test",
+      cacheVersion: LEADERBOARD_CACHE_VERSION,
+      excludedAddresses: [LEADERBOARD_TEAM],
     });
   return {
     make,
@@ -151,11 +176,8 @@ test("event decoding counts full binary stake, fixed 5 IMD tickets, distinct hou
       103n,
     ),
   ];
-  const w = rankWallets(
-    aggregateBets(
-      events.map((e) => decodeVolumeBet(LEADERBOARD_EVENTS, e, 5n * W)),
-    ),
-  )[0];
+  events.push(settled(1n, 104n), settled(2n, 105n));
+  const w = rankWallets(totals(events))[0];
   assert.equal(w.volume, 22n * W);
   assert.equal(w.bets, 4);
   assert.equal(w.tickets, 1);
@@ -163,13 +185,18 @@ test("event decoding counts full binary stake, fixed 5 IMD tickets, distinct hou
 });
 test("sorting is exact above Number precision, deterministic for ties, and retains ranks below 50", () => {
   const rows = rankWallets(
-    aggregateBets(
-      Array.from({ length: 60 }, (_, i) => ({
-        bettor: `0x${(i + 1).toString(16).padStart(40, "0")}` as Address,
-        hour: 0n,
-        ticket: false,
-        amount: 2n ** 100n + BigInt(i === 59 ? 1 : 0),
-      })),
+    walletVolumes(
+      aggregateEvents([
+        ...Array.from({ length: 60 }, (_, i) => ({
+          type: "bet" as const,
+          market: 0,
+          bettor: `0x${(i + 1).toString(16).padStart(40, "0")}` as Address,
+          hour: 0n,
+          ticket: false as const,
+          amount: 2n ** 100n + BigInt(i === 59 ? 1 : 0),
+        })),
+        { type: "settled", hour: 0n },
+      ]),
     ),
   );
   assert.equal(rows[0].address, "0x000000000000000000000000000000000000003c");
@@ -250,7 +277,7 @@ test("cache corruption, chain reorg and unavailable storage recover through real
     address: game,
     deploymentBlock: 100n,
     abi: LEADERBOARD_EVENTS,
-    decode: (l) => decodeVolumeBet(LEADERBOARD_EVENTS, l, 5n * W),
+    decode: (l) => decodeVolumeEvent(LEADERBOARD_EVENTS, l, 5n * W),
     rpc: h.rpc,
     cacheVersion: "test",
     storage: {
@@ -286,7 +313,7 @@ test("wrong contract, out-of-range, removed and malformed logs fail without adva
       address: game,
       deploymentBlock: 100n,
       abi: LEADERBOARD_EVENTS,
-      decode: (l) => decodeVolumeBet(LEADERBOARD_EVENTS, l, 5n * W),
+      decode: (l) => decodeVolumeEvent(LEADERBOARD_EVENTS, l, 5n * W),
       rpc,
       storage: h.storage,
       cacheVersion: "test",
@@ -311,7 +338,7 @@ test("a reorg between chunks cannot mix old aggregates with a new canonical boun
     address: game,
     deploymentBlock: 100n,
     abi: LEADERBOARD_EVENTS,
-    decode: (l) => decodeVolumeBet(LEADERBOARD_EVENTS, l, 5n * W),
+    decode: (l) => decodeVolumeEvent(LEADERBOARD_EVENTS, l, 5n * W),
     rpc,
     cacheVersion: "test",
   });
@@ -418,7 +445,7 @@ test("all-provider range refusals subdivide without gaps; cancellation stops wit
     address: game,
     deploymentBlock: 100n,
     abi: LEADERBOARD_EVENTS,
-    decode: (l) => decodeVolumeBet(LEADERBOARD_EVENTS, l, 5n * W),
+    decode: (l) => decodeVolumeEvent(LEADERBOARD_EVENTS, l, 5n * W),
     rpc,
     cacheVersion: "test",
   });
@@ -437,4 +464,245 @@ test("all-provider range refusals subdivide without gaps; cancellation stops wit
     }) as any,
   });
   await assert.rejects(pool("eth_blockNumber", [], c.signal));
+});
+
+test("only settled non-voided markets count; tickets ignore market voids; timeouts override settlement", () => {
+  const logs = [
+    binary(alice, 100n, 11n * W, 1n),
+    event(
+      "BinaryBet",
+      { k: 1n, bettor: alice, market: 1, side: false, amount: 7n * W },
+      101n,
+    ),
+    ticket(alice, 102n, 1n),
+    settled(1n, 103n),
+    event("MarketVoided", { k: 1n, market: 0 }, 103n, 1),
+    binary(alice, 104n, 13n * W, 2n),
+    ticket(alice, 105n, 2n),
+    event("TimedOut", { k: 2n }, 106n),
+    settled(2n, 107n),
+    binary(alice, 108n, 17n * W, 3n),
+    ticket(alice, 109n, 3n),
+    // Another window's void must not exclude this played market 0.
+    binary(alice, 110n, 19n * W, 4n),
+    settled(4n, 111n),
+  ];
+  for (const order of [logs, [...logs].reverse()]) {
+    const w = totals(order).get(alice)!;
+    assert.equal(w.volume, 31n * W);
+    assert.equal(w.pending, 22n * W);
+    assert.equal(w.bets, 3);
+    assert.equal(w.tickets, 1);
+    assert.deepEqual([...w.hours].sort(), ["1", "4"]);
+  }
+});
+
+test("unsettled bets are pending only; voids and timeouts are neither counted nor pending", () => {
+  const h = totals([
+    binary(),
+    ticket(),
+    binary(bob, 102n, 10n * W, 2n),
+    ticket(bob, 103n, 2n),
+    event("TimedOut", { k: 2n }, 104n),
+    binary(bob, 105n, 9n * W, 3n),
+    event("MarketVoided", { k: 3n, market: 0 }, 106n),
+  ]);
+  assert.deepEqual(rankWallets(h), []);
+  assert.equal(h.get(alice)!.pending, 17n * W);
+  assert.equal(h.get(alice)!.bets, 0);
+  assert.equal(h.get(alice)!.tickets, 0);
+  assert.equal(h.get(alice)!.hours.size, 0);
+  assert.equal(h.get(bob)!.pending, 0n);
+  assert.equal(h.get(bob)!.volume, 0n);
+});
+
+test("pending survives reload and moves once on a settlement-only incremental refresh", async () => {
+  const h = harness();
+  h.logs.splice(
+    0,
+    h.logs.length,
+    binary(),
+    ticket(),
+    binary(bob, 101n, 9n * W, 1n, 1),
+  );
+  h.setHead(101n);
+  const initial = await h.make().scan(signal());
+  assert.deepEqual(initial.rows, []);
+  assert.equal(
+    initial.unranked.find((w) => w.address === alice)!.pending,
+    17n * W,
+  );
+  const reloaded = h.make();
+  assert.deepEqual(reloaded.snapshot()!.unranked, initial.unranked);
+  h.ranges.length = 0;
+  h.logs.push(settled());
+  h.setHead(102n);
+  const result = await reloaded.scan(signal());
+  assert.deepEqual(h.ranges, [[102n, 102n]]);
+  assert.equal(result.rows[0].volume, 17n * W);
+  assert.equal(result.rows[0].pending, 0n);
+  assert.equal(result.rows[0].bets, 2);
+  assert.equal(result.rows[0].hours.size, 1);
+  assert.equal(result.rows[1].volume, 9n * W);
+  assert.deepEqual((await reloaded.scan(signal())).rows, result.rows);
+  assert.deepEqual(h.make().snapshot()!.rows, result.rows);
+});
+
+test("late void and timeout events reclassify cached windows and survive reload", async () => {
+  const h = harness();
+  await h.make().scan(signal());
+  h.logs.push(event("MarketVoided", { k: 1n, market: 0 }, 4103n));
+  h.setHead(4103n);
+  const first = await h.make().scan(signal());
+  assert.equal(first.rows[0].volume, 8n * W); // ticket hour 1, binary hour 2
+  assert.equal(first.rows[0].bets, 2);
+  assert.equal(first.rows[0].hours.size, 2);
+  assert.equal(first.unranked.find((w) => w.address === bob)!.pending, 0n);
+  h.logs.push(event("TimedOut", { k: 1n }, 4104n));
+  h.setHead(4104n);
+  const second = await h.make().scan(signal());
+  assert.equal(second.rows[0].volume, 3n * W);
+  assert.equal(second.rows[0].tickets, 0);
+  assert.deepEqual([...second.rows[0].hours], ["2"]);
+  assert.deepEqual(h.make().snapshot()!.rows, second.rows);
+});
+
+test("team never receives a rank; pending-only wallets never occupy top five", async () => {
+  const h = harness();
+  h.logs.push(
+    binary(LEADERBOARD_TEAM, 102n, 100000n * W, 1n, 1),
+    binary(LEADERBOARD_TEAM, 103n, 5n * W, 10n),
+  );
+  const result = await h.make().scan(signal());
+  assert.deepEqual(
+    result.rows.map((w) => w.address),
+    [alice, bob],
+  );
+  assert.deepEqual(
+    result.rows.map((w) => w.rank),
+    [1, 2],
+  );
+  const team = result.unranked.find((w) => w.address === LEADERBOARD_TEAM)!;
+  assert.equal(team.volume, 100000n * W);
+  assert.equal(team.pending, 5n * W);
+  assert.equal("rank" in team, false);
+  const refundedTeam = totals([
+    binary(LEADERBOARD_TEAM),
+    event("TimedOut", { k: 1n }, 101n),
+  ]).get(LEADERBOARD_TEAM)!;
+  assert.equal(refundedTeam.volume, 0n);
+  assert.equal(refundedTeam.pending, 0n);
+  assert.deepEqual(
+    rankWallets(totals([binary(LEADERBOARD_TEAM), settled()]), [
+      LEADERBOARD_TEAM.toUpperCase() as Address,
+    ]),
+    [],
+  );
+});
+
+test("old-rule cache is ignored and rebuilt; invalid window or stake checkpoints restart", async () => {
+  const h = harness();
+  const scanner = h.make();
+  const oldKey = scanner.key.replace(
+    LEADERBOARD_CACHE_VERSION,
+    "v1-ticket-5-imd",
+  );
+  h.memory.set(
+    oldKey,
+    JSON.stringify({
+      lastBlock: "4102",
+      lastHash: hash(4102n),
+      complete: true,
+      wallets: [
+        {
+          address: alice,
+          volume: String(9999n * W),
+          bets: 1,
+          tickets: 0,
+          hours: ["1"],
+        },
+      ],
+    }),
+  );
+  assert.equal(h.make().snapshot(), undefined);
+  const result = await scanner.scan(signal());
+  assert.equal(result.rows[0].volume, 20n * W);
+  const saved = h.memory.get(scanner.key)!;
+  for (const mutate of [
+    (d: any) => {
+      d.windows[0].settled = "true";
+    },
+    (d: any) => {
+      d.windows[0].voidedMarkets = [0, 0];
+    },
+    (d: any) => {
+      d.windows[0].stakes[0].volume = "-1";
+    },
+    (d: any) => {
+      d.windows[0].stakes[0].market = 256;
+    },
+    (d: any) => {
+      d.windows[0].stakes[0].bets = 0;
+    },
+    (d: any) => {
+      d.windows.push(d.windows[0]);
+    },
+  ]) {
+    const data = JSON.parse(saved);
+    mutate(data);
+    h.memory.set(scanner.key, JSON.stringify(data));
+    assert.equal(h.make().snapshot(), undefined);
+  }
+});
+
+test("a failed settlement range preserves the saved pending state until recovery", async () => {
+  const h = harness();
+  h.logs.splice(0, h.logs.length, binary(), ticket());
+  h.setHead(101n);
+  const scanner = h.make();
+  await scanner.scan(signal());
+  const before = h.memory.get(scanner.key);
+  h.logs.push(settled(), { ...settled(2n, 103n), data: "0x" });
+  h.setHead(103n);
+  await assert.rejects(scanner.scan(signal()));
+  assert.equal(h.memory.get(scanner.key), before);
+  assert.equal(scanner.snapshot()!.unranked[0].pending, 17n * W);
+  h.logs.pop();
+  assert.equal((await scanner.scan(signal())).rows[0].volume, 17n * W);
+});
+
+test("aggregation does not mutate a previous checkpoint or depend on event order", () => {
+  const before = aggregateEvents(decode([binary(), ticket()]));
+  const after = aggregateEvents(
+    decode([settled(), event("MarketVoided", { k: 1n, market: 0 }, 103n)]),
+    before,
+  );
+  assert.equal(walletVolumes(before).get(alice)!.pending, 17n * W);
+  assert.equal(before.get("1")!.settled, false);
+  assert.equal(before.get("1")!.voidedMarkets.size, 0);
+  assert.equal(walletVolumes(after).get(alice)!.volume, 5n * W);
+});
+
+test("all five scanner events match the unchanged v2 contract ABI including indexed fields", () => {
+  const abi = JSON.parse(
+    readFileSync(
+      new URL("../contracts/HamsterHour.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const canonicalInputs = (event: AbiEvent) =>
+    event.inputs.map(({ name, type, indexed }) => ({
+      name,
+      type,
+      indexed: !!indexed,
+    }));
+  for (const event of LEADERBOARD_EVENTS) {
+    if (event.type !== "event") continue;
+    const pinned = abi.find(
+      (e: AbiEvent) => e.type === "event" && e.name === event.name,
+    );
+    assert.ok(pinned);
+    assert.equal(getEventSelector(event), getEventSelector(pinned));
+    assert.deepEqual(canonicalInputs(event), canonicalInputs(pinned));
+  }
 });

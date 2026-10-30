@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import type { Runtime } from "./config";
 import {
   createRpcPool,
-  decodeVolumeBet,
+  decodeVolumeEvent,
   VolumeScanner,
   type ScanProgress,
   type VolumeSnapshot,
 } from "./leaderboard";
 import {
   LEADERBOARD_DEPLOYMENT_BLOCK,
+  LEADERBOARD_CACHE_VERSION,
+  LEADERBOARD_TEAM,
   LEADERBOARD_EVENTS,
   LEADERBOARD_REFRESH_MS,
   LEADERBOARD_RPCS,
@@ -30,12 +32,13 @@ export function useLeaderboard(r: Runtime, active: boolean) {
       deploymentBlock: LEADERBOARD_DEPLOYMENT_BLOCK,
       abi: LEADERBOARD_EVENTS,
       decode: (log) =>
-        decodeVolumeBet(LEADERBOARD_EVENTS, log, LEADERBOARD_TICKET_PRICE),
+        decodeVolumeEvent(LEADERBOARD_EVENTS, log, LEADERBOARD_TICKET_PRICE),
       rpc: createRpcPool(LEADERBOARD_RPCS, {
         onRetry: () => setRetrying(true),
       }),
       storage,
-      cacheVersion: "v1-ticket-5-imd",
+      cacheVersion: LEADERBOARD_CACHE_VERSION,
+      excludedAddresses: [LEADERBOARD_TEAM],
     });
   }, [r.chain.id, r.game.address]);
   const [snapshot, setSnapshot] = useState<VolumeSnapshot | undefined>(() =>

@@ -11,6 +11,7 @@ import {
   LEADERBOARD_LIMIT,
   LEADERBOARD_PAGE_SIZE,
   LEADERBOARD_REWARD_TEXT,
+  LEADERBOARD_TEAM,
 } from "./leaderboard-config";
 import { loadImdUsd } from "./rewards";
 import { shortAddress, number } from "./model";
@@ -111,7 +112,15 @@ function WalletName({ r, address }: { r: Runtime; address: Address }) {
     </div>
   );
 }
-function Volume({ amount, price }: { amount: bigint; price?: number }) {
+function Volume({
+  amount,
+  pending,
+  price,
+}: {
+  amount: bigint;
+  pending: bigint;
+  price?: number;
+}) {
   const estimate =
     price === undefined ? undefined : Number(formatUnits(amount, 18)) * price;
   return (
@@ -119,6 +128,11 @@ function Volume({ amount, price }: { amount: bigint; price?: number }) {
       <strong>
         {volumeImd(amount)} <span className="leaderboard-unit">IMD</span>
       </strong>
+      {pending > 0n && (
+        <small className="leaderboard-pending">
+          {volumeImd(pending)} IMD pending
+        </small>
+      )}
       <small className="muted">
         {estimate !== undefined && Number.isFinite(estimate)
           ? `≈ ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(estimate)}`
@@ -209,7 +223,10 @@ function ScanStatus({
 function NoBets() {
   return (
     <div className="leaderboard-empty">
-      <p>No bets yet. Be the first name on the board 🐹</p>
+      <p>
+        No counted bets yet. Bets only count when both sides of the hour are
+        taken. Bring a friend and play the same hour 🐹
+      </p>
       <a className="button" href="#play">
         Place a bet <Icon name="arrow" />
       </a>
@@ -230,15 +247,17 @@ function VolumeRow({
   wallet,
   price,
   yours = false,
+  team = false,
 }: {
   r: Runtime;
   wallet: WalletVolume & { rank?: number };
   price?: number;
   yours?: boolean;
+  team?: boolean;
 }) {
   return (
     <tr
-      className={`${wallet.rank && wallet.rank <= 5 ? `leaderboard-top rank-${wallet.rank}` : ""} ${yours ? "leaderboard-your-row" : ""}`}
+      className={`${wallet.rank && wallet.rank <= 5 ? `leaderboard-top rank-${wallet.rank}` : ""} ${yours ? "leaderboard-your-row" : ""} ${team ? "leaderboard-team-row" : ""}`}
     >
       <td className="leaderboard-rank">
         <span>{wallet.rank ? `#${wallet.rank}` : "—"}</span>
@@ -247,13 +266,23 @@ function VolumeRow({
       <th scope="row" className="leaderboard-identity">
         {yours && (
           <span className="leaderboard-your-label">
-            Your position{!wallet.rank && " · no bets yet"}
+            Your position
+            {!wallet.rank &&
+              (wallet.pending > 0n
+                ? " · pending hours"
+                : " · no counted bets yet")}
           </span>
+        )}
+        {team && (
+          <span className="leaderboard-your-label">team, not ranked</span>
+        )}
+        {!team && !yours && !wallet.rank && (
+          <span className="leaderboard-your-label muted">Pending hours</span>
         )}
         <WalletName r={r} address={wallet.address} />
       </th>
       <td className="leaderboard-amount">
-        <Volume amount={wallet.volume} price={price} />
+        <Volume amount={wallet.volume} pending={wallet.pending} price={price} />
       </td>
       <td className="leaderboard-bets">
         <span>
@@ -273,6 +302,29 @@ function VolumeRow({
     </tr>
   );
 }
+function VolumeHead() {
+  return (
+    <thead>
+      <tr>
+        <th scope="col">
+          <span>Rank</span>
+        </th>
+        <th scope="col">
+          <span>Wallet</span>
+        </th>
+        <th scope="col">
+          <span>Counted volume</span>
+        </th>
+        <th scope="col">
+          <span>Counted bets</span>
+        </th>
+        <th scope="col">
+          <span>Hours played</span>
+        </th>
+      </tr>
+    </thead>
+  );
+}
 export function Leaderboard({
   r,
   data,
@@ -284,7 +336,12 @@ export function Leaderboard({
   const { address } = useConnection();
   const price = usePrice(r);
   const rows = data.snapshot?.rows;
-  const top = rows?.slice(0, LEADERBOARD_LIMIT) ?? [];
+  const unranked = data.snapshot?.unranked ?? [];
+  const team = unranked.find((w) => w.address === LEADERBOARD_TEAM);
+  const pendingOnly = unranked.filter(
+    (w) => w.pending > 0n && w.address !== LEADERBOARD_TEAM,
+  );
+  const top = [...(rows?.slice(0, LEADERBOARD_LIMIT) ?? []), ...pendingOnly];
   const pages = Math.max(1, Math.ceil(top.length / LEADERBOARD_PAGE_SIZE));
   const shownPage = Math.min(page, pages - 1);
   const visible = top.slice(
@@ -292,10 +349,13 @@ export function Leaderboard({
     (shownPage + 1) * LEADERBOARD_PAGE_SIZE,
   );
   const yours =
-    address && rows
-      ? (rows.find((w) => w.address === address.toLowerCase()) ?? {
+    address && rows && address.toLowerCase() !== LEADERBOARD_TEAM
+      ? ([...rows, ...unranked].find(
+          (w) => w.address === address.toLowerCase(),
+        ) ?? {
           address,
           volume: 0n,
+          pending: 0n,
           bets: 0,
           tickets: 0,
           hours: new Set<string>(),
@@ -329,21 +389,15 @@ export function Leaderboard({
         <ScanStatus data={data} />
         {rows && (
           <>
-            {(rows.length > 0 || yours) && (
+            {(top.length > 0 || yours) && (
               <table className="leaderboard-table">
                 <caption className="sr-only">
-                  All-time betting volume, ranked highest first. Top 50 wallets,
-                  10 per page. EXACT tickets count as bets.
+                  Counted betting volume, ranked highest first. Top 50 ranked
+                  wallets, followed by wallets with pending hours only; 10 per
+                  page. Bets and hours include only counted stakes. Settled
+                  EXACT tickets count as bets.
                 </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Rank</th>
-                    <th scope="col">Wallet</th>
-                    <th scope="col">Total volume</th>
-                    <th scope="col">Bets</th>
-                    <th scope="col">Hours played</th>
-                  </tr>
-                </thead>
+                <VolumeHead />
                 {yours && (
                   <tbody className="leaderboard-yours">
                     <VolumeRow r={r} wallet={yours} price={price.data} yours />
@@ -361,9 +415,8 @@ export function Leaderboard({
                 </tbody>
               </table>
             )}
-            {rows.length === 0 ? (
-              <NoBets />
-            ) : (
+            {rows.length === 0 && <NoBets />}
+            {top.length > 0 && (
               <div className="leaderboard-pagination">
                 <p className="small muted" role="status">
                   {shownPage * LEADERBOARD_PAGE_SIZE + 1}–
@@ -373,7 +426,7 @@ export function Leaderboard({
                   )}{" "}
                   of {top.length}
                   {rows.length > LEADERBOARD_LIMIT &&
-                    ` · ${number(rows.length)} wallets in all`}
+                    ` · ${number(rows.length)} ranked wallets in all`}
                 </p>
                 <nav aria-label="Leaderboard pages">
                   <button
@@ -396,12 +449,25 @@ export function Leaderboard({
                 </nav>
               </div>
             )}
+            {team && (
+              <table
+                className="leaderboard-table leaderboard-team"
+                aria-label="Team wallet, not ranked"
+              >
+                <caption className="sr-only">
+                  Team wallet, not ranked. Counted volume and pending hours.
+                </caption>
+                <VolumeHead />
+                <tbody>
+                  <VolumeRow r={r} wallet={team} price={price.data} team />
+                </tbody>
+              </table>
+            )}
           </>
         )}
         <p className="leaderboard-method small muted">
-          Every binary bet counts its full IMD stake. Each EXACT ticket adds 5
-          IMD and one bet. Hours count distinct betting windows. Feeds and
-          payouts do not count. Ties use wallet address order.
+          Only bets that were played count: refunded (one-sided or timed-out)
+          bets and pending hours are not included. Team wallet is not ranked.
         </p>
       </section>
     </div>
@@ -438,7 +504,11 @@ export function LeaderboardPreview({
                 <span>#{w.rank}</span>
               </span>
               <WalletName r={r} address={w.address} />
-              <Volume amount={w.volume} price={price.data} />
+              <Volume
+                amount={w.volume}
+                pending={w.pending}
+                price={price.data}
+              />
             </li>
           ))}
         </ol>

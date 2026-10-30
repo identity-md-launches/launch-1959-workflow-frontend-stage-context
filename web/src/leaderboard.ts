@@ -10,15 +10,33 @@ import {
 
 // This module has no React, wallet, price API, or backend dependency. Another
 // event-based board can supply its own ABI, deployment, and event-to-bet decoder.
-export interface VolumeBet {
+export type VolumeBet = {
+  type: "bet";
   bettor: Address;
   hour: bigint;
   amount: bigint;
-  ticket: boolean;
+} & ({ ticket: true; market?: never } | { ticket: false; market: number });
+export type VolumeEvent =
+  | VolumeBet
+  | { type: "settled" | "timedOut"; hour: bigint }
+  | { type: "voided"; hour: bigint; market: number };
+interface WindowStake {
+  address: Address;
+  // null is an EXACT ticket, independent of binary market voids.
+  market: number | null;
+  volume: bigint;
+  bets: number;
+}
+export interface VolumeWindow {
+  settled: boolean;
+  timedOut: boolean;
+  voidedMarkets: Set<number>;
+  stakes: Map<string, WindowStake>;
 }
 export interface WalletVolume {
   address: Address;
   volume: bigint;
+  pending: bigint;
   bets: number;
   tickets: number;
   hours: Set<string>;
@@ -26,36 +44,104 @@ export interface WalletVolume {
 export interface RankedWallet extends WalletVolume {
   rank: number;
 }
-export function aggregateBets(
-  bets: readonly VolumeBet[],
-  previous = new Map<string, WalletVolume>(),
+const validMarket = (market: unknown): market is number =>
+  Number.isInteger(market) && Number(market) >= 0 && Number(market) <= 255;
+const stakeKey = (address: Address, market: number | null) =>
+  `${address}:${market ?? "ticket"}`;
+
+// Retain per-window/market aggregates so a later settlement, void or timeout
+// reclassifies earlier bets, even after a reload or across scan chunks.
+export function aggregateEvents(
+  events: readonly VolumeEvent[],
+  previous: ReadonlyMap<string, VolumeWindow> = new Map(),
 ) {
-  const wallets = new Map(
-    [...previous].map(([a, w]) => [a, { ...w, hours: new Set(w.hours) }]),
-  );
-  for (const bet of bets) {
-    if (bet.amount < 0n || bet.hour < 0n || !isAddress(bet.bettor))
-      throw Error("Invalid bet event");
-    const address = bet.bettor.toLowerCase() as Address;
-    const w = wallets.get(address) ?? {
-      address,
-      volume: 0n,
-      bets: 0,
-      tickets: 0,
-      hours: new Set<string>(),
-    };
-    w.volume += bet.amount;
-    w.bets++;
-    if (bet.ticket) w.tickets++;
-    w.hours.add(String(bet.hour));
-    wallets.set(address, w);
+  const windows = new Map(previous);
+  const changed = new Set<string>();
+  for (const event of events) {
+    if (event.hour < 0n) throw Error("Invalid event window");
+    const hour = String(event.hour);
+    if (!changed.has(hour)) {
+      const old = windows.get(hour);
+      windows.set(hour, {
+        settled: old?.settled ?? false,
+        timedOut: old?.timedOut ?? false,
+        voidedMarkets: new Set(old?.voidedMarkets),
+        stakes: new Map(old?.stakes),
+      });
+      changed.add(hour);
+    }
+    const window = windows.get(hour)!;
+    switch (event.type) {
+      case "settled":
+        window.settled = true;
+        break;
+      case "timedOut":
+        window.timedOut = true;
+        break;
+      case "voided":
+        if (!validMarket(event.market)) throw Error("Invalid market");
+        window.voidedMarkets.add(event.market);
+        break;
+      case "bet": {
+        if (
+          event.amount < 0n ||
+          !isAddress(event.bettor) ||
+          (!event.ticket && !validMarket(event.market))
+        )
+          throw Error("Invalid bet event");
+        const address = event.bettor.toLowerCase() as Address;
+        const market = event.ticket ? null : event.market;
+        const key = stakeKey(address, market);
+        const stake = window.stakes.get(key);
+        window.stakes.set(key, {
+          address,
+          market,
+          volume: (stake?.volume ?? 0n) + event.amount,
+          bets: (stake?.bets ?? 0) + 1,
+        });
+        break;
+      }
+    }
+  }
+  return windows;
+}
+export function walletVolumes(windows: ReadonlyMap<string, VolumeWindow>) {
+  const wallets = new Map<string, WalletVolume>();
+  for (const [hour, window] of windows) {
+    for (const stake of window.stakes.values()) {
+      const w = wallets.get(stake.address) ?? {
+        address: stake.address,
+        volume: 0n,
+        pending: 0n,
+        bets: 0,
+        tickets: 0,
+        hours: new Set<string>(),
+      };
+      wallets.set(stake.address, w);
+      if (
+        window.timedOut ||
+        (stake.market !== null && window.voidedMarkets.has(stake.market))
+      )
+        continue;
+      if (!window.settled) {
+        w.pending += stake.volume;
+        continue;
+      }
+      w.volume += stake.volume;
+      w.bets += stake.bets;
+      if (stake.market === null) w.tickets += stake.bets;
+      w.hours.add(hour);
+    }
   }
   return wallets;
 }
 export function rankWallets(
   wallets: ReadonlyMap<string, WalletVolume>,
+  excludedAddresses: readonly Address[] = [],
 ): RankedWallet[] {
+  const excluded = new Set(excludedAddresses.map((a) => a.toLowerCase()));
   return [...wallets.values()]
+    .filter((w) => w.volume > 0n && !excluded.has(w.address.toLowerCase()))
     .sort((a, b) =>
       a.volume === b.volume
         ? a.address.localeCompare(b.address)
@@ -167,38 +253,57 @@ export interface RawVolumeLog {
   logIndex: Hex;
   removed?: boolean;
 }
-export function decodeVolumeBet(
+export function decodeVolumeEvent(
   abi: Abi,
   log: RawVolumeLog,
   ticketPrice: bigint,
-): VolumeBet {
+): VolumeEvent {
   const { eventName, args } = decodeEventLog({
     abi,
     data: log.data,
     topics: log.topics as [Hex, ...Hex[]],
     strict: true,
   });
-  const a = args as unknown as { k: bigint; bettor: Address; amount?: bigint };
-  if (eventName !== "BinaryBet" && eventName !== "TicketBought")
-    throw Error("Unexpected event");
-  if (
-    typeof a.k !== "bigint" ||
-    !isAddress(a.bettor) ||
-    (eventName === "BinaryBet" && typeof a.amount !== "bigint")
-  )
-    throw Error("Invalid bet arguments");
-  return {
-    bettor: a.bettor,
-    hour: a.k,
-    ticket: eventName === "TicketBought",
-    amount: eventName === "TicketBought" ? ticketPrice : a.amount!,
+  const a = args as unknown as {
+    k: bigint;
+    bettor?: Address;
+    amount?: bigint;
+    market?: number;
   };
+  if (typeof a.k !== "bigint") throw Error("Invalid event window");
+  if (eventName === "Settled") return { type: "settled", hour: a.k };
+  if (eventName === "TimedOut") return { type: "timedOut", hour: a.k };
+  if (eventName === "MarketVoided" && validMarket(a.market))
+    return { type: "voided", hour: a.k, market: a.market };
+  if (!a.bettor || !isAddress(a.bettor)) throw Error("Invalid bettor");
+  if (eventName === "TicketBought")
+    return {
+      type: "bet",
+      bettor: a.bettor,
+      hour: a.k,
+      ticket: true,
+      amount: ticketPrice,
+    };
+  if (
+    eventName === "BinaryBet" &&
+    typeof a.amount === "bigint" &&
+    validMarket(a.market)
+  )
+    return {
+      type: "bet",
+      bettor: a.bettor,
+      hour: a.k,
+      ticket: false,
+      market: a.market,
+      amount: a.amount,
+    };
+  throw Error("Unexpected or invalid volume event");
 }
 interface Checkpoint {
   lastBlock: bigint;
   lastHash?: Hex;
   complete: boolean;
-  wallets: Map<string, WalletVolume>;
+  windows: Map<string, VolumeWindow>;
 }
 export interface ScanProgress {
   scanned: bigint;
@@ -208,6 +313,7 @@ export interface ScanProgress {
 }
 export interface VolumeSnapshot {
   rows: RankedWallet[];
+  unranked: WalletVolume[];
   lastBlock: bigint;
   cached: boolean;
 }
@@ -216,7 +322,8 @@ export interface VolumeScannerOptions {
   address: Address;
   deploymentBlock: bigint;
   abi: Abi;
-  decode: (log: RawVolumeLog) => VolumeBet;
+  decode: (log: RawVolumeLog) => VolumeEvent;
+  excludedAddresses?: readonly Address[];
   rpc: RpcCall;
   storage?: Pick<Storage, "getItem" | "setItem">;
   // Include the aggregation rule version so a price/rule change invalidates cache.
@@ -241,51 +348,68 @@ export class VolumeScanner {
     return {
       lastBlock: this.options.deploymentBlock - 1n,
       complete: false,
-      wallets: new Map(),
+      windows: new Map(),
     };
   }
   private parse(raw: string): Checkpoint {
     const data = JSON.parse(raw);
+    const decimal = (v: unknown): v is string =>
+      typeof v === "string" && /^(0|[1-9]\d*)$/.test(v);
     if (
-      !/^\d+$/.test(data.lastBlock) ||
+      !decimal(data.lastBlock) ||
       BigInt(data.lastBlock) < this.options.deploymentBlock ||
       !blockHash(data.lastHash) ||
       typeof data.complete !== "boolean" ||
-      !Array.isArray(data.wallets)
+      !Array.isArray(data.windows)
     )
       throw Error("Invalid checkpoint");
-    const wallets = new Map<string, WalletVolume>();
-    for (const w of data.wallets) {
+    const windows = new Map<string, VolumeWindow>();
+    for (const w of data.windows) {
       if (
-        !isAddress(w.address) ||
-        !/^\d+$/.test(w.volume) ||
-        !Number.isSafeInteger(w.bets) ||
-        w.bets < 1 ||
-        !Number.isSafeInteger(w.tickets) ||
-        w.tickets < 0 ||
-        w.tickets > w.bets ||
-        !Array.isArray(w.hours) ||
-        !w.hours.length ||
-        w.hours.length > w.bets ||
-        !w.hours.every((h: unknown) => typeof h === "string" && /^\d+$/.test(h))
+        !w ||
+        !decimal(w.hour) ||
+        windows.has(w.hour) ||
+        typeof w.settled !== "boolean" ||
+        typeof w.timedOut !== "boolean" ||
+        !Array.isArray(w.voidedMarkets) ||
+        !w.voidedMarkets.every(validMarket) ||
+        new Set(w.voidedMarkets).size !== w.voidedMarkets.length ||
+        !Array.isArray(w.stakes)
       )
-        throw Error("Invalid wallet checkpoint");
-      const address = w.address.toLowerCase() as Address;
-      if (wallets.has(address) || new Set(w.hours).size !== w.hours.length)
-        throw Error("Duplicate checkpoint");
-      wallets.set(address, {
-        address,
-        volume: BigInt(w.volume),
-        bets: w.bets,
-        tickets: w.tickets,
-        hours: new Set(w.hours),
+        throw Error("Invalid window checkpoint");
+      const stakes = new Map<string, WindowStake>();
+      for (const stake of w.stakes) {
+        if (
+          !stake ||
+          !isAddress(stake.address) ||
+          !decimal(stake.volume) ||
+          !Number.isSafeInteger(stake.bets) ||
+          stake.bets < 1 ||
+          (stake.market !== null && !validMarket(stake.market))
+        )
+          throw Error("Invalid stake checkpoint");
+        const address = stake.address.toLowerCase() as Address;
+        const key = stakeKey(address, stake.market);
+        if (stakes.has(key)) throw Error("Duplicate stake checkpoint");
+        stakes.set(key, {
+          address,
+          market: stake.market,
+          volume: BigInt(stake.volume),
+          bets: stake.bets,
+        });
+      }
+      windows.set(w.hour, {
+        settled: w.settled,
+        timedOut: w.timedOut,
+        voidedMarkets: new Set(w.voidedMarkets),
+        stakes,
       });
     }
     return {
       lastBlock: BigInt(data.lastBlock),
       lastHash: data.lastHash,
       complete: data.complete,
-      wallets,
+      windows,
     };
   }
   private save() {
@@ -298,10 +422,15 @@ export class VolumeScanner {
           lastBlock: String(c.lastBlock),
           lastHash: c.lastHash,
           complete: c.complete,
-          wallets: [...c.wallets.values()].map((w) => ({
-            ...w,
-            volume: String(w.volume),
-            hours: [...w.hours],
+          windows: [...c.windows].map(([hour, w]) => ({
+            hour,
+            settled: w.settled,
+            timedOut: w.timedOut,
+            voidedMarkets: [...w.voidedMarkets],
+            stakes: [...w.stakes.values()].map((s) => ({
+              ...s,
+              volume: String(s.volume),
+            })),
           })),
         }),
       );
@@ -309,11 +438,21 @@ export class VolumeScanner {
       this.cacheAvailable = false;
     }
   }
+  private result(cached: boolean): VolumeSnapshot {
+    const wallets = walletVolumes(this.checkpoint.windows);
+    const rows = rankWallets(wallets, this.options.excludedAddresses);
+    const ranked = new Set(rows.map((w) => w.address));
+    return {
+      rows,
+      unranked: [...wallets.values()]
+        .filter((w) => !ranked.has(w.address))
+        .sort((a, b) => a.address.localeCompare(b.address)),
+      lastBlock: this.checkpoint.lastBlock,
+      cached,
+    };
+  }
   snapshot(): VolumeSnapshot | undefined {
-    const c = this.checkpoint;
-    return c.complete
-      ? { rows: rankWallets(c.wallets), lastBlock: c.lastBlock, cached: true }
-      : undefined;
+    return this.checkpoint.complete ? this.result(true) : undefined;
   }
   async scan(
     signal: AbortSignal,
@@ -390,7 +529,7 @@ export class VolumeScanner {
         }
         throw e;
       }
-      const bets: VolumeBet[] = [],
+      const events: VolumeEvent[] = [],
         seen = new Set<string>();
       for (const log of logs) {
         if (
@@ -414,7 +553,7 @@ export class VolumeScanner {
         const key = `${log.transactionHash}:${BigInt(log.logIndex)}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        bets.push(o.decode(log));
+        events.push(o.decode(log));
       }
       // Commit only whole, validated ranges. A failed request never becomes an
       // empty range, and a reload can resume an interrupted historical scan.
@@ -431,7 +570,7 @@ export class VolumeScanner {
         lastBlock: to,
         lastHash: before.hash,
         complete: false,
-        wallets: aggregateBets(bets, this.checkpoint.wallets),
+        windows: aggregateEvents(events, this.checkpoint.windows),
       };
       this.save();
       progress();
@@ -445,10 +584,6 @@ export class VolumeScanner {
     abort(signal);
     this.checkpoint.complete = true;
     this.save();
-    return {
-      rows: rankWallets(this.checkpoint.wallets),
-      lastBlock: target,
-      cached: false,
-    };
+    return this.result(false);
   }
 }

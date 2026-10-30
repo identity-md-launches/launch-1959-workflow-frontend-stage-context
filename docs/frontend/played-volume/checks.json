@@ -1,0 +1,265 @@
+{
+  "note": "Worker-run checks, not independent certification. Browser fixtures are test-only.",
+  "unitTests": {
+    "passed": 54,
+    "failed": 0
+  },
+  "productionBrowser": {
+    "results": [
+      {
+        "name": "leaderboard navigation, Top 5 preview, ENS, copy and wallet-free viewing",
+        "passed": true
+      },
+      {
+        "name": "leaderboard top 50 pagination and pinned rank outside top 50",
+        "passed": true
+      },
+      {
+        "name": "leaderboard loading progress, range fallback, error recovery and empty action",
+        "passed": true
+      },
+      {
+        "name": "leaderboard minute refresh and reload use only new logs; inactive tabs stop polling",
+        "passed": true
+      },
+      {
+        "name": "leaderboard responsive themes, long ENS, huge amounts, keyboard and accessibility",
+        "passed": true
+      },
+      {
+        "name": "leaderboard failed refresh keeps saved totals and recovers automatically",
+        "passed": true
+      },
+      {
+        "name": "leaderboard played-only volumes, market voids, timeouts, pending-only rows and team exclusion",
+        "passed": true
+      },
+      {
+        "name": "leaderboard pending survives reload and settles automatically without recounting",
+        "passed": true
+      },
+      {
+        "name": "leaderboard empty counted ranking still shows pending wallets and a muted team below",
+        "passed": true
+      },
+      {
+        "name": "jackpot total includes deposits from all hours in strip and tab",
+        "passed": true
+      },
+      {
+        "name": "rewards pool appears in Stake and HAMSTER Stats across responsive themes",
+        "passed": true
+      },
+      {
+        "name": "connected rewards share includes mature grants and excludes warm-up",
+        "passed": true
+      },
+      {
+        "name": "reward price failure leaves IMD visible and retries recover USD and APR",
+        "passed": true
+      },
+      {
+        "name": "reward checkpoint and no-earning states avoid invented release or wallet earnings",
+        "passed": true
+      },
+      {
+        "name": "390px first screen, reflow, local fonts, theme, onboarding, keyboard help",
+        "passed": true
+      },
+      {
+        "name": "exact approval, review, rejected signature, confirmed v2 bet, PNG share",
+        "passed": true
+      },
+      {
+        "name": "ticket and feed use exact IMD approvals and v2 calls",
+        "passed": true
+      },
+      {
+        "name": "My bets discovers indexed wallet bets and claims all payable hours sequentially",
+        "passed": true
+      },
+      {
+        "name": "stats ranges, dated fallback, chat signed message, cam pause, upcoming hour",
+        "passed": true
+      },
+      {
+        "name": "live speed drives night theme, stale/error telemetry does not pretend running, reduced motion",
+        "passed": true
+      },
+      {
+        "name": "contract bytecode mismatch blocks transaction before wallet send",
+        "passed": true
+      },
+      {
+        "name": "reverted approval receipt restores the approval button and links failed receipt",
+        "passed": true
+      },
+      {
+        "name": "mobile wallet picker offers four wallet browsers and Coinbase Smart Wallet",
+        "passed": true
+      },
+      {
+        "name": "all tabs, direct hashes, chat drawer on every tab, and comma formatting in a French browser",
+        "passed": true
+      },
+      {
+        "name": "offline, expired and failed live feeds never replay a remembered recording",
+        "passed": true
+      },
+      {
+        "name": "automated accessibility in day/night on play, stats and wallet sheet",
+        "passed": true
+      },
+      {
+        "name": "320/800/1440 reflow, all navigation routes and no page script errors",
+        "passed": true
+      }
+    ],
+    "pageErrors": []
+  },
+  "accessibility": [
+    {
+      "file": "leaderboard-accessibility.json",
+      "audits": 8,
+      "violations": 0
+    },
+    {
+      "file": "played-accessibility.json",
+      "audits": 8,
+      "violations": 0
+    },
+    {
+      "file": "accessibility.json",
+      "audits": 14,
+      "violations": 0
+    }
+  ],
+  "designProbe": [
+    {
+      "name": "render",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 40918,
+      "output": "renders, no script errors or missing local files\nexternal hosts: hamster-hour.hamsterhour562.workers.dev, api.dexscreener.com, ethereum.public.blockpi.network, ethereum-rpc.publicnode.com, eth.drpc.org, rpc.mevblocker.io"
+    },
+    {
+      "name": "layout",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no horizontal scroll at 320, 390 or 1440\nno text box overlaps another\nno floating control covers text\nno text cut off by overflow: hidden"
+    },
+    {
+      "name": "targets",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all 23 controls at least 24px or spaced at 390\n19 under the 44px comfortable size"
+    },
+    {
+      "name": "contrast",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all measured text meets 4.5:1 (3:1 large)"
+    },
+    {
+      "name": "casing",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "no all-caps text in content"
+    },
+    {
+      "name": "tracking",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "letter-spacing natural in content (display type may run tight)"
+    },
+    {
+      "name": "eyebrows",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 1,
+      "output": "1 kicker labels above headings:\n390px: \"The wheel\" above \"Bet on the hamster\" (div.site.wheel-page > header.site-header > nav > a.active:nth-of-type(1))"
+    },
+    {
+      "name": "type-sizes",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "390: 4 sizes in use, 4 with one-offs (12px\u00d730, 14px\u00d77, 16px\u00d72, 40px\u00d72)\n1440: 3 sizes in use, 6 with one-offs (12px\u00d727, 14px\u00d725, 16px\u00d71, 20px\u00d77, 40px\u00d71, 88px\u00d71)\nbar: 6 sizes used more than once, 8 counting one-offs, per width"
+    },
+    {
+      "name": "type-faces",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "families (2): geist, silkscreen\nweights (3): 400, 600, 700"
+    },
+    {
+      "name": "glyphs",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no em dashes or emoji in text"
+    },
+    {
+      "name": "slogans",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "2 two-beat lines; a stack is four or more, so keep the best and cut the rest:\n\"A real hamster. Bets in IMD.\" (#main > div.hero:nth-of-type(1) > div:nth-of-type(1) > p)\n\"Bet on the hamster. A real hamster. Bets in IMD.\" (#main > div.hero:nth-of-type(1) > div:nth-of-type(1))"
+    },
+    {
+      "name": "repetition",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no repeated lines"
+    },
+    {
+      "name": "copy-budget",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "prose on the first screen: 6 words at 390 (bar 60), 6 at 1440 (bar 90)\nall words on the first screen: 99 at 390, 113 at 1440\nwhole page: 162 words, 29 of them prose"
+    },
+    {
+      "name": "chrome",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 0,
+      "output": "border and shadow together: 5 (#bet-panel > div.sides:nth-of-type(4) > button.side.side-over:nth-of-type(1); #bet-panel > div.sides:nth-of-type(4) > button.side.side-under:nth-of-type(2); #bet-panel > div.sides:nth-of-type(4) > button.side.side-snooze:nth-of-type(3))\ncards inside cards: 1 (#bet-form > div.amount-control:nth-of-type(2) in #bet-panel)\ngradient text: 0"
+    },
+    {
+      "name": "motion",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "transition: all on 0 elements\nendless animations: 3; still running with reduced motion: 0"
+    },
+    {
+      "name": "share",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "title \"Hamster Hour \u00b7 Bet on the hamster.\", favicon, og:title, og:image, description"
+    }
+  ],
+  "liveSnapshot": {
+    "throughBlock": "26306529",
+    "countedImd": "0",
+    "pendingImd": "8",
+    "refundedImd": "5",
+    "bets": 10,
+    "teamBets": 3
+  },
+  "exportBytesIncludingManifest": 1309918,
+  "limitations": [
+    "WebKit launch failed: missing host libraries (including libgtk-4.so.1 and GStreamer).",
+    "Live local-origin telemetry CORS failures and some public-RPC HTTP/CORS failures; leaderboard fallback completed.",
+    "No native zoom, screen-reader, physical-device, passkey or real signing test."
+  ]
+}

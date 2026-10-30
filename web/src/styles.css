@@ -32,6 +32,7 @@
   --ink: #2b2118;
   --muted: #796451;
   --muted-brand: #8a7765;
+  --leaderboard-muted: #6f6b66;
   --line: #e9d9c3;
   --peach: #ffb48a;
   --butter: #ffe08a;
@@ -57,6 +58,7 @@
   --card: #29233d;
   --ink: #fff5e6;
   --muted: #beafcf;
+  --leaderboard-muted: #bdb7c7;
   --line: #493d5b;
   --hover: #362e4b;
   --focus: #ffe08a;
@@ -3630,6 +3632,33 @@ dialog::backdrop {
 }
 .leaderboard-unit {
   font-size: var(--small);
+  font-weight: 400;
+}
+.leaderboard-pending {
+  color: var(--leaderboard-muted);
+  overflow-wrap: anywhere;
+}
+.leaderboard-team {
+  margin-top: 20px;
+  color: var(--leaderboard-muted);
+}
+.leaderboard-team thead {
+  /* Keep column sizing and accessible headers without repeating visual labels. */
+  height: 0;
+}
+.leaderboard-team thead th {
+  padding-block: 0;
+}
+.leaderboard-team thead th > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.leaderboard-team .leaderboard-volume strong {
   font-weight: 400;
 }
 .leaderboard-mobile-label {
