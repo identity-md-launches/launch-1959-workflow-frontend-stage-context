@@ -4,7 +4,8 @@ import { parseAbi } from "viem";
 // Block 26,229,404 has no code; block 26,229,405 has the deployed runtime.
 // The address itself continues to come from the verified runtime handoff.
 export const LEADERBOARD_DEPLOYMENT_BLOCK = 26_229_405n;
-export const LEADERBOARD_REWARD_TEXT: string = "";
+export const LEADERBOARD_REWARD_TEXT: string =
+  "Top 5 by volume get a WL for the @squeekchain NFT mint";
 // Explicit team exclusion supplied for the leaderboard; never used for transactions.
 export const LEADERBOARD_TEAM = "0x6cba4751742f6989fa224b2dc5d5d52fcef98a34";
 export const LEADERBOARD_CACHE_VERSION = "v2-played-ticket-5-imd";

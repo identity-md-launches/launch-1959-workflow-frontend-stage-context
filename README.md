@@ -1,6 +1,6 @@
 # Hamster Hour
 
-A cozy pixel betting app for the live HamsterHour v2 contract on Ethereum, with a compact betting home and seven top tabs. The finished static site is in [`dist/`](dist/); editable React/TypeScript source is in [`web/src/`](web/src/). The existing `hamsterhour.fun` domain and worker hostname are retained. Nothing is deployed, published, re-minted or signed by this repository update.
+A cozy pixel betting app for the live HamsterHour v2 contract on Ethereum, with a compact betting home and eight top tabs. The finished static site is in [`dist/`](dist/); editable React/TypeScript source is in [`web/src/`](web/src/). The existing `hamsterhour.fun` domain and worker hostname are retained. Nothing is deployed, published, re-minted or signed by this repository update.
 
 ## Install, preview and rebuild
 
@@ -49,7 +49,7 @@ Live wheel video, hardware status, settlement telemetry and signed chat retain t
 
 ## Pages and live data
 
-The wheel has the headline and “New here?”, one shared camera/hamster frame, this hour’s passes and six seeds, the bet form, a compact jackpot strip one-line live activity, and a Top 5 leaderboard preview at the bottom. On phones the frame precedes the form; its amount and main action are on the first 390×844 screen. Jackpot contains the full jar, hour selector, ticket purchase, feeding and feeds. Stats contains the usual-day chart and completed-window history. My bets retains claims, and Agents contains the skill. Chat opens from the small bottom-right button on every tab. All seven pages use hash links, including direct links and browser back/forward.
+The wheel has the headline and “New here?”, one shared camera/hamster frame, this hour’s passes and six seeds, the bet form, a compact jackpot strip one-line live activity, and a Top 5 leaderboard preview at the bottom. On phones the frame precedes the form; its amount and main action are on the first 390×844 screen. Jackpot contains the full jar, hour selector, ticket purchase, feeding and feeds. Stats contains the usual-day chart and completed-window history. My bets retains claims, and Agents contains the skill. Chat opens from the small bottom-right button on every tab. All eight pages use hash links, including direct links and browser back/forward.
 
 The camera is embedded only when `/live` explicitly says live, supplies a supported ID, and its `observedAt` and `validUntil` establish freshness. Expired/offline/failed checks show the existing telemetry-driven pixel hamster in the same frame. Remembered stream IDs and the old hard-coded recording fallback are gone. The wake note chooses the first future local hour whose 7-day mean is at least 100 passes. Pass counts, amounts and records use comma grouping independent of browser locale; times remain local.
 
@@ -81,7 +81,17 @@ Public RPCs are BlockPI, MEV Blocker, PublicNode, LlamaRPC, dRPC and Cloudflare.
 
 The wheel preview and Leaderboard refresh every 60 seconds while their tab is active. Failed scans retry after 15 seconds and offer Retry now. Leaving those tabs aborts the scan and stops its timer; returning to a visible document resumes. Previously complete totals remain labelled with their block during a failed refresh. Newly mined data can change after a reorg; every displayed snapshot names its last block.
 
-Edit **`LEADERBOARD_REWARD_TEXT`** in `web/src/leaderboard-config.ts` to add reward copy below “Top 5 by volume”; its default is empty. Rebuild the export after editing. No rewards, contract settings or transactions are added. The optional loss column is omitted: this game's `lossOf` takes both a window and a wallet, rather than the single-address view in the brief.
+Edit **`LEADERBOARD_REWARD_TEXT`** in `web/src/leaderboard-config.ts` to add reward copy below “Top 5 by volume”; its default is “Top 5 by volume get a WL for the @squeekchain NFT mint”. Both the guide and the leaderboard use this same constant. Rebuild the export after editing. No rewards, contract settings or transactions are added. The optional loss column is omitted: this game's `lossOf` takes both a window and a wallet, rather than the single-address view in the brief.
+
+## How to play
+
+Open **How to play** in the header, use the help link below the bet form, or visit `/#docs`. The guide keeps the cozy pixel design and explains the hour, three markets, fees, refunds, mining, staking, leaderboard, agents and safety in eleven short sections. A sticky desktop contents list becomes a collapsible menu on phones; section links, copy buttons and eight native FAQ accordions work without a wallet.
+
+`web/src/Docs.tsx` contains the guide and `web/src/docs-rules.ts` the immutable explanatory constants. The current line, jar (`jackpotSeed + totalPendingJackpotDeposits`) and current/next window times come from the existing queries every 15 seconds. The current mining rate is also read from the vault. Failed reads leave the rules available, show unknown live values and offer retry. The reward message remains configurable in the single `LEADERBOARD_REWARD_TEXT` constant.
+
+The [rule verification map](docs/frontend/HOW-TO-PLAY-SOURCES.md) links every rule to the exact deployed source and [live/compiled evidence](docs/frontend/how-to-play/contracts.json). Source compilation reproduced the four requested runtimes and the vault's immutable mining engine. Numeric constants were separately read onchain; no contract, address, ABI, approval or betting logic was changed.
+
+Guide checks: `HH_TEST=docs node tests/browser.mjs` with the same Playwright settings as above. Full regression, build and review results are recorded in [HOW-TO-PLAY-VALIDATION.md](docs/frontend/HOW-TO-PLAY-VALIDATION.md).
 
 ## Worker and agent handoff
 
@@ -93,4 +103,6 @@ Edit **`LEADERBOARD_REWARD_TEXT`** in `web/src/leaderboard-config.ts` to add rew
 
 Current played-volume results, six-domain Better Interface coverage and limitations are recorded in [PLAYED-VOLUME-VALIDATION.md](docs/frontend/PLAYED-VOLUME-VALIDATION.md). The earlier unfiltered leaderboard review remains in [LEADERBOARD-VALIDATION.md](docs/frontend/LEADERBOARD-VALIDATION.md) as historical evidence; its old counting rules are superseded above. Earlier rewards/jackpot results remain in [REWARDS-VALIDATION.md](docs/frontend/REWARDS-VALIDATION.md). Earlier polish evidence remains in [POLISH-VALIDATION.md](docs/frontend/POLISH-VALIDATION.md). [DESIGN.md](DESIGN.md) describes the final source. The preceding implementation’s evidence remains in [V2-VALIDATION.md](docs/frontend/V2-VALIDATION.md).
 
-The played-volume revision ran the production build, a separate typecheck, ABI/export verification and 54 unit/worker tests successfully. All 27 production Chromium interaction scenarios passed, including nine leaderboard scenarios. Sixteen targeted leaderboard accessibility audits passed. The design probe passed 14/16, with the two existing-style exceptions documented. Rendered review, public-RPC observations and remaining platform limits are in the current validation report. Test fixtures are confined to tests; the delivered app uses real on-chain events. No real transaction or production chat post was sent, and no website or worker was published.
+The earlier played-volume revision ran the production build, a separate typecheck, ABI/export verification and 54 unit/worker tests successfully. All 27 production Chromium interaction scenarios passed, including nine leaderboard scenarios. Sixteen targeted leaderboard accessibility audits passed. The design probe passed 14/16, with the two existing-style exceptions documented. Rendered review, public-RPC observations and remaining platform limits are in the current validation report. Test fixtures are confined to tests; the delivered app uses real on-chain events. No real transaction or production chat post was sent, and no website or worker was published.
+
+The How to play update passed the production build, a separate typecheck, export verification and all 54 unit/worker tests. The complete Chromium regression passed 32/32 scenarios, and the final guide-only run passed 5/5 with eight targeted accessibility audits and no reported violations. Both theme layouts were checked from 320 to 1440px. The design probe reports 14/16 for the wheel and 13/16 for the guide, retaining the requested pixel button treatment, navigation pills and market/token names. WebKit could not launch because required system libraries are missing; live wallet spending, native devices and native zoom remain untested. Full results and source verification are linked above.

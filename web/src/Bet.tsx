@@ -300,6 +300,9 @@ export function BetPanel({
           </a>
         </div>
       </form>
+      <a className="bet-docs-link" href="#docs">
+        New here? Read how it works ↗
+      </a>
       <TransactionStatus r={r} />
       <p className="error" id="bet-error" role="status">
         {error}

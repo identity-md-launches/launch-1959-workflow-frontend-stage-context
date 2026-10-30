@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "name": "docs mobile entry, contents, deep links, back and keyboard FAQ",
+      "passed": true
+    },
+    {
+      "name": "docs live line, jackpot and UTC windows refresh from contract reads",
+      "passed": true
+    },
+    {
+      "name": "docs read failure preserves rules, hides stale values and retries",
+      "passed": true
+    },
+    {
+      "name": "docs contract links, clipboard, agent command and destination tabs",
+      "passed": true
+    },
+    {
+      "name": "docs fee tables, mining schedule, responsive themes and accessibility",
+      "passed": true
+    }
+  ],
+  "pageErrors": []
+}

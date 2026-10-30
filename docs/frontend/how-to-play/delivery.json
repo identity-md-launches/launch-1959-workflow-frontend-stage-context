@@ -1,0 +1,163 @@
+{
+  "scope": "Conservative sum of complete added/modified files; deleted files excluded. Scratch is removed by the task runner.",
+  "limitBytes": 8388608,
+  "protectedFilesChanged": [],
+  "ignoreFilesChanged": false,
+  "submodules": false,
+  "generatedDependencyDirectoriesAdded": false,
+  "staticAssetUrlsRelative": true,
+  "sourceManifestAndLockPreserved": true,
+  "testedExportByteMatch": true,
+  "exportFiles": 26,
+  "exportBytes": 1342500,
+  "agentDiscoveryArchivePreserved": true,
+  "build": {
+    "production": "passed",
+    "typecheck": "passed",
+    "unitTests": {
+      "passed": 54,
+      "total": 54
+    },
+    "browserRegression": {
+      "passed": 32,
+      "total": 32
+    },
+    "finalGuideScenarios": {
+      "passed": 5,
+      "total": 5
+    },
+    "guideAxeAudits": 8,
+    "guideAxeViolations": 0,
+    "wheelTastePassed": 14,
+    "docsTastePassed": 13,
+    "tasteTotal": 16,
+    "webkit": "Could not launch: required host libraries missing"
+  },
+  "changedFileBytes": 3202278,
+  "files": [
+    {
+      "path": "DESIGN.md",
+      "bytes": 26363
+    },
+    {
+      "path": "README.md",
+      "bytes": 19098
+    },
+    {
+      "path": "dist/assets/ccip-Vp5AodpY.js",
+      "bytes": 2830
+    },
+    {
+      "path": "dist/assets/dist-BZ8eLg6h.js",
+      "bytes": 96217
+    },
+    {
+      "path": "dist/assets/index-Ct27Z1wW.css",
+      "bytes": 61468
+    },
+    {
+      "path": "dist/assets/index-DUlgJHBM.js",
+      "bytes": 786824
+    },
+    {
+      "path": "dist/imd-deployment.json",
+      "bytes": 5617
+    },
+    {
+      "path": "dist/index.html",
+      "bytes": 1333
+    },
+    {
+      "path": "docs/frontend/HOW-TO-PLAY-SOURCES.md",
+      "bytes": 10060
+    },
+    {
+      "path": "docs/frontend/HOW-TO-PLAY-VALIDATION.md",
+      "bytes": 14409
+    },
+    {
+      "path": "docs/frontend/how-to-play/accessibility.json",
+      "bytes": 556
+    },
+    {
+      "path": "docs/frontend/how-to-play/contracts.json",
+      "bytes": 11734
+    },
+    {
+      "path": "docs/frontend/how-to-play/delivery.json",
+      "bytes": 3568
+    },
+    {
+      "path": "docs/frontend/how-to-play/docs-1440-day.png",
+      "bytes": 692644
+    },
+    {
+      "path": "docs/frontend/how-to-play/docs-390-day.png",
+      "bytes": 261588
+    },
+    {
+      "path": "docs/frontend/how-to-play/docs-390-night.png",
+      "bytes": 228815
+    },
+    {
+      "path": "docs/frontend/how-to-play/docs-focus-390.png",
+      "bytes": 228771
+    },
+    {
+      "path": "docs/frontend/how-to-play/docs-wheel-390.png",
+      "bytes": 267608
+    },
+    {
+      "path": "docs/frontend/how-to-play/interactions.json",
+      "bytes": 630
+    },
+    {
+      "path": "docs/frontend/how-to-play/regression.json",
+      "bytes": 4051
+    },
+    {
+      "path": "docs/frontend/how-to-play/rendered-styles.json",
+      "bytes": 3469
+    },
+    {
+      "path": "docs/frontend/how-to-play/taste-docs.json",
+      "bytes": 156320
+    },
+    {
+      "path": "docs/frontend/how-to-play/taste-wheel.json",
+      "bytes": 73752
+    },
+    {
+      "path": "web/README.md",
+      "bytes": 3816
+    },
+    {
+      "path": "web/src/App.tsx",
+      "bytes": 20358
+    },
+    {
+      "path": "web/src/Bet.tsx",
+      "bytes": 12276
+    },
+    {
+      "path": "web/src/Docs.tsx",
+      "bytes": 31089
+    },
+    {
+      "path": "web/src/docs-rules.ts",
+      "bytes": 1915
+    },
+    {
+      "path": "web/src/leaderboard-config.ts",
+      "bytes": 1557
+    },
+    {
+      "path": "web/src/styles.css",
+      "bytes": 79065
+    },
+    {
+      "path": "web/tests/browser.mjs",
+      "bytes": 94477
+    }
+  ]
+}

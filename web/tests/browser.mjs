@@ -153,6 +153,11 @@ function reset() {
     ensName: "tiny-athlete.eth",
     ensMismatch: false,
     walletAccount: account,
+    docsLine: 2100n,
+    docsSeed: 125n * W,
+    docsPending: 33n * W,
+    docsHourShift: 0n,
+    docsReadFailure: false,
   };
   addLog(
     "BinaryBet",
@@ -229,7 +234,7 @@ function windowInfo(k) {
     endsAt: GENESIS + (k + 1n) * 3600n,
     closesAt: GENESIS + k * 3600n,
     timeoutAt: GENESIS + (k + 1n) * 3600n + 172800n,
-    line: 2100n,
+    line: state.docsLine,
     result: k < current ? 2300n : 0n,
     over: k < current - 2n ? 0n : 10n * W,
     under: k < current - 2n ? 0n : 10n * W,
@@ -463,14 +468,14 @@ function rpc(method, params) {
       const globals = {
         IMD: token,
         GENESIS,
-        currentWindow: current,
-        earliestNotStartedWindow: next,
-        line: 2100n,
-        jackpotSeed: 125n * W,
+        currentWindow: current + state.docsHourShift,
+        earliestNotStartedWindow: next + state.docsHourShift,
+        line: state.docsLine,
+        jackpotSeed: state.docsSeed,
         jackpotInFlight: 3n * W,
         jackpotOutstanding: 80n * W,
         nextFinalizeWindow: current,
-        totalPendingJackpotDeposits: 33n * W,
+        totalPendingJackpotDeposits: state.docsPending,
       };
       result =
         fn in globals
@@ -716,11 +721,18 @@ async function pageFor({
               },
             });
         }
-        const one = (x) => ({
-          jsonrpc: "2.0",
-          id: x.id,
-          result: rpc(x.method, x.params ?? []),
-        });
+        const one = (x) =>
+          state.docsReadFailure && x.method === "eth_call"
+            ? {
+                jsonrpc: "2.0",
+                id: x.id,
+                error: { code: -32000, message: "Read unavailable" },
+              }
+            : {
+                jsonrpc: "2.0",
+                id: x.id,
+                result: rpc(x.method, x.params ?? []),
+              };
         return route.fulfill({
           json: Array.isArray(payload) ? payload.map(one) : one(payload),
         });
@@ -828,8 +840,11 @@ async function pageFor({
   await page.goto(url + `#${initialTab}`);
   await page
     .getByRole("heading", {
-      name:
-        initialTab === "leaderboard" ? "Leaderboard." : "Bet on the hamster.",
+      name: initialTab.startsWith("docs")
+        ? "How to play."
+        : initialTab === "leaderboard"
+          ? "Leaderboard."
+          : "Bet on the hamster.",
     })
     .waitFor();
   if (initialTab === "play")
@@ -869,6 +884,418 @@ async function check(name, fn) {
   }
 }
 try {
+  await check(
+    "docs mobile entry, contents, deep links, back and keyboard FAQ",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        walletAvailable: false,
+        liveState: "offline",
+      });
+      const action = await page
+        .getByRole("button", { name: "Connect to bet" })
+        .boundingBox();
+      assert.ok(
+        action && action.y + action.height <= 844,
+        "Primary bet action fits the first mobile screen",
+      );
+      await page.screenshot({ path: resolve(out, "docs-wheel-390.png") });
+      await page
+        .getByRole("link", { name: "New here? Read how it works" })
+        .click();
+      await page.getByRole("heading", { name: "How to play." }).waitFor();
+      assert.equal(new URL(page.url()).hash, "#docs");
+      assert.equal(
+        await page.locator('.site-header a[aria-current="page"]').innerText(),
+        "How to play",
+      );
+      assert.equal(await page.locator(".docs-section").count(), 11);
+      assert.equal(await page.locator(".docs-faq details").count(), 8);
+      assert.equal(await page.locator("#docs-contents").isVisible(), false);
+      await page.getByRole("button", { name: "In this guide" }).click();
+      assert.equal(await page.locator("#docs-contents a").count(), 11);
+      await page
+        .getByRole("navigation", { name: "Guide contents" })
+        .getByRole("link", { name: "Refunds and claims" })
+        .click();
+      await page.waitForFunction(
+        () => document.activeElement?.id === "docs-refunds",
+      );
+      assert.equal(await page.locator("#docs-contents").isVisible(), false);
+      await page.reload();
+      await page.waitForFunction(
+        () => document.activeElement?.id === "docs-refunds",
+      );
+      assert.ok((await page.locator("#docs-refunds").boundingBox()).y < 60);
+      await page.goto(url + "#docs-faq");
+      await page.waitForFunction(
+        () => document.activeElement?.id === "docs-faq",
+      );
+      await page.keyboard.press("Tab");
+      assert.ok(
+        (
+          await page.evaluate(() => document.activeElement.textContent)
+        ).includes("Why was my bet refunded?"),
+      );
+      await page.keyboard.press("Enter");
+      await page.waitForFunction(
+        () => document.querySelector(".docs-faq details").open,
+      );
+      assert.equal(
+        await page.locator(".docs-faq details").first().getAttribute("open"),
+        "",
+      );
+      await page.keyboard.press("Space");
+      await page.waitForFunction(
+        () => !document.querySelector(".docs-faq details").open,
+      );
+      assert.equal(
+        await page.locator(".docs-faq details").first().getAttribute("open"),
+        null,
+      );
+      for (const summary of await page.locator(".docs-faq summary").all()) {
+        await summary.click();
+        assert.equal(await summary.locator("..").getAttribute("open"), "");
+      }
+      await page
+        .locator(".docs-faq")
+        .screenshot({ path: resolve(out, "docs-faq-390.png") });
+      await page.locator(".docs-body a[href='#my-bets']").first().click();
+      await page
+        .getByRole("heading", { name: "Your place by the wheel." })
+        .waitFor();
+      await page.goBack();
+      await page.getByRole("heading", { name: "How to play." }).waitFor();
+      assert.deepEqual(state.txs, []);
+      await context.close();
+    },
+  );
+  await check(
+    "docs live line, jackpot and UTC windows refresh from contract reads",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 1440,
+        initialTab: "docs",
+        locale: "de-DE",
+        walletAvailable: false,
+      });
+      await page
+        .locator('[data-testid="docs-live-line"]')
+        .filter({ hasText: "2,100 passes" })
+        .waitFor();
+      assert.equal(
+        await page.locator('[data-testid="docs-live-jar"]').innerText(),
+        "158 IMD",
+      );
+      const oldHour = await page
+        .locator('[data-testid="docs-live-hour"]')
+        .innerText();
+      state.docsLine = 7777n;
+      state.docsSeed = 200n * W;
+      state.docsPending = 31n * W;
+      state.docsHourShift = 1n;
+      await page.clock.fastForward(15_100);
+      await page
+        .locator('[data-testid="docs-live-line"]')
+        .filter({ hasText: "7,777 passes" })
+        .waitFor();
+      await page
+        .locator('[data-testid="docs-live-jar"]')
+        .filter({ hasText: "231 IMD" })
+        .waitFor();
+      await page.waitForFunction(
+        (before) =>
+          document.querySelector('[data-testid="docs-live-hour"]')
+            .textContent !== before,
+        oldHour,
+      );
+      assert.ok(
+        (await page.locator(".docs-markets").innerText()).includes(
+          "7,778 passes is OVER; 7,777 is UNDER",
+        ),
+      );
+      await page.waitForFunction(() =>
+        [...document.querySelectorAll(".docs-hour-times dd")].every((e) =>
+          e.textContent.endsWith("UTC"),
+        ),
+      );
+      const dates = await page.locator(".docs-hour-times dd").allTextContents();
+      assert.ok(dates.every((d) => d.endsWith("UTC")));
+      assert.equal(
+        await page
+          .locator(".docs-toc")
+          .evaluate((e) => getComputedStyle(e).position),
+        "sticky",
+      );
+      await page.locator("#docs-markets").scrollIntoViewIfNeeded();
+      const toc = await page.locator(".docs-toc").boundingBox();
+      assert.ok(
+        toc.y >= 0 && toc.y < 60,
+        "Desktop contents remains in view while reading",
+      );
+      await context.close();
+    },
+  );
+  await check(
+    "docs read failure preserves rules, hides stale values and retries",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        initialTab: "docs",
+        walletAvailable: false,
+      });
+      await page
+        .locator('[data-testid="docs-live-line"]')
+        .filter({ hasText: "2,100" })
+        .waitFor();
+      state.docsReadFailure = true;
+      await page.clock.fastForward(15_100);
+      await page.clock.fastForward(5_000);
+      await page
+        .getByRole("button", { name: "Retry live values" })
+        .waitFor({ timeout: 20000 });
+      assert.equal(
+        await page.locator('[data-testid="docs-live-line"]').innerText(),
+        "—",
+      );
+      assert.ok(
+        (await page.locator(".docs-body").innerText()).includes(
+          "Claims do not expire",
+        ),
+      );
+      await page.screenshot({ path: resolve(out, "docs-error-390.png") });
+      state.docsReadFailure = false;
+      await page.getByRole("button", { name: "Retry live values" }).click();
+      await page
+        .locator('[data-testid="docs-live-line"]')
+        .filter({ hasText: "2,100" })
+        .waitFor();
+      assert.equal(
+        await page.getByRole("button", { name: "Retry live values" }).count(),
+        0,
+      );
+      await context.close();
+    },
+  );
+  await check(
+    "docs contract links, clipboard, agent command and destination tabs",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 1440,
+        initialTab: "docs",
+        walletAvailable: false,
+      });
+      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+      for (const [label, address] of [
+        ["Game", game],
+        ["HamsterVault", vault],
+        ["HAMSTER token", hamster],
+        ["HamsterHook", hook],
+        ["IMD token", token],
+      ]) {
+        const link = page.getByRole("link", {
+          name: `${label} on Etherscan: ${address}`,
+        });
+        assert.equal(
+          await link.getAttribute("href"),
+          `https://etherscan.io/address/${address}`,
+        );
+        assert.equal(
+          (await link.innerText()).toLowerCase(),
+          address.toLowerCase(),
+        );
+        await page
+          .getByRole("button", { name: `Copy ${label} address`, exact: true })
+          .click();
+        assert.equal(
+          (
+            await page.evaluate(() => navigator.clipboard.readText())
+          ).toLowerCase(),
+          address.toLowerCase(),
+        );
+      }
+      await page
+        .getByRole("button", {
+          name: "Copy agent install command",
+          exact: true,
+        })
+        .click();
+      assert.equal(
+        await page.evaluate(() => navigator.clipboard.readText()),
+        "npx skills add https://hamsterhour.fun",
+      );
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: { writeText: () => Promise.reject(Error("Denied")) },
+        });
+      });
+      await page
+        .getByRole("button", { name: "Copy Game address", exact: true })
+        .click();
+      await page
+        .locator(".docs-contracts li")
+        .first()
+        .getByText("Select and copy the text above.")
+        .waitFor();
+      await page
+        .locator(".docs-body")
+        .getByRole("link", { name: "See the Leaderboard" })
+        .click();
+      await page.getByRole("heading", { name: "Leaderboard." }).waitFor();
+      assert.ok(
+        (await page.locator(".leaderboard-page").innerText()).includes(
+          "Top 5 by volume get a WL for the @squeekchain NFT mint",
+        ),
+      );
+      await page.goBack();
+      await page
+        .locator(".docs-body")
+        .getByRole("link", { name: "Open the Agents tab" })
+        .click();
+      await page
+        .getByRole("heading", { name: "AI agents can play." })
+        .waitFor();
+      await page.goBack();
+      await page
+        .locator(".docs-intro")
+        .getByRole("link", { name: "Make a pick" })
+        .click();
+      await page
+        .getByRole("heading", { name: "Bet on the hamster." })
+        .waitFor();
+      assert.deepEqual(state.txs, []);
+      await context.close();
+    },
+  );
+  await check(
+    "docs fee tables, mining schedule, responsive themes and accessibility",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        initialTab: "docs",
+        walletAvailable: false,
+      });
+      await page
+        .locator('[data-testid="docs-live-line"]')
+        .filter({ hasText: "2,100" })
+        .waitFor();
+      assert.deepEqual(
+        await page
+          .locator(".docs-fee-grid table")
+          .first()
+          .locator("tbody td")
+          .allTextContents(),
+        ["5%", "2%", "1%", "1%", "91%"],
+      );
+      assert.deepEqual(
+        await page
+          .locator(".docs-fee-grid table")
+          .last()
+          .locator("tbody td")
+          .allTextContents(),
+        ["5%", "93%", "1%", "1%", "From the jar*"],
+      );
+      assert.deepEqual(
+        await page.locator(".docs-halvings tbody td").allTextContents(),
+        ["20,000", "10,000", "5,000", "2,500"],
+      );
+      assert.ok(
+        (await page.locator(".docs-worked").innerText()).includes("13.65 IMD"),
+      );
+      const audits = [];
+      for (const width of [320, 390, 800, 900, 1024, 1440]) {
+        await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
+        for (const theme of ["day", "night"]) {
+          await page.evaluate((t) => {
+            document.documentElement.dataset.theme = t;
+          }, theme);
+          assert.equal(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth > innerWidth,
+            ),
+            false,
+            `${width} ${theme}`,
+          );
+          assert.equal(
+            await page
+              .locator(".docs-body")
+              .evaluate((e) => e.scrollWidth > e.clientWidth + 1),
+            false,
+            `docs overflow ${width} ${theme}`,
+          );
+          for (const table of await page.locator(".docs-fees").all())
+            assert.equal(
+              await table.evaluate((e) => e.scrollWidth > e.clientWidth + 1),
+              false,
+            );
+          if ([320, 390, 800, 1440].includes(width)) {
+            const audit = await new AxeBuilder({ page })
+              .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+              .analyze();
+            audits.push({ width, theme, violations: audit.violations });
+          }
+          if ([390, 1440].includes(width)) {
+            await page.evaluate(() => {
+              document.querySelector(".site").scrollTop = 0;
+              window.scrollTo(0, 0);
+            });
+            await page.screenshot({
+              path: resolve(out, `docs-${width}-${theme}.png`),
+            });
+            if (width === 390 && theme === "day")
+              await page.screenshot({
+                path: resolve(out, "docs-full-390.png"),
+                fullPage: true,
+              });
+          }
+        }
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.evaluate(() => {
+        document.documentElement.dir = "rtl";
+      });
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > innerWidth,
+        ),
+        false,
+        "RTL reflow",
+      );
+      await page.evaluate(() => {
+        document.documentElement.dir = "ltr";
+      });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      assert.equal(
+        await page
+          .locator(".docs-page")
+          .evaluate(
+            (e) =>
+              e
+                .getAnimations({ subtree: true })
+                .filter((a) => a.playState === "running").length,
+          ),
+        0,
+      );
+      await page.getByRole("button", { name: "In this guide" }).focus();
+      assert.equal(
+        await page.evaluate(
+          () => getComputedStyle(document.activeElement).outlineStyle,
+        ),
+        "solid",
+      );
+      await page.screenshot({ path: resolve(out, "docs-focus-390.png") });
+      await writeFile(
+        resolve(out, "docs-accessibility.json"),
+        JSON.stringify(audits, null, 2),
+      );
+      assert.deepEqual(
+        audits.flatMap((a) => a.violations),
+        [],
+      );
+      await context.close();
+    },
+  );
   await check(
     "leaderboard navigation, Top 5 preview, ENS, copy and wallet-free viewing",
     async () => {

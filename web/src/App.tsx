@@ -26,6 +26,7 @@ import { CardHead, Help, Icon } from "./ui";
 import { Share } from "./Share";
 import { imd, shortAddress, number } from "./model";
 import { blip } from "./sound";
+import { Docs } from "./Docs";
 const tabs = [
   ["play", "The wheel"],
   ["jackpot", "Jackpot"],
@@ -34,11 +35,14 @@ const tabs = [
   ["my-bets", "My bets"],
   ["agents", "Agents"],
   ["hamster", "$HAMSTER"],
+  ["docs", "How to play"],
 ] as const;
 const currentTab = () =>
-  tabs.some(([id]) => location.hash === `#${id}`)
-    ? location.hash.slice(1)
-    : "play";
+  location.hash.startsWith("#docs-")
+    ? "docs"
+    : tabs.some(([id]) => location.hash === `#${id}`)
+      ? location.hash.slice(1)
+      : "play";
 const stored = (key: string, fallback: string) => {
   try {
     return localStorage.getItem(key) ?? fallback;
@@ -339,7 +343,9 @@ function Game({ r }: { r: Runtime }) {
         </div>
       </header>
       <main id="main" tabIndex={-1}>
-        {tab === "stats" ? (
+        {tab === "docs" ? (
+          <Docs r={r} />
+        ) : tab === "stats" ? (
           <Stats
             r={r}
             g={global.data}

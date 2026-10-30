@@ -1,0 +1,298 @@
+{
+  "verification": "Worker-side reads and local source compilation; not an independent audit.",
+  "liveReads": {
+    "chainId": 1,
+    "block": "26307073",
+    "timestamp": "1793381375",
+    "publicRpcSource": "https://ethereum-rpc.publicnode.com",
+    "contracts": {
+      "game": {
+        "address": "0xe33ab493249a2df0d8c4a71ac54f46d1f7778367",
+        "runtimeKeccak": "0x1e66fecb356e22bc82058abcbb1564d5604606a2d776fbd107bca301a5989cde",
+        "values": {
+          "GENESIS": "1791847200",
+          "WINDOW_DURATION": "3600",
+          "WINDOW_ROUNDS": "6",
+          "ROUND_DURATION": "600",
+          "OPEN_AHEAD": "86400",
+          "TIMEOUT": "172800",
+          "MIN_BET": "500000000000000000",
+          "TICKET_PRICE": "5000000000000000000",
+          "MAX_TICKETS": "256",
+          "SNOOZE_THRESHOLD": "100",
+          "BINARY_STAKERS_PCT": "5",
+          "BINARY_JACKPOT_PCT": "2",
+          "BINARY_ORACLE_PCT": "1",
+          "BINARY_TEAM_PCT": "1",
+          "TICKET_STAKERS_PCT": "5",
+          "TICKET_ORACLE_PCT": "1",
+          "TICKET_TEAM_PCT": "1",
+          "JACKPOT_PAYOUT_PCT": "80",
+          "TEAM": "0x6CBA4751742F6989fA224B2dC5d5d52fCef98a34",
+          "ATTESTER": "0x5598Aa9146215Bc13eb26f2c692Ad1461Fd32982",
+          "SOURCE": "https://sepolia.squeekchain.com",
+          "stakingRecipient": "0x1DCeb78b36b5F18Ac4a130F1FFc76ebA0E73D183",
+          "line": "2100",
+          "currentWindow": "426",
+          "earliestNotStartedWindow": "427",
+          "jackpotSeed": "37197469317392062603",
+          "totalPendingJackpotDeposits": "0"
+        }
+      },
+      "vault": {
+        "address": "0x1dceb78b36b5f18ac4a130f1ffc76eba0e73d183",
+        "runtimeKeccak": "0x1c64e1ab2e07a8e56623836242355771a62771a9e99acaee8a19c20ebcd96e3b",
+        "values": {
+          "token": "0x8e7c7936B4F2D4475DC4baCD174DC228d4D24e86",
+          "GAME_V2": "0xe33AB493249a2Df0D8c4a71aC54F46d1F7778367",
+          "currentGame": "0xe33AB493249a2Df0D8c4a71aC54F46d1F7778367",
+          "TEAM": "0x6CBA4751742F6989fA224B2dC5d5d52fCef98a34",
+          "HALF_LOSS": "18750000000000000000000",
+          "MINING_ALLOCATION": "750000000000000000000000000",
+          "WARMUP": "86400",
+          "UNSTAKE_DELAY": "86400",
+          "VESTING": "604800",
+          "HOOK_STREAM": "604800",
+          "GAME_STREAM": "2592000",
+          "currentMiningState": [
+            "0",
+            "20000000000000000000000",
+            "0"
+          ],
+          "boostEngine": "0x8546B2190B5C38c253e8Bea5BE1b6427e91e0905"
+        }
+      },
+      "hook": {
+        "address": "0x82f636a92364d13754d7b3e72d460f0be20a28cc",
+        "runtimeKeccak": "0x9c20e6ad88f8c46e2e5d6aca88b4a49116ea5de3a2f0e98226b1d0d772ce14b9",
+        "values": {
+          "token": "0x8e7c7936B4F2D4475DC4baCD174DC228d4D24e86",
+          "VAULT": "0x1DCeb78b36b5F18Ac4a130F1FFc76ebA0E73D183",
+          "HOOK_FEE_BPS": "110",
+          "BPS": "10000",
+          "TEAM": "0x6CBA4751742F6989fA224B2dC5d5d52fCef98a34"
+        }
+      },
+      "token": {
+        "address": "0x8e7c7936b4f2d4475dc4bacd174dc228d4d24e86",
+        "runtimeKeccak": "0x01fb92b21a7414fcac4480618142f8968a5d2bae8071370fb5e9369b97fc55bc",
+        "values": {
+          "symbol": "HAMSTER",
+          "decimals": 18,
+          "totalSupply": "1000000000000000000000000000"
+        }
+      }
+    },
+    "nextWindow": {
+      "index": "427",
+      "status": 1,
+      "startsAt": "1793384400",
+      "endsAt": "1793388000",
+      "closesAt": "1793384400",
+      "timeoutAt": "1793560800",
+      "line": "2100",
+      "result": "0",
+      "over": "0",
+      "under": "0",
+      "yes": "2000000000000000000",
+      "no": "0",
+      "tickets": "0",
+      "ouVoid": false,
+      "snVoid": false,
+      "feesAllocated": false,
+      "jackpotFinalized": false,
+      "jackpotPot": "0",
+      "jackpotWinners": "0",
+      "jackpotShare": "0",
+      "pendingJackpotDeposits": "0",
+      "oracleRequested": false,
+      "oracleRequestPending": false,
+      "publicSettleHeld": false,
+      "intakeRequestId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "requestId": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "toleranceChecks": [
+      {
+        "guess": "1990",
+        "result": "2000",
+        "wins": true
+      },
+      {
+        "guess": "2010",
+        "result": "2000",
+        "wins": true
+      },
+      {
+        "guess": "2011",
+        "result": "2000",
+        "wins": false
+      }
+    ]
+  },
+  "recompiledRuntimes": [
+    {
+      "contract": "HamsterHour",
+      "compiler": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+      "optimizerRuns": 200,
+      "viaIR": false,
+      "evmVersion": "cancun",
+      "bytecodeHash": "none",
+      "runtimeMatches": true,
+      "compiledRuntimeBytes": 23289,
+      "deployedRuntimeBytes": 23289
+    },
+    {
+      "contract": "HamsterVault",
+      "compiler": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+      "optimizerRuns": 1,
+      "viaIR": true,
+      "evmVersion": "cancun",
+      "bytecodeHash": "none",
+      "runtimeMatches": true,
+      "compiledRuntimeBytes": 24421,
+      "deployedRuntimeBytes": 24421
+    },
+    {
+      "contract": "HamsterHook",
+      "compiler": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+      "optimizerRuns": 200,
+      "viaIR": false,
+      "evmVersion": "cancun",
+      "bytecodeHash": "none",
+      "runtimeMatches": true,
+      "compiledRuntimeBytes": 11106,
+      "deployedRuntimeBytes": 11106
+    },
+    {
+      "contract": "HamsterToken",
+      "compiler": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+      "optimizerRuns": 200,
+      "viaIR": false,
+      "evmVersion": "cancun",
+      "bytecodeHash": "none",
+      "runtimeMatches": true,
+      "compiledRuntimeBytes": 1722,
+      "deployedRuntimeBytes": 1722
+    },
+    {
+      "contract": "HamsterBoost",
+      "address": "0x8546B2190B5C38c253e8Bea5BE1b6427e91e0905",
+      "compiler": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+      "optimizerRuns": 1,
+      "viaIR": true,
+      "evmVersion": "cancun",
+      "bytecodeHash": "none",
+      "runtimeMatches": true,
+      "compiledRuntimeBytes": 18376,
+      "deployedRuntimeBytes": 18376,
+      "runtimeKeccak": "0xf663fc6f2d79c9c9d703ff279ccdb361e9d3e0d8b647e8a81cabe12deca15754"
+    }
+  ],
+  "additionalChecks": {
+    "miningSteps": [
+      {
+        "lossIMD": "0",
+        "rateAndHalving": [
+          "20000000000000000000000",
+          "0"
+        ]
+      },
+      {
+        "lossIMD": "18750",
+        "rateAndHalving": [
+          "10000000000000000000000",
+          "1"
+        ]
+      },
+      {
+        "lossIMD": "37500",
+        "rateAndHalving": [
+          "5000000000000000000000",
+          "2"
+        ]
+      },
+      {
+        "lossIMD": "56250",
+        "rateAndHalving": [
+          "2500000000000000000000",
+          "3"
+        ]
+      }
+    ],
+    "abiChecks": [
+      {
+        "contract": "HamsterHour",
+        "productionAbiKeccak": "0x1b4767e78f20172a55d48af634b51337edf1805d463361e0d2df249cc822b698",
+        "compiledArrayKeccak": "0x015f5f7e73a03d86bf819e3f61557d38fd27b46381cf0414df9150ade893579d",
+        "allEntriesMatch": true,
+        "note": "Solc and Foundry order ABI entries differently; every complete entry matches as a set. Production ABI/hash are preserved."
+      },
+      {
+        "contract": "HamsterVault",
+        "productionAbiKeccak": "0xd125b46bede309d06e67697d5e81b2c6e1fc63ad319ced9d9f346605b855de81",
+        "compiledArrayKeccak": "0x359a1a73cd52d519d901a066879f15edeaf97e66efe21779b620fe3a38f537ee",
+        "allEntriesMatch": true,
+        "note": "Solc and Foundry order ABI entries differently; every complete entry matches as a set. Production ABI/hash are preserved."
+      }
+    ]
+  },
+  "sourceFiles": [
+    {
+      "url": "https://github.com/identity-md-launches/launch-2260-build-hamster-hour-v2/blob/49f53ca0f278fe4edf6431f68a51468552372af7/src/HamsterHour.sol",
+      "sha256": "4fdddc18b47e7e326b4ec519949bdc8c00bb384abbcd245e39a2b8a5b2be1741"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2260-build-hamster-hour-v2/blob/49f53ca0f278fe4edf6431f68a51468552372af7/src/OracleAttestation.sol",
+      "sha256": "f87a4b4ae80bb2f2b558626cb2c13b1857698de21a0b18c4d1919ea37b2f44e1"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2260-build-hamster-hour-v2/blob/49f53ca0f278fe4edf6431f68a51468552372af7/src/interfaces/IIntake.sol",
+      "sha256": "8c2bd92b58ee501cd0d661d34a0b6242d068d0e04dfb3248d4e86d86ba67770c"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2304-project-site-https-hamsterhour-fun-launc/blob/69ca386ed1d5ea7529caf7b75c348159bf488885/src/VaultBase.sol",
+      "sha256": "dd68066351a84fa6ed1d484bc544ebe4cef5f3e66ea1d750a5da573470ec7e80"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2304-project-site-https-hamsterhour-fun-launc/blob/69ca386ed1d5ea7529caf7b75c348159bf488885/src/HamsterMining.sol",
+      "sha256": "daeeca751993554116aab290c94a2f222ac3af25d7782d7d279c1479866d4bc4"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2304-project-site-https-hamsterhour-fun-launc/blob/69ca386ed1d5ea7529caf7b75c348159bf488885/src/HamsterVault.sol",
+      "sha256": "29d2dd7adedacb9e5e53ae45109ff827f247c8b618cdeec7c136fd8254429c6e"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2304-project-site-https-hamsterhour-fun-launc/blob/69ca386ed1d5ea7529caf7b75c348159bf488885/src/HamsterBoost.sol",
+      "sha256": "7505fe791a14e556db0f10c52ac0391ebef32885e00413257cc59bddd5ec59f2"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2304-project-site-https-hamsterhour-fun-launc/blob/69ca386ed1d5ea7529caf7b75c348159bf488885/src/HamsterStaking.sol",
+      "sha256": "0bfad8a9c8a08671879f9940f587204d4514164cd476e25fd0724180d4268210"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2304-project-site-https-hamsterhour-fun-launc/blob/69ca386ed1d5ea7529caf7b75c348159bf488885/src/libraries/VaultMath.sol",
+      "sha256": "695c1629660b1e991a0a07e91ee67f63a4409eb1f75b551a0270166a03fe73d6"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2304-project-site-https-hamsterhour-fun-launc/blob/69ca386ed1d5ea7529caf7b75c348159bf488885/src/interfaces/Interfaces.sol",
+      "sha256": "015e32f12b143a0b8ed32c10cfc1e33cbde88d4bcc5840b0e652848288b8ee06"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2336-hamster-hour/blob/bf12d716b9268cbe820ee776be2a990b4f2c09bd/src/HamsterHook.sol",
+      "sha256": "2830d1fa504b7fdf69d0dba8f9f695f6c9134b4c5cc6db47186b4b657290f3a8"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2336-hamster-hour/blob/bf12d716b9268cbe820ee776be2a990b4f2c09bd/src/HookFlags.sol",
+      "sha256": "ec90de2f0dca8e02ab38e163af351e9e1a9c547a17ffb5b4b6c5516e8836382e"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2336-hamster-hour/blob/bf12d716b9268cbe820ee776be2a990b4f2c09bd/src/HamsterToken.sol",
+      "sha256": "7df61a1505807c15286f486b370ad710b38711c5e9d320bd4359951d3a39bc38"
+    },
+    {
+      "url": "https://github.com/identity-md-launches/launch-2336-hamster-hour/blob/bf12d716b9268cbe820ee776be2a990b4f2c09bd/src/interfaces/IHamsterVault.sol",
+      "sha256": "290f27eccb67f1ed855b0917365d5c1149113c67ccc596f01f9bded9767e599a"
+    }
+  ],
+  "immutableComparison": "Compiler-designated immutable bytes were substituted from deployed code before comparison; all other runtime bytes match. Key identities and constants were separately read via getters. HamsterBoost and HamsterToken match without substitutions."
+}

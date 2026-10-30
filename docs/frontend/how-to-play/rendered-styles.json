@@ -1,0 +1,141 @@
+{
+  "note": "Computed solid foreground/background pairs from the rendered export. The existing film-grain pseudo-element is not included in these ratios; these are not image-composited pixel measurements.",
+  "results": [
+    {
+      "theme": "day",
+      "pairs": [
+        {
+          "role": "body",
+          "foreground": "rgb(43, 33, 24)",
+          "background": "rgb(255, 245, 230)",
+          "contrast": 14.59
+        },
+        {
+          "role": "secondary on card",
+          "foreground": "rgb(121, 100, 81)",
+          "background": "rgb(255, 251, 244)",
+          "contrast": 5.42
+        },
+        {
+          "role": "example on card",
+          "foreground": "rgb(121, 100, 81)",
+          "background": "rgb(255, 251, 244)",
+          "contrast": 5.42
+        },
+        {
+          "role": "focus border",
+          "foreground": "rgb(128, 80, 44)",
+          "background": "rgb(255, 251, 244)",
+          "contrast": 6.56
+        },
+        {
+          "role": "pixel icon",
+          "foreground": "rgb(43, 33, 24)",
+          "background": "rgb(255, 180, 138)",
+          "contrast": 9.11
+        }
+      ],
+      "heading": {
+        "size": "40px",
+        "weight": "600"
+      },
+      "body": {
+        "size": "16px",
+        "lineHeight": "25.6px"
+      },
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "unloaded"
+        }
+      ],
+      "tocPosition": "sticky",
+      "copyMinHeight": "44px",
+      "faqMinHeight": "56px"
+    },
+    {
+      "theme": "night",
+      "pairs": [
+        {
+          "role": "body",
+          "foreground": "rgb(255, 245, 230)",
+          "background": "rgb(30, 26, 46)",
+          "contrast": 15.66
+        },
+        {
+          "role": "secondary on card",
+          "foreground": "rgb(190, 175, 207)",
+          "background": "rgb(41, 35, 61)",
+          "contrast": 7.29
+        },
+        {
+          "role": "example on card",
+          "foreground": "rgb(190, 175, 207)",
+          "background": "rgb(41, 35, 61)",
+          "contrast": 7.29
+        },
+        {
+          "role": "focus border",
+          "foreground": "rgb(255, 224, 138)",
+          "background": "rgb(41, 35, 61)",
+          "contrast": 11.61
+        },
+        {
+          "role": "pixel icon",
+          "foreground": "rgb(43, 33, 24)",
+          "background": "rgb(255, 180, 138)",
+          "contrast": 9.11
+        }
+      ],
+      "heading": {
+        "size": "40px",
+        "weight": "600"
+      },
+      "body": {
+        "size": "16px",
+        "lineHeight": "25.6px"
+      },
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "unloaded"
+        }
+      ],
+      "tocPosition": "sticky",
+      "copyMinHeight": "44px",
+      "faqMinHeight": "56px"
+    }
+  ]
+}

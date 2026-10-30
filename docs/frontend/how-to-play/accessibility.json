@@ -1,0 +1,42 @@
+[
+  {
+    "width": 320,
+    "theme": "day",
+    "violations": []
+  },
+  {
+    "width": 320,
+    "theme": "night",
+    "violations": []
+  },
+  {
+    "width": 390,
+    "theme": "day",
+    "violations": []
+  },
+  {
+    "width": 390,
+    "theme": "night",
+    "violations": []
+  },
+  {
+    "width": 800,
+    "theme": "day",
+    "violations": []
+  },
+  {
+    "width": 800,
+    "theme": "night",
+    "violations": []
+  },
+  {
+    "width": 1440,
+    "theme": "day",
+    "violations": []
+  },
+  {
+    "width": 1440,
+    "theme": "night",
+    "violations": []
+  }
+]
