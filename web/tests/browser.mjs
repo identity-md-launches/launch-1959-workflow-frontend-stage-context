@@ -186,6 +186,17 @@ function reset() {
     },
     1005n,
   );
+  // Positive counterparties are required per market, independently of void events.
+  addLog(
+    "BinaryBet",
+    { k: current - 1n, bettor: other, market: 0, side: false, amount: 1n },
+    1006n,
+  );
+  addLog(
+    "BinaryBet",
+    { k: current - 2n, bettor: other, market: 1, side: false, amount: 1n },
+    1007n,
+  );
   settleHour(current - 1n, 1006n);
   settleHour(current - 2n, 1007n);
 }
@@ -854,8 +865,15 @@ async function pageFor({
       .waitFor();
   await page.waitForTimeout(120);
   if (connected) {
-    if (!(await page.locator(".account-menu").count()))
-      await page.locator(".wallet-button").first().click();
+    if (!(await page.locator(".account-menu").count())) {
+      try {
+        await page.locator(".wallet-button").first().click({ timeout: 1500 });
+      } catch (error) {
+        // Auto-reconnect can replace Connect between the check and the click.
+        // Accept only the intended connected state; all other failures propagate.
+        if (!(await page.locator(".account-menu").count())) throw error;
+      }
+    }
     await page.locator(".account-menu").waitFor();
   }
   return { page, context };
@@ -931,6 +949,8 @@ try {
       await page.waitForFunction(
         () => document.activeElement?.id === "docs-faq",
       );
+      // Flush the app's anchor-focus animation frame before testing the next Tab.
+      await page.clock.runFor(50);
       await page.keyboard.press("Tab");
       assert.ok(
         (
@@ -1297,6 +1317,79 @@ try {
     },
   );
   await check(
+    "leaderboard recorded-chain regression removes one-sided 7.37 IMD from table, preview and cache",
+    async () => {
+      const fixture = JSON.parse(
+        await readFile(
+          resolve(web, "tests/fixtures/leaderboard-26314829.json"),
+          "utf8",
+        ),
+      );
+      const refunded = "0xa1c19314851e7abf72b3c124476b1c7a3be2217a";
+      const { page, context } = await pageFor({
+        width: 390,
+        initialTab: "leaderboard",
+        walletAvailable: false,
+        prepare: () => {
+          state.logs = fixture.logs;
+          state.head = BigInt(fixture.throughBlock);
+        },
+      });
+      await page.locator(".leaderboard-team-row").waitFor();
+      const rows = page.locator(
+        ".leaderboard-table:not(.leaderboard-team) tbody tr",
+      );
+      assert.equal(await rows.count(), 3);
+      for (const [wallet, amount, exact] of [
+        ["0x2300878c6e8fc1706cabdf86f3d70f909bf572f1", "5.00 IMD", "1 EXACT"],
+        ["0xc6579c593b34916fcc7f3f2750e8b56749bf0808", "5.00 IMD", "0 EXACT"],
+        ["0xdc8a2958f8b8a07a9609d6f4cb4d35f3b5856c26", "4.00 IMD", "0 EXACT"],
+      ]) {
+        const row = rows.filter({ has: page.locator(`a[href$="${wallet}"]`) });
+        assert.equal(
+          await row.locator(".leaderboard-volume strong").innerText(),
+          amount,
+        );
+        assert.match(await row.innerText(), new RegExp(exact));
+      }
+      assert.equal(
+        await page.locator(`.leaderboard-table a[href$="${refunded}"]`).count(),
+        0,
+      );
+      assert.equal(await page.locator(".leaderboard-pending").count(), 0);
+      assert.equal(
+        await page.locator(".leaderboard-team-row .leaderboard-trophy").count(),
+        0,
+      );
+      await page.screenshot({ path: resolve(out, "two-sided-chain-390.png") });
+      await page.reload();
+      await page.locator(".leaderboard-team-row").waitFor();
+      assert.equal(await rows.count(), 3);
+      assert.equal(
+        await page.locator(`.leaderboard-table a[href$="${refunded}"]`).count(),
+        0,
+      );
+      await page.getByRole("link", { name: "Back to the wheel" }).click();
+      await page.locator(".leaderboard-preview-list").waitFor();
+      assert.equal(
+        await page.locator(".leaderboard-preview-list li").count(),
+        3,
+      );
+      assert.equal(
+        await page
+          .locator(`.leaderboard-preview-list a[href$="${refunded}"]`)
+          .count(),
+        0,
+      );
+      await page.evaluate(() => {
+        document.querySelector(".site").scrollTop = 0;
+        window.scrollTo(0, 0);
+      });
+      await page.screenshot({ path: resolve(out, "two-sided-home-390.png") });
+      await context.close();
+    },
+  );
+  await check(
     "leaderboard navigation, Top 5 preview, ENS, copy and wallet-free viewing",
     async () => {
       const { page, context } = await pageFor({
@@ -1384,6 +1477,11 @@ try {
               },
               1010n + BigInt(i),
             );
+          addLog(
+            "BinaryBet",
+            { k: current, bettor: other, market: 1, side: true, amount: 1n },
+            1079n,
+          );
           settleHour(current, 1080n);
         },
       });
@@ -1475,7 +1573,7 @@ try {
       });
       await empty.page
         .getByText(
-          "No counted bets yet. Bets only count when both sides of the hour are taken. Bring a friend and play the same hour 🐹",
+          "No counted bets yet. Binary bets need both sides in the same market and a settled hour. EXACT tickets count after settlement.",
           {
             exact: true,
           },
@@ -1576,6 +1674,16 @@ try {
               amount: 2n ** 128n - 1n,
             },
             1011n,
+          );
+          addLog(
+            "BinaryBet",
+            { k: current, bettor: other, market: 0, side: false, amount: 1n },
+            1012n,
+          );
+          addLog(
+            "BinaryBet",
+            { k: next, bettor: other, market: 1, side: true, amount: 1n },
+            1013n,
           );
           settleHour(current, 1012n);
           addLog(
@@ -1687,7 +1795,7 @@ try {
     },
   );
   await check(
-    "leaderboard played-only volumes, market voids, timeouts, pending-only rows and team exclusion",
+    "leaderboard two-sided volumes, lazy void independence, timeouts, pending rows and team exclusion",
     async () => {
       const pendingWallet = "0x3333333333333333333333333333333333333333";
       const { page, context } = await pageFor({
@@ -1701,7 +1809,7 @@ try {
             {
               k: current - 1n,
               bettor: teamWallet,
-              market: 0,
+              market: 1,
               side: true,
               amount: 10000n * W,
             },
@@ -1718,7 +1826,12 @@ try {
             },
             1011n,
           );
-          addLog("MarketVoided", { k: current - 1n, market: 0 }, 1012n);
+          // Team's large SNOOZE stake is one-sided even without a void event.
+          addLog(
+            "BinaryBet",
+            { k: next, bettor: other, market: 0, side: true, amount: 1n },
+            1012n,
+          );
           addLog(
             "BinaryBet",
             {
@@ -1771,20 +1884,20 @@ try {
       const row = main
         .locator("tbody tr")
         .filter({ has: page.locator(`a[href$="${account}"]`) });
-      assert.match(await row.innerText(), /5.00 IMD/);
+      assert.match(await row.innerText(), /10.00 IMD/);
       assert.equal(
         await row.locator(".leaderboard-pending").innerText(),
         "17.00 IMD pending",
       );
       assert.equal(
         await row.locator(".leaderboard-bets > span").innerText(),
-        "1 bet",
+        "2 bets",
       );
       assert.equal(
         await row.locator(".leaderboard-hours").innerText(),
-        "1 hour",
+        "2 hours",
       );
-      assert.match(await row.innerText(), /≈ \$10.00/);
+      assert.match(await row.innerText(), /≈ \$20.00/);
       assert.equal(await main.locator(`a[href$="${teamWallet}"]`).count(), 0);
       assert.equal(await page.locator(".leaderboard-yours").count(), 0);
       const teamRow = page.locator(".leaderboard-team-row");
@@ -1816,7 +1929,7 @@ try {
       );
       assert.equal(
         await page.locator(".leaderboard-method").innerText(),
-        "Only bets that were played count: refunded (one-sided or timed-out) bets and pending hours are not included. Team wallet is not ranked.",
+        "Binary bets count after settlement only when their market has stake on both sides. One-sided and timed-out bets are excluded. Pending stakes are shown separately. Team wallet is not ranked.",
       );
       const audits = [];
       for (const width of [320, 390, 800, 1440]) {
@@ -1869,9 +1982,67 @@ try {
       );
       assert.equal(
         await page
-          .locator(".leaderboard-preview-list .leaderboard-pending")
+          .locator(".leaderboard-preview-list li")
+          .filter({ has: page.locator(`a[href$="${account}"]`) })
+          .locator(".leaderboard-pending")
           .innerText(),
         "17.00 IMD pending",
+      );
+      await context.close();
+    },
+  );
+  await check(
+    "leaderboard one-sided pending stays hidden until an opposing bet arrives on an incremental refresh",
+    async () => {
+      const { page, context } = await pageFor({
+        width: 390,
+        initialTab: "leaderboard",
+        connected: true,
+        prepare: () => {
+          addLog(
+            "BinaryBet",
+            {
+              k: current,
+              bettor: account,
+              market: 0,
+              side: false,
+              amount: 12n * W,
+            },
+            1010n,
+          );
+        },
+      });
+      await page.getByText(/Through block .*refreshes every minute/).waitFor();
+      assert.equal(await page.locator(".leaderboard-pending").count(), 0);
+      state.head++;
+      addLog(
+        "BinaryBet",
+        { k: current, bettor: other, market: 0, side: true, amount: W },
+        3001n,
+      );
+      await page.clock.fastForward(60_100);
+      await page
+        .locator(".leaderboard-yours .leaderboard-pending")
+        .filter({ hasText: "12.00 IMD pending" })
+        .waitFor();
+      await page.reload();
+      await page.getByText(/Through block .*refreshes every minute/).waitFor();
+      assert.equal(
+        await page
+          .locator(".leaderboard-yours .leaderboard-pending")
+          .innerText(),
+        "12.00 IMD pending",
+      );
+      state.head++;
+      settleHour(current, 3002n);
+      await page.clock.fastForward(60_100);
+      await page
+        .locator(".leaderboard-yours .leaderboard-volume strong")
+        .filter({ hasText: "22.00 IMD" })
+        .waitFor();
+      assert.equal(
+        await page.locator(".leaderboard-yours .leaderboard-pending").count(),
+        0,
       );
       await context.close();
     },
@@ -1884,6 +2055,11 @@ try {
         initialTab: "leaderboard",
         connected: true,
         prepare: () => {
+          addLog(
+            "BinaryBet",
+            { k: current, bettor: other, market: 0, side: true, amount: 1n },
+            1009n,
+          );
           addLog(
             "BinaryBet",
             {
@@ -1959,7 +2135,7 @@ try {
     },
   );
   await check(
-    "leaderboard empty counted ranking still shows pending wallets and a muted team below",
+    "leaderboard empty ranking shows two-sided pending and hides settled one-sided refunds",
     async () => {
       const { page, context } = await pageFor({
         width: 390,
@@ -1980,7 +2156,7 @@ try {
           addLog(
             "BinaryBet",
             {
-              k: current - 1n,
+              k: current,
               bettor: teamWallet,
               market: 0,
               side: false,
@@ -1988,21 +2164,36 @@ try {
             },
             1011n,
           );
-          settleHour(current - 1n, 1012n);
+          addLog(
+            "BinaryBet",
+            {
+              k: current - 1n,
+              bettor: other,
+              market: 1,
+              side: true,
+              amount: (737n * W) / 100n,
+            },
+            1012n,
+          );
+          settleHour(current - 1n, 1013n);
         },
       });
       await page
         .getByText(
-          "No counted bets yet. Bets only count when both sides of the hour are taken. Bring a friend and play the same hour 🐹",
+          "No counted bets yet. Binary bets need both sides in the same market and a settled hour. EXACT tickets count after settlement.",
           { exact: true },
         )
         .waitFor();
       assert.equal(await page.locator(".leaderboard-top").count(), 0);
       assert.equal(
+        await page.locator(`.leaderboard-table a[href$="${other}"]`).count(),
+        0,
+      );
+      assert.equal(
         await page
           .locator(".leaderboard-team-row .leaderboard-volume strong")
           .innerText(),
-        "10,000.00 IMD",
+        "0.00 IMD",
       );
       assert.equal(
         await page

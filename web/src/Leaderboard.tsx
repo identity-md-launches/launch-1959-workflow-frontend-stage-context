@@ -224,8 +224,8 @@ function NoBets() {
   return (
     <div className="leaderboard-empty">
       <p>
-        No counted bets yet. Bets only count when both sides of the hour are
-        taken. Bring a friend and play the same hour 🐹
+        No counted bets yet. Binary bets need both sides in the same market and
+        a settled hour. EXACT tickets count after settlement.
       </p>
       <a className="button" href="#play">
         Place a bet <Icon name="arrow" />
@@ -466,8 +466,9 @@ export function Leaderboard({
           </>
         )}
         <p className="leaderboard-method small muted">
-          Only bets that were played count: refunded (one-sided or timed-out)
-          bets and pending hours are not included. Team wallet is not ranked.
+          Binary bets count after settlement only when their market has stake on
+          both sides. One-sided and timed-out bets are excluded. Pending stakes
+          are shown separately. Team wallet is not ranked.
         </p>
       </section>
     </div>

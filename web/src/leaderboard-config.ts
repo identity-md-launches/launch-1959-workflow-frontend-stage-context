@@ -8,7 +8,7 @@ export const LEADERBOARD_REWARD_TEXT: string =
   "Top 5 by volume get a WL for the @squeekchain NFT mint";
 // Explicit team exclusion supplied for the leaderboard; never used for transactions.
 export const LEADERBOARD_TEAM = "0x6cba4751742f6989fa224b2dc5d5d52fcef98a34";
-export const LEADERBOARD_CACHE_VERSION = "v2-played-ticket-5-imd";
+export const LEADERBOARD_CACHE_VERSION = "v3-two-sided-ticket-5-imd";
 export const LEADERBOARD_TICKET_PRICE = 5n * 10n ** 18n;
 export const LEADERBOARD_PAGE_SIZE = 10;
 export const LEADERBOARD_LIMIT = 50;
@@ -25,6 +25,5 @@ export const LEADERBOARD_EVENTS = parseAbi([
   "event BinaryBet(uint256 indexed k, address indexed bettor, uint8 indexed market, bool side, uint256 amount)",
   "event TicketBought(uint256 indexed k, address indexed bettor, uint256 guess)",
   "event Settled(uint256 indexed k, uint256 result, bytes32 indexed requestId, address indexed settler)",
-  "event MarketVoided(uint256 indexed k, uint8 indexed market)",
   "event TimedOut(uint256 indexed k)",
 ]);

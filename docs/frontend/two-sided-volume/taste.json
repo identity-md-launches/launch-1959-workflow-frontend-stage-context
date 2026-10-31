@@ -1,0 +1,134 @@
+{
+  "target": "dist",
+  "at": "2026-10-31T19:35:13.403Z",
+  "bar": {
+    "sizes": 6,
+    "strays": 8,
+    "faces": 3,
+    "weights": 3,
+    "target": 24,
+    "comfortable": 44,
+    "proseMobile": 60,
+    "proseDesktop": 90,
+    "tracking": 0.04,
+    "repeatWords": 5,
+    "contrast": 4.5,
+    "contrastLarge": 3,
+    "slogans": 3
+  },
+  "checks": [
+    {
+      "name": "render",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 42483,
+      "output": "renders, no script errors or missing local files\nexternal hosts: hamster-hour.hamsterhour562.workers.dev, api.dexscreener.com, ethereum.public.blockpi.network, ethereum-rpc.publicnode.com, eth.drpc.org, rpc.mevblocker.io"
+    },
+    {
+      "name": "layout",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no horizontal scroll at 320, 390 or 1440\nno text box overlaps another\nno floating control covers text\nno text cut off by overflow: hidden"
+    },
+    {
+      "name": "targets",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all 23 controls at least 24px or spaced at 390\n19 under the 44px comfortable size"
+    },
+    {
+      "name": "contrast",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all measured text meets 4.5:1 (3:1 large)"
+    },
+    {
+      "name": "casing",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "no all-caps text in content"
+    },
+    {
+      "name": "tracking",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "letter-spacing natural in content (display type may run tight)"
+    },
+    {
+      "name": "eyebrows",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 2,
+      "output": "1 kicker labels above headings:\n390px: \"The wheel\" above \"Bet on the hamster\" (div.site.wheel-page > header.site-header > nav > a.active:nth-of-type(1))"
+    },
+    {
+      "name": "type-sizes",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "390: 4 sizes in use, 4 with one-offs (12px\u00d730, 14px\u00d77, 16px\u00d72, 40px\u00d72)\n1440: 3 sizes in use, 6 with one-offs (12px\u00d728, 14px\u00d726, 16px\u00d71, 20px\u00d77, 40px\u00d71, 88px\u00d71)\nbar: 6 sizes used more than once, 8 counting one-offs, per width"
+    },
+    {
+      "name": "type-faces",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "families (2): geist, silkscreen\nweights (3): 400, 600, 700"
+    },
+    {
+      "name": "glyphs",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no em dashes or emoji in text"
+    },
+    {
+      "name": "slogans",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "3 two-beat lines; a stack is four or more, so keep the best and cut the rest:\n\"A real hamster. Bets in IMD.\" (#main > div.hero:nth-of-type(1) > div:nth-of-type(1) > p)\n\"Bet on the hamster. A real hamster. Bets in IMD.\" (#main > div.hero:nth-of-type(1) > div:nth-of-type(1))\n\"New here? Read how it works \u2197\" (#bet-panel > a.bet-docs-link)"
+    },
+    {
+      "name": "repetition",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 2,
+      "output": "no repeated lines"
+    },
+    {
+      "name": "copy-budget",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "prose on the first screen: 6 words at 390 (bar 60), 12 at 1440 (bar 90)\nall words on the first screen: 99 at 390, 119 at 1440\nwhole page: 171 words, 35 of them prose"
+    },
+    {
+      "name": "chrome",
+      "passed": false,
+      "exitCode": 1,
+      "durationMs": 0,
+      "output": "border and shadow together: 5 (#bet-panel > div.sides:nth-of-type(4) > button.side.side-over:nth-of-type(1); #bet-panel > div.sides:nth-of-type(4) > button.side.side-under:nth-of-type(2); #bet-panel > div.sides:nth-of-type(4) > button.side.side-snooze:nth-of-type(3))\ncards inside cards: 1 (#bet-form > div.amount-control:nth-of-type(2) in #bet-panel)\ngradient text: 0"
+    },
+    {
+      "name": "motion",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "transition: all on 0 elements\nendless animations: 3; still running with reduced motion: 0"
+    },
+    {
+      "name": "share",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "title \"Hamster Hour \u00b7 Bet on the hamster.\", favicon, og:title, og:image, description"
+    }
+  ],
+  "errors": []
+}

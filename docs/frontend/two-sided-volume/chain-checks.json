@@ -1,0 +1,82 @@
+{
+  "observedAt": "2026-10-31T19:27:15.671Z",
+  "chainId": 1,
+  "address": "0xe33ab493249a2df0d8c4a71ac54f46d1f7778367",
+  "sourceRpc": "https://ethereum-rpc.publicnode.com",
+  "deploymentBlock": "26229405",
+  "throughBlock": "26314829",
+  "events": 30,
+  "ranked": [
+    {
+      "address": "0x2300878c6e8fc1706cabdf86f3d70f909bf572f1",
+      "volume": "5",
+      "pending": "0",
+      "bets": 1,
+      "tickets": 1,
+      "hours": [
+        "429"
+      ],
+      "rank": 1
+    },
+    {
+      "address": "0xc6579c593b34916fcc7f3f2750e8b56749bf0808",
+      "volume": "5",
+      "pending": "0",
+      "bets": 1,
+      "tickets": 0,
+      "hours": [
+        "440"
+      ],
+      "rank": 2
+    },
+    {
+      "address": "0xdc8a2958f8b8a07a9609d6f4cb4d35f3b5856c26",
+      "volume": "4",
+      "pending": "0",
+      "bets": 1,
+      "tickets": 0,
+      "hours": [
+        "440"
+      ],
+      "rank": 3
+    }
+  ],
+  "unranked": [
+    {
+      "address": "0x6cba4751742f6989fa224b2dc5d5d52fcef98a34",
+      "volume": "2",
+      "pending": "0",
+      "bets": 2,
+      "tickets": 0,
+      "hours": [
+        "178"
+      ]
+    }
+  ],
+  "window429": {
+    "settled": true,
+    "timedOut": false,
+    "stakes": [
+      {
+        "address": "0x2300878c6e8fc1706cabdf86f3d70f909bf572f1",
+        "market": null,
+        "side": null,
+        "volume": "5",
+        "bets": 1
+      },
+      {
+        "address": "0xa1c19314851e7abf72b3c124476b1c7a3be2217a",
+        "market": 1,
+        "side": true,
+        "volume": "7.374185066434527746",
+        "bets": 1
+      }
+    ]
+  },
+  "suspect": {
+    "address": "0xA1c19314851e7abf72b3C124476b1c7A3be2217A",
+    "ranked": false,
+    "pending": false,
+    "claimable": "7374185066434527746"
+  }
+}

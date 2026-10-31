@@ -1,0 +1,33 @@
+{
+  "protectedPathsUnchanged": true,
+  "contractsAndWorkersUnchanged": true,
+  "ignoreFilesUnchanged": true,
+  "addedOrModifiedFiles": 21,
+  "addedOrModifiedBytesBeforeThisReport": 2253193,
+  "budgetBytes": 8388608,
+  "distBytes": 1342438,
+  "distFiles": 26,
+  "rootExportMatchesVerifiedBuild": true,
+  "productionBuild": "passed",
+  "typecheck": "passed",
+  "unitTests": {
+    "passed": 58,
+    "total": 58
+  },
+  "chromiumScenarios": {
+    "passed": 34,
+    "total": 34
+  },
+  "leaderboardScenarios": 11,
+  "targetedAccessibilityAudits": 16,
+  "tasteChecks": {
+    "passed": 14,
+    "total": 16,
+    "exceptions": [
+      "active navigation pill classified as eyebrow",
+      "existing pixel controls classified as chrome"
+    ]
+  },
+  "webkit": "could not launch; required host libraries missing",
+  "publishingOrGitMutationPerformed": false
+}

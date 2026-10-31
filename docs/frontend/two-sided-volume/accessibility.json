@@ -1,0 +1,98 @@
+[
+  {
+    "width": 320,
+    "theme": "day",
+    "violations": [],
+    "scenario": "leaderboard-accessibility"
+  },
+  {
+    "width": 320,
+    "theme": "night",
+    "violations": [],
+    "scenario": "leaderboard-accessibility"
+  },
+  {
+    "width": 390,
+    "theme": "day",
+    "violations": [],
+    "scenario": "leaderboard-accessibility"
+  },
+  {
+    "width": 390,
+    "theme": "night",
+    "violations": [],
+    "scenario": "leaderboard-accessibility"
+  },
+  {
+    "width": 800,
+    "theme": "day",
+    "violations": [],
+    "scenario": "leaderboard-accessibility"
+  },
+  {
+    "width": 800,
+    "theme": "night",
+    "violations": [],
+    "scenario": "leaderboard-accessibility"
+  },
+  {
+    "width": 1440,
+    "theme": "day",
+    "violations": [],
+    "scenario": "leaderboard-accessibility"
+  },
+  {
+    "width": 1440,
+    "theme": "night",
+    "violations": [],
+    "scenario": "leaderboard-accessibility"
+  },
+  {
+    "width": 320,
+    "theme": "day",
+    "violations": [],
+    "scenario": "played-accessibility"
+  },
+  {
+    "width": 320,
+    "theme": "night",
+    "violations": [],
+    "scenario": "played-accessibility"
+  },
+  {
+    "width": 390,
+    "theme": "day",
+    "violations": [],
+    "scenario": "played-accessibility"
+  },
+  {
+    "width": 390,
+    "theme": "night",
+    "violations": [],
+    "scenario": "played-accessibility"
+  },
+  {
+    "width": 800,
+    "theme": "day",
+    "violations": [],
+    "scenario": "played-accessibility"
+  },
+  {
+    "width": 800,
+    "theme": "night",
+    "violations": [],
+    "scenario": "played-accessibility"
+  },
+  {
+    "width": 1440,
+    "theme": "day",
+    "violations": [],
+    "scenario": "played-accessibility"
+  },
+  {
+    "width": 1440,
+    "theme": "night",
+    "violations": [],
+    "scenario": "played-accessibility"
+  }
+]
