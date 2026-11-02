@@ -4364,3 +4364,171 @@ dialog::backdrop {
     margin-left: 0;
   }
 }
+/* My bets: every bet of the wallet, grouped by hour, each with a status. */
+.bet-hours {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.bet-hour {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+.bet-hour-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: var(--label);
+}
+.bet-hour-head .muted {
+  font-size: var(--small);
+}
+.bet-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.bet-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 10px;
+  border-top: 1px solid var(--line);
+  font-size: var(--small);
+}
+.bet-what {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.bet-what strong {
+  font-size: var(--label);
+}
+.bet-what > span {
+  color: var(--muted);
+}
+.bet-what > span strong {
+  color: var(--ink);
+  font-size: var(--small);
+  font-variant-numeric: tabular-nums;
+}
+.tx-link {
+  color: var(--muted);
+  width: fit-content;
+}
+.bet-state-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  text-align: right;
+  flex-shrink: 0;
+  max-width: 48%;
+}
+.bet-state-cell small {
+  flex-basis: 100%;
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bet-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--hover);
+  color: var(--ink);
+  font-size: var(--small);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.state-waiting-refund {
+  background: var(--butter);
+  border-color: var(--butter);
+  color: #2b2118;
+}
+.state-refund-ready,
+.state-won {
+  background: var(--mint);
+  border-color: var(--mint);
+  color: #2b2118;
+}
+.state-lost {
+  background: var(--rose);
+  border-color: var(--rose);
+  color: #2b2118;
+}
+.bet-state-cell .help-popover {
+  text-align: left;
+}
+.bet-hour-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-size: var(--small);
+  color: var(--muted);
+}
+.bet-hour-foot button {
+  margin-inline-start: auto;
+}
+.bet-hour-hint {
+  margin: 0;
+}
+.withdraw-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--butter);
+  color: #2b2118;
+  font-size: var(--label);
+}
+.one-sided-notice {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hover);
+  color: var(--ink);
+  font-size: var(--small);
+}
+@media (max-width: 680px) {
+  .bet-hour {
+    padding: 12px;
+  }
+  .bet-line {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .bet-state-cell {
+    justify-content: flex-start;
+    text-align: left;
+    max-width: none;
+  }
+  .bet-state-cell .help-popover {
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+  }
+  .bet-hour-foot button {
+    width: 100%;
+  }
+}

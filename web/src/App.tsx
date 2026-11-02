@@ -409,7 +409,7 @@ function Game({ r }: { r: Runtime }) {
                 <p>Good guesses, sleepy hours, and everything you can claim.</p>
               </div>
             </div>
-            <MyBets r={r} events={events.data} eventError={events.isError} />
+            <MyBets r={r} now={now} />
           </div>
         ) : (
           <>

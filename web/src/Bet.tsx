@@ -58,6 +58,17 @@ export function BetPanel({
   const preview =
     v && stake > 0n ? payout(v, side, stake, snoozeYes) : undefined;
   const close = v ? Number(v.closesAt) - now : undefined;
+  // The market the user is betting on has no stake against their chosen side.
+  const against = !v
+    ? undefined
+    : side === "over"
+      ? v.under
+      : side === "under"
+        ? v.over
+        : snoozeYes
+          ? v.no
+          : v.yes;
+  const lonely = against === 0n && close !== undefined && close > 0;
   const opens = w.data?.open && close !== undefined && close > 0;
   const label = !address
     ? "Connect to bet"
@@ -300,6 +311,12 @@ export function BetPanel({
           </a>
         </div>
       </form>
+      {lonely && (
+        <p className="one-sided-notice" role="note">
+          Nobody is on the other side yet. If nobody joins before the hour
+          starts, your bet is refunded after 48h.
+        </p>
+      )}
       <a className="bet-docs-link" href="#docs">
         New here? Read how it works ↗
       </a>

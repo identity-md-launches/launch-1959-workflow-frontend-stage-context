@@ -1,7 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { erc20Abi, keccak256, decodeEventLog, type Address } from "viem";
+import {
+  erc20Abi,
+  keccak256,
+  decodeEventLog,
+  encodeEventTopics,
+  pad,
+  toHex,
+  type Address,
+  type Hex,
+} from "viem";
 import type { Runtime } from "./config";
 import type { GameWindow, Position } from "./model";
+import { TICKET_PRICE, type WalletBet, type WindowRead } from "./mybets";
 export function reader(r: Runtime) {
   return <T = unknown>(
     functionName: string,
@@ -233,3 +243,133 @@ export function usePositions(
     retry: 1,
   });
 }
+
+// ------------------------------------------------------------ My bets
+// The connected wallet's own BinaryBet, TicketBought and Claimed logs, filtered
+// on chain by the indexed bettor/account topic (topic 2 in all three events).
+const walletScans = new Map<
+  string,
+  { head: bigint; bets: WalletBet[]; claimed: Set<string> }
+>();
+async function walletLogs(
+  r: Runtime,
+  topics: unknown[],
+  from: bigint,
+  to: bigint,
+): Promise<any[]> {
+  try {
+    return (await r.client.request({
+      method: "eth_getLogs",
+      params: [
+        {
+          address: r.game.address,
+          fromBlock: toHex(from),
+          toBlock: toHex(to),
+          topics,
+        },
+      ],
+    } as any)) as any[];
+  } catch (e) {
+    // Some providers refuse wide ranges: split until the range is small.
+    if (to - from < 2000n) throw e;
+    const mid = from + (to - from) / 2n;
+    return [
+      ...(await walletLogs(r, topics, from, mid)),
+      ...(await walletLogs(r, topics, mid + 1n, to)),
+    ];
+  }
+}
+export async function loadWalletBets(r: Runtime, account: Address) {
+  const key = `${r.game.address.toLowerCase()}:${account.toLowerCase()}`;
+  const latest = await r.client.getBlockNumber();
+  const deployed = BigInt(r.game.deploymentBlock);
+  const prior = walletScans.get(key);
+  let from = prior ? prior.head - 12n : deployed;
+  if (from < deployed) from = deployed;
+  const bets = (prior?.bets ?? []).filter((b) => b.blockNumber < from);
+  const claimed = new Set(prior?.claimed ?? []);
+  const selectors = ["BinaryBet", "TicketBought", "Claimed"].map(
+    (eventName) =>
+      encodeEventTopics({ abi: r.game.abi, eventName } as any)[0] as Hex,
+  );
+  const topics = [selectors, null, pad(account.toLowerCase() as Hex)];
+  const logs = from <= latest ? await walletLogs(r, topics, from, latest) : [];
+  for (const log of logs) {
+    let d: any;
+    try {
+      d = decodeEventLog({
+        abi: r.game.abi,
+        data: log.data,
+        topics: log.topics,
+      });
+    } catch {
+      continue;
+    }
+    const who = (d.args.bettor ?? d.args.account) as string | undefined;
+    if (who?.toLowerCase() !== account.toLowerCase()) continue;
+    if (d.eventName === "Claimed") {
+      claimed.add(String(d.args.k));
+      continue;
+    }
+    if (d.eventName !== "BinaryBet" && d.eventName !== "TicketBought") continue;
+    bets.push({
+      kind: d.eventName === "BinaryBet" ? "binary" : "ticket",
+      k: BigInt(d.args.k),
+      market: d.eventName === "BinaryBet" ? Number(d.args.market) : undefined,
+      side: d.eventName === "BinaryBet" ? Boolean(d.args.side) : undefined,
+      amount:
+        d.eventName === "BinaryBet" ? BigInt(d.args.amount) : TICKET_PRICE,
+      guess: d.eventName === "TicketBought" ? BigInt(d.args.guess) : undefined,
+      transactionHash: log.transactionHash,
+      blockNumber: BigInt(log.blockNumber),
+      logIndex: Number(log.logIndex),
+    });
+  }
+  walletScans.set(key, { head: latest, bets, claimed });
+  return { bets, claimed };
+}
+export async function loadMyBets(r: Runtime, account: Address) {
+  const { bets, claimed } = await loadWalletBets(r, account);
+  const block = await r.client.getBlock();
+  const read = reader(r);
+  const ks = [...new Set(bets.map((b) => b.k.toString()))].map(BigInt);
+  const [timeout, balance] = await Promise.all([
+    read<bigint>("TIMEOUT", [], block.number),
+    read<bigint>("balances", [account], block.number),
+  ]);
+  const reads: WindowRead[] = await Promise.all(
+    ks.map(async (k) => {
+      const [window, position, claimable, end, loss] = await Promise.all([
+        read<GameWindow>("windowInfo", [k], block.number),
+        read<Position>("position", [k, account], block.number),
+        read<bigint>("claimable", [k, account], block.number),
+        read<bigint>("windowEnd", [k], block.number),
+        read<bigint>("lossOf", [k, account], block.number),
+      ]);
+      return {
+        k,
+        window,
+        position,
+        claimable,
+        unlockAt: BigInt(end) + BigInt(timeout),
+        loss,
+        claimed: claimed.has(k.toString()),
+      };
+    }),
+  );
+  return {
+    bets,
+    reads,
+    balance,
+    timestamp: block.timestamp,
+    blockNumber: block.number,
+  };
+}
+export const useMyBets = (r: Runtime, account: Address | undefined) =>
+  useQuery({
+    queryKey: ["my-bets", account?.toLowerCase()],
+    queryFn: () => loadMyBets(r, account!),
+    enabled: !!account,
+    refetchInterval: 20000,
+    retry: 1,
+  });
