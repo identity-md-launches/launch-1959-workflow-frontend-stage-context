@@ -150,31 +150,59 @@ test("chat preserves signed text protocol, rejects links, and merges idempotentl
 
 test("quiet event refreshes use a block cursor and replay the reorg tail", async () => {
   const { loadEvents } = await import("../src/data");
+  const { createServer } = await import("node:http");
+  const { toHex } = await import("viem");
   const calls: { fromBlock: bigint; toBlock: bigint }[] = [];
   let latest = 6000n;
+  const server = createServer(async (req, res) => {
+    let text = "";
+    for await (const chunk of req) text += chunk;
+    const body = JSON.parse(text);
+    if (body.method === "eth_getLogs")
+      calls.push({
+        fromBlock: BigInt(body.params[0].fromBlock),
+        toBlock: BigInt(body.params[0].toBlock),
+      });
+    res.setHeader("Content-Type", "application/json");
+    res.end(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: body.id,
+        result: body.method === "eth_blockNumber" ? toHex(latest) : [],
+      }),
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const url = `http://127.0.0.1:${(server.address() as any).port}`;
+  const { mainnet } = await import("viem/chains");
   const r = {
-    chain: { id: 1 },
+    chain: mainnet,
     game: {
       address: "0x3333333333333333333333333333333333333333",
       deploymentBlock: "1000",
       abi: [],
     },
     client: {
-      getBlockNumber: async () => latest,
-      getLogs: async (a: any) => {
-        calls.push(a);
-        return [];
+      getBlockNumber: () => {
+        throw Error("Game logs must not use the wallet transport");
+      },
+      getLogs: () => {
+        throw Error("Game logs must not use the wallet transport");
       },
     },
   } as any;
-  const first = await loadEvents(r);
-  assert.equal(calls[0].fromBlock, 1000n);
-  assert.equal(calls[0].toBlock, 5999n);
-  assert.equal(calls[1].toBlock, 6000n);
-  calls.length = 0;
-  latest = 6010n;
-  await loadEvents(r, first);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].fromBlock, 5988n);
-  assert.equal(calls[0].toBlock, 6010n);
+  try {
+    const first = await loadEvents(r, undefined, [url]);
+    assert.equal(calls[0].fromBlock, 1000n);
+    assert.equal(calls[0].toBlock, 5999n);
+    assert.equal(calls[1].toBlock, 6000n);
+    calls.length = 0;
+    latest = 6010n;
+    await loadEvents(r, first, [url]);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].fromBlock, 5988n);
+    assert.equal(calls[0].toBlock, 6010n);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

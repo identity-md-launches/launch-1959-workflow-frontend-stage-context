@@ -16,8 +16,10 @@ import { mainnet } from "viem/chains";
 import {
   betsFromEvents,
   loadMyBets,
+  loadEvents,
   loadWalletBets,
   walletEvents,
+  GAME_LOG_RPCS,
   type GameEvent,
 } from "../src/data";
 import { classify } from "../src/mybets";
@@ -309,7 +311,7 @@ test("fallback rotates RPCs, retries each fixed chunk and covers deployment to p
   });
   try {
     const result = betsFromEvents(
-      await loadWalletBets(runtime({}, rpc.urls), account),
+      await loadWalletBets(runtime({}), account, rpc.urls),
     );
     assert.equal(result.bets.length, 1);
     assert.deepEqual([...result.claimed], ["429"]);
@@ -323,14 +325,16 @@ test("fallback rotates RPCs, retries each fixed chunk and covers deployment to p
       `${start + 5000n}-${start + 9999n}`,
       `${start + 10000n}-${latest}`,
     ]);
+    // The refusing RPC is tried, the transient failure is retried on the
+    // same chunk, and the working RPC then stays preferred for later chunks.
     assert.deepEqual(
-      logs.slice(0, 3).map((l) => l.rpc),
-      [1, 0, 1],
+      logs.map((l) => l.rpc),
+      [0, 1, 0, 1, 1, 1],
     );
     assert.ok(failures.length >= 2);
     const detail = failures[0][1];
     assert.equal(detail.step, "eth_getLogs");
-    assert.equal(detail.rpcUrl, rpc.urls[1]);
+    assert.equal(detail.rpcUrl, rpc.urls[0]);
     assert.equal(detail.fromBlock, String(start));
     assert.equal(detail.toBlock, String(start + 4999n));
   } finally {
@@ -352,7 +356,7 @@ test("exhausted chunk retries reject without returning partial history", async (
   });
   try {
     await assert.rejects(
-      loadWalletBets(runtime({}, rpc.urls), account),
+      loadWalletBets(runtime({}), account, rpc.urls),
       /RPC offline/,
     );
     assert.equal(attempts, 4);
@@ -393,4 +397,64 @@ test("per-hour errors identify the read, RPC URL and pinned block", async (t) =>
   assert.equal(errors[0][1].rpcUrl, "https://eth.drpc.org");
   assert.equal(errors[0][1].fromBlock, "26330000");
   assert.equal(errors[0][1].toBlock, "26330000");
+});
+
+test("shared events load through the leaderboard RPC list in 5000-block chunks past refusing RPCs", async (t) => {
+  const failures: any[] = [];
+  t.mock.method(console, "error", (...args: any[]) => failures.push(args));
+  const { LEADERBOARD_RPCS } = await import("../src/leaderboard-config");
+  assert.deepEqual(GAME_LOG_RPCS, LEADERBOARD_RPCS);
+  const start = BigInt(handoff.contracts[0].deploymentBlock),
+    latest = start + 7000n;
+  const ranges: string[] = [];
+  const rpc = await rpcServers((rpc, body) => {
+    if (body.method === "eth_blockNumber") return toHex(latest);
+    const from = BigInt(body.params[0].fromBlock),
+      to = BigInt(body.params[0].toBlock);
+    assert.ok(to - from + 1n <= 5000n);
+    // Mirrors publicnode's refusal of the deployment-era range.
+    if (rpc === 0)
+      throw Error(
+        "Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode",
+      );
+    ranges.push(`${from}-${to}`);
+    return from === start
+      ? [
+          rawLog(
+            "BinaryBet",
+            { k: 429n, bettor: account, market: 1, side: true, amount: W },
+            from,
+          ),
+          rawLog(
+            "BinaryBet",
+            { k: 429n, bettor: other, market: 1, side: false, amount: W },
+            from,
+            1,
+          ),
+        ]
+      : [rawLog("Claimed", { k: 429n, account, amount: W }, to, 2)];
+  });
+  try {
+    const r = runtime({
+      getLogs: () => {
+        throw Error("Game logs must not use the wallet transport");
+      },
+    });
+    const events = await loadEvents(r, undefined, rpc.urls);
+    assert.deepEqual(ranges, [
+      `${start}-${start + 4999n}`,
+      `${start + 5000n}-${latest}`,
+    ]);
+    assert.equal(events.length, 3);
+    const own = betsFromEvents(walletEvents(events, account));
+    assert.equal(own.bets.length, 1);
+    assert.deepEqual([...own.claimed], ["429"]);
+    const detail = failures[0][1];
+    assert.equal(detail.step, "shared events: eth_getLogs");
+    assert.equal(detail.rpcUrl, rpc.urls[0]);
+    assert.equal(detail.fromBlock, String(start));
+    assert.equal(detail.toBlock, String(start + 4999n));
+  } finally {
+    await rpc.close();
+  }
 });

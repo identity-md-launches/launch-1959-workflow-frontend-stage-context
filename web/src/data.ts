@@ -11,8 +11,10 @@ import {
   toHex,
   type Address,
   type Hex,
+  type PublicClient,
 } from "viem";
 import type { Runtime } from "./config";
+import { LEADERBOARD_RPCS } from "./leaderboard-config";
 import type { GameWindow, Position } from "./model";
 import { TICKET_PRICE, type WalletBet, type WindowRead } from "./mybets";
 export function reader(r: Runtime) {
@@ -159,11 +161,84 @@ export interface GameEvent {
   blockNumber: bigint;
 }
 const scanHeads = new Map<string, bigint>();
-export async function loadEvents(r: Runtime, previous?: GameEvent[]) {
-  const latest = await r.client.getBlockNumber().catch((error) => {
-    logMyBetsReadError(r, "shared events: eth_blockNumber", error);
-    throw error;
-  });
+// Historical game logs load through the leaderboard's working RPC list, never
+// through the wallet transport: publicnode refuses archive ranges without a
+// token and drpc's free plan refuses them, while BlockPI and MEV Blocker serve
+// every fixed 5000-block chunk. Contract reads keep using r.client unchanged.
+export const GAME_LOG_RPCS: readonly string[] = LEADERBOARD_RPCS;
+export const GAME_LOG_CHUNK = 5000n;
+const logPools = new Map<
+  string,
+  {
+    preferred: number;
+    clients: { url: string; client: PublicClient }[];
+  }
+>();
+// Each request is bounded by the caller. A failed attempt is logged with its
+// step, RPC URL and block range, then the same request moves to the next RPC;
+// every RPC gets two attempts before the step fails. The last working RPC
+// stays preferred, so healthy scans do not keep probing refusing endpoints.
+function logRequester(r: Runtime, urls: readonly string[], label: string) {
+  const key = `${r.chain.id}:${urls.join(",")}`;
+  let pool = logPools.get(key);
+  if (!pool) {
+    pool = {
+      preferred: 0,
+      clients: urls.map((url) => ({
+        url,
+        client: createPublicClient({
+          chain: r.chain,
+          transport: http(url, { timeout: 10000, retryCount: 0 }),
+        }) as PublicClient,
+      })),
+    };
+    logPools.set(key, pool);
+  }
+  const p = pool;
+  return async function request<T>(
+    step: string,
+    from: bigint | undefined,
+    to: bigint | undefined,
+    run: (client: PublicClient, url: string) => Promise<T>,
+  ): Promise<T> {
+    let failure: unknown = Error("No game RPCs are configured.");
+    for (let attempt = 0; attempt < p.clients.length * 2; attempt++) {
+      const index = (p.preferred + attempt) % p.clients.length;
+      const { url, client } = p.clients[index];
+      try {
+        const result = await run(client, url);
+        p.preferred = index;
+        return result;
+      } catch (error) {
+        failure = error;
+        console.error(
+          `[My bets] ${label} request failed`,
+          {
+            step,
+            rpcUrl: url,
+            fromBlock: from?.toString() ?? "latest",
+            toBlock: to?.toString() ?? "latest",
+            attempt: attempt + 1,
+          },
+          error,
+        );
+      }
+    }
+    throw failure;
+  };
+}
+export async function loadEvents(
+  r: Runtime,
+  previous?: GameEvent[],
+  urls: readonly string[] = GAME_LOG_RPCS,
+) {
+  const request = logRequester(r, urls, "Shared events");
+  const latest = await request(
+    "shared events: eth_blockNumber",
+    undefined,
+    undefined,
+    (client) => client.getBlockNumber({ cacheTime: 0 }),
+  );
   const prior = previous ?? [];
   const scanKey = `${r.chain.id}:${r.game.address.toLowerCase()}`;
   const head = previous ? scanHeads.get(scanKey) : undefined;
@@ -174,18 +249,22 @@ export async function loadEvents(r: Runtime, previous?: GameEvent[]) {
   if (from < BigInt(r.game.deploymentBlock))
     from = BigInt(r.game.deploymentBlock);
   const output = prior.filter((e) => e.blockNumber < from);
-  for (let start = from; start <= latest; start += 5000n) {
-    const end = start + 4999n < latest ? start + 4999n : latest;
-    const logs = await r.client
-      .getLogs({
-        address: r.game.address,
-        fromBlock: start,
-        toBlock: end,
-      })
-      .catch((error) => {
-        logMyBetsReadError(r, "shared events: eth_getLogs", error, start, end);
-        throw error;
-      });
+  for (let start = from; start <= latest; start += GAME_LOG_CHUNK) {
+    const end =
+      start + GAME_LOG_CHUNK - 1n < latest
+        ? start + GAME_LOG_CHUNK - 1n
+        : latest;
+    const logs = await request(
+      "shared events: eth_getLogs",
+      start,
+      end,
+      (client) =>
+        client.getLogs({
+          address: r.game.address,
+          fromBlock: start,
+          toBlock: end,
+        }),
+    );
     for (const log of logs) {
       try {
         const decoded = decodeEventLog({
@@ -297,45 +376,14 @@ function logMyBetsReadError(
   );
 }
 
-// Only used when the shared events query has failed. Every request is bounded
-// before sending; retry the same chunk across the configured RPCs twice.
-export async function loadWalletBets(r: Runtime, account: Address) {
-  const clients = r.deployment.network.rpcUrls.map((url) => ({
-    url,
-    client: createPublicClient({
-      chain: r.chain,
-      transport: http(url, { timeout: 10000, retryCount: 0 }),
-    }),
-  }));
-  let cursor = 0;
-  async function request<T>(
-    step: string,
-    from: bigint | undefined,
-    to: bigint | undefined,
-    run: (client: (typeof clients)[number]["client"]) => Promise<T>,
-  ): Promise<T> {
-    let failure: unknown = Error("No game RPCs are configured.");
-    for (let attempt = 0; attempt < clients.length * 2; attempt++) {
-      const { url, client } = clients[cursor++ % clients.length];
-      try {
-        return await run(client);
-      } catch (error) {
-        failure = error;
-        console.error(
-          "[My bets] Fallback request failed",
-          {
-            step,
-            rpcUrl: url,
-            fromBlock: from?.toString() ?? "latest",
-            toBlock: to?.toString() ?? "latest",
-            attempt: attempt + 1,
-          },
-          error,
-        );
-      }
-    }
-    throw failure;
-  }
+// Only used when the shared events query has failed. Every request is a fixed
+// 5000-block chunk over the same RPC list as the shared events, retried per chunk.
+export async function loadWalletBets(
+  r: Runtime,
+  account: Address,
+  urls: readonly string[] = GAME_LOG_RPCS,
+) {
+  const request = logRequester(r, urls, "Wallet fallback");
   const latest = await request(
     "eth_blockNumber",
     undefined,
@@ -355,11 +403,14 @@ export async function loadWalletBets(r: Runtime, account: Address) {
   for (
     let from = BigInt(r.game.deploymentBlock);
     from <= latest;
-    from += 5000n
+    from += GAME_LOG_CHUNK
   ) {
-    const to = from + 4999n < latest ? from + 4999n : latest;
-    const logs = await request("eth_getLogs", from, to, (client) =>
-      client.request({
+    const to =
+      from + GAME_LOG_CHUNK - 1n < latest ? from + GAME_LOG_CHUNK - 1n : latest;
+    let source = "";
+    const logs = await request("eth_getLogs", from, to, (client, url) => {
+      source = url;
+      return client.request({
         method: "eth_getLogs",
         params: [
           {
@@ -370,8 +421,8 @@ export async function loadWalletBets(r: Runtime, account: Address) {
             topics,
           },
         ],
-      }),
-    );
+      });
+    });
     for (const log of logs) {
       try {
         const d = decodeEventLog({
@@ -391,7 +442,7 @@ export async function loadWalletBets(r: Runtime, account: Address) {
           "[My bets] Fallback log decoding failed",
           {
             step: "decodeEventLog",
-            rpcUrl: clients[(cursor - 1) % clients.length].url,
+            rpcUrl: source,
             fromBlock: from.toString(),
             toBlock: to.toString(),
           },

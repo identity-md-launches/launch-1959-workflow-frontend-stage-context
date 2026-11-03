@@ -2,6 +2,38 @@
 
 Scope: the existing Hamster Hour site, its production static export, and the My Bets loading/refund/claim flow. The established cozy pixel design, contracts, keeper, leaderboard implementation, wallet configuration, build configuration, manifest and lockfile are preserved. Production contains no test-wallet injection or fixture data.
 
+## Revision: event history through the leaderboard's RPC list
+
+A reviewer reported that My Bets still showed "Your bets could not load" while the leaderboard loaded. It reproduced. The shared `useEvents` query and the wallet fallback both requested logs only through the runtime RPCs, PublicNode and dRPC. On November 3, a direct `eth_getLogs` for blocks 26,229,405–26,234,404 returned these results:
+
+| RPC | Result |
+| --- | --- |
+| BlockPI (`ethereum.public.blockpi.network`) | logs returned |
+| MEV Blocker | logs returned |
+| PublicNode | -32602 "Archive requests require a personal token" |
+| dRPC | 35 "ranges over 10000 blocks are not supported on free plan" |
+| LlamaRPC | HTTP 525 |
+| Cloudflare | -32047 "Max range: 800" |
+
+Fix (`web/src/data.ts`): `GAME_LOG_RPCS` is the leaderboard's own `LEADERBOARD_RPCS` list. `logRequester` sends each bounded request to the preferred RPC. On failure it logs the step, RPC URL, block range and attempt, then moves to the next RPC, with two passes per chunk. The working RPC stays preferred. `loadEvents`, the shared query My Bets filters in memory, and `loadWalletBets`, the error-only fallback, both use it with fixed 5,000-block chunks. Contract reads, refund classification, the leaderboard scanner and its configuration are unchanged.
+
+The leaderboard's `VolumeScanner` was not changed to also hand My Bets its logs. It keeps only per-window aggregates: no `Claimed` events, transaction hashes or log identities. Its localStorage checkpoint means a returning visitor's scan reads only blocks after the checkpoint. It therefore cannot supply a wallet's full history without changing leaderboard logic, which the brief forbids. The shared events query now reads from the same endpoints the leaderboard uses.
+
+Checks run for this revision:
+
+| Check | Actual outcome |
+| --- | --- |
+| `npx tsc --noEmit` | Passed |
+| `npm test` | 69/69 passed. New: shared loader skips a PublicNode-style refusal, stays at 5,000-block ranges, logs the failed RPC and range, and filters BinaryBet/Claimed for the wallet. Updated: the loader no longer touches the wallet transport, and the fallback prefers the working RPC. |
+| `npm run build` | Passed, with export verification (25 assets) |
+| Live Node run of `loadEvents` → unchanged `loadMyBets` → `classify` | 1,130 events, 0 failed attempts. `0xa1c1…217a`: hour 429, 7.37 IMD, Refund ready. `0x15e0…e217`: hour 431, 1 IMD, Refund ready; hour 478, 5 IMD, Waiting for refund at 1793744399, Refund ready at 1793744400 (Nov 3 22:20 UTC). |
+| Live Node run of `loadWalletBets` (fallback) for both wallets | Hours 429 (7.37), 431 (1) and 478 (5), 0 failed attempts |
+| Chromium, 390×844, production `dist/` served locally, live RPCs, read-only EIP-6963 provider (`eth_accounts`/`eth_chainId` only) | Wallet 1: hour 429 · 7.37 IMD · Refund ready, Claim 7.37 IMD shown ([screenshot](mybets-live-0xa1c1-390.png)). Wallet 2: "Finding your bets…" while loading, then hour 478 · 5 IMD · Waiting for refund ("22:20 UTC Nov 3") and hour 431 · 1 IMD · Refund ready ([screenshot](mybets-live-0x15e0-390.png)). Network: every historical log request went to BlockPI; PublicNode served only latest-block reads. No My Bets console errors. The only console errors were CORS refusals of the worker endpoints for the `127.0.0.1` origin, which this change does not affect. |
+
+| `taste.mjs --out test/scratch/taste`, with a Playwright installed only in scratch | 14/16, matching the previous round. The two failures are the documented existing-style exceptions: the active "The wheel" nav tab is read as a kicker, and the bet side buttons use border plus shadow. Neither is touched by this data-layer change. |
+
+Limitations: no transaction was signed or sent. The broad `tests/browser.mjs` suite was not re-run in this revision. Its fixtures intercept RPC traffic, and the change is confined to the log-loading data layer. Layout, CSS and copy are unchanged, so the earlier Better Interface review and design-probe results still apply.
+
 ## Implementation
 
 `web/src/App.tsx:412` passes the existing shared `useEvents` query to My Bets. `walletEvents` (`web/src/data.ts:262`) filters BinaryBet/TicketBought by bettor and Claimed by account, case-insensitively. It does not apply leaderboard volume eligibility. `useMyBets` (`data.ts:492`) enables its reads only after shared history is available or that query errors. A successful empty array never triggers a scan. Available shared history remains usable through a background refresh error.

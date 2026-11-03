@@ -79,7 +79,7 @@ The counting fix adds no palette, typography, spacing or responsive rules. The l
 
 ### My Bets history and recovery
 
-`App.tsx` passes its shared game-events query into `MyBets` (`web/src/MyBets.tsx`); `useMyBets` in `data.ts` waits for that query and filters by the connected wallet. The existing cozy pixel composition is retained: one page heading, the My bets card, Ready to claim and Claim all at the top, then newest-first hour groups with every stake, textual status, transaction link and per-hour claim action. The leaderboard's volume eligibility never filters these groups.
+`App.tsx` passes its shared game-events query into `MyBets` (`web/src/MyBets.tsx`); `useMyBets` in `data.ts` waits for that query and filters by the connected wallet. That query reads historical logs through the leaderboard's RPC list in 5,000-block chunks. The existing cozy pixel composition is retained: one page heading, the My bets card, Ready to claim and Claim all at the top, then newest-first hour groups with every stake, textual status, transaction link and per-hour claim action. The leaderboard's volume eligibility never filters these groups.
 
 Loading uses the existing `Empty` component with “Finding your bets…” in a polite `role=status` region. Exhausted requests show the existing error copy with `role=alert` and a native Try again button. No loading skeleton, font, palette or animation was added. The empty connected state offers Make your first pick; the disconnected state offers Connect wallet. A failed shared query can recover through a bounded wallet-event scan, with the same visible loading/error states.
 
