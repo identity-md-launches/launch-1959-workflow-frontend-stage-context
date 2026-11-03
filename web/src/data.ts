@@ -160,11 +160,8 @@ export interface GameEvent {
   logIndex: number;
   blockNumber: bigint;
 }
-const scanHeads = new Map<string, bigint>();
-// Historical game logs load through the leaderboard's working RPC list, never
-// through the wallet transport: publicnode refuses archive ranges without a
-// token and drpc's free plan refuses them, while BlockPI and MEV Blocker serve
-// every fixed 5000-block chunk. Contract reads keep using r.client unchanged.
+// Wallet fallback uses the same RPC pool as the shared history scanner.
+// Contract reads keep using r.client unchanged.
 export const GAME_LOG_RPCS: readonly string[] = LEADERBOARD_RPCS;
 export const GAME_LOG_CHUNK = 5000n;
 const logPools = new Map<
@@ -227,74 +224,6 @@ function logRequester(r: Runtime, urls: readonly string[], label: string) {
     throw failure;
   };
 }
-export async function loadEvents(
-  r: Runtime,
-  previous?: GameEvent[],
-  urls: readonly string[] = GAME_LOG_RPCS,
-) {
-  const request = logRequester(r, urls, "Shared events");
-  const latest = await request(
-    "shared events: eth_blockNumber",
-    undefined,
-    undefined,
-    (client) => client.getBlockNumber({ cacheTime: 0 }),
-  );
-  const prior = previous ?? [];
-  const scanKey = `${r.chain.id}:${r.game.address.toLowerCase()}`;
-  const head = previous ? scanHeads.get(scanKey) : undefined;
-  let from =
-    head !== undefined
-      ? (head > latest ? latest : head) - 12n
-      : BigInt(r.game.deploymentBlock);
-  if (from < BigInt(r.game.deploymentBlock))
-    from = BigInt(r.game.deploymentBlock);
-  const output = prior.filter((e) => e.blockNumber < from);
-  for (let start = from; start <= latest; start += GAME_LOG_CHUNK) {
-    const end =
-      start + GAME_LOG_CHUNK - 1n < latest
-        ? start + GAME_LOG_CHUNK - 1n
-        : latest;
-    const logs = await request(
-      "shared events: eth_getLogs",
-      start,
-      end,
-      (client) =>
-        client.getLogs({
-          address: r.game.address,
-          fromBlock: start,
-          toBlock: end,
-        }),
-    );
-    for (const log of logs) {
-      try {
-        const decoded = decodeEventLog({
-          abi: r.game.abi,
-          data: log.data,
-          topics: log.topics,
-        });
-        output.push({
-          eventName: decoded.eventName!,
-          args: decoded.args as any,
-          transactionHash: log.transactionHash!,
-          blockNumber: log.blockNumber!,
-          logIndex: log.logIndex!,
-        });
-      } catch {
-        /* Unknown logs are not gameplay. */
-      }
-    }
-  }
-  scanHeads.set(scanKey, latest);
-  return output;
-}
-let cachedEvents: GameEvent[] | undefined;
-export const useEvents = (r: Runtime) =>
-  useQuery({
-    queryKey: ["events"],
-    queryFn: async () => (cachedEvents = await loadEvents(r, cachedEvents)),
-    refetchInterval: 20000,
-    retry: 1,
-  });
 export function usePositions(
   r: Runtime,
   account: Address | undefined,
@@ -536,10 +465,10 @@ export async function loadMyBets(
     blockNumber: block.number,
   };
 }
-export type SharedEvents = Pick<
-  ReturnType<typeof useEvents>,
-  "data" | "isError"
->;
+export interface SharedEvents {
+  data: GameEvent[] | undefined;
+  isError: boolean;
+}
 export function useMyBets(
   r: Runtime,
   account: Address | undefined,

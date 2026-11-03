@@ -16,7 +16,6 @@ import { mainnet } from "viem/chains";
 import {
   betsFromEvents,
   loadMyBets,
-  loadEvents,
   loadWalletBets,
   walletEvents,
   GAME_LOG_RPCS,
@@ -397,64 +396,4 @@ test("per-hour errors identify the read, RPC URL and pinned block", async (t) =>
   assert.equal(errors[0][1].rpcUrl, "https://eth.drpc.org");
   assert.equal(errors[0][1].fromBlock, "26330000");
   assert.equal(errors[0][1].toBlock, "26330000");
-});
-
-test("shared events load through the leaderboard RPC list in 5000-block chunks past refusing RPCs", async (t) => {
-  const failures: any[] = [];
-  t.mock.method(console, "error", (...args: any[]) => failures.push(args));
-  const { LEADERBOARD_RPCS } = await import("../src/leaderboard-config");
-  assert.deepEqual(GAME_LOG_RPCS, LEADERBOARD_RPCS);
-  const start = BigInt(handoff.contracts[0].deploymentBlock),
-    latest = start + 7000n;
-  const ranges: string[] = [];
-  const rpc = await rpcServers((rpc, body) => {
-    if (body.method === "eth_blockNumber") return toHex(latest);
-    const from = BigInt(body.params[0].fromBlock),
-      to = BigInt(body.params[0].toBlock);
-    assert.ok(to - from + 1n <= 5000n);
-    // Mirrors publicnode's refusal of the deployment-era range.
-    if (rpc === 0)
-      throw Error(
-        "Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode",
-      );
-    ranges.push(`${from}-${to}`);
-    return from === start
-      ? [
-          rawLog(
-            "BinaryBet",
-            { k: 429n, bettor: account, market: 1, side: true, amount: W },
-            from,
-          ),
-          rawLog(
-            "BinaryBet",
-            { k: 429n, bettor: other, market: 1, side: false, amount: W },
-            from,
-            1,
-          ),
-        ]
-      : [rawLog("Claimed", { k: 429n, account, amount: W }, to, 2)];
-  });
-  try {
-    const r = runtime({
-      getLogs: () => {
-        throw Error("Game logs must not use the wallet transport");
-      },
-    });
-    const events = await loadEvents(r, undefined, rpc.urls);
-    assert.deepEqual(ranges, [
-      `${start}-${start + 4999n}`,
-      `${start + 5000n}-${latest}`,
-    ]);
-    assert.equal(events.length, 3);
-    const own = betsFromEvents(walletEvents(events, account));
-    assert.equal(own.bets.length, 1);
-    assert.deepEqual([...own.claimed], ["429"]);
-    const detail = failures[0][1];
-    assert.equal(detail.step, "shared events: eth_getLogs");
-    assert.equal(detail.rpcUrl, rpc.urls[0]);
-    assert.equal(detail.fromBlock, String(start));
-    assert.equal(detail.toBlock, String(start + 4999n));
-  } finally {
-    await rpc.close();
-  }
 });

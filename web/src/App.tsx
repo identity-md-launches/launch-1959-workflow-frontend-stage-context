@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Runtime } from "./config";
-import {
-  useGlobal,
-  useWindow,
-  useEvents,
-  useVerification,
-  type GameEvent,
-} from "./data";
+import { useGlobal, useWindow, useVerification, type GameEvent } from "./data";
 import { useStatus, useRounds, windowProgress } from "./live";
 import { useStats, wakeEstimate } from "./telemetry";
 import { BetPanel, type BetReceipt } from "./Bet";
@@ -177,7 +171,6 @@ function Ticker({ events, error }: { events?: GameEvent[]; error: boolean }) {
 function Game({ r }: { r: Runtime }) {
   const global = useGlobal(r),
     verification = useVerification(r),
-    events = useEvents(r),
     status = useStatus(),
     rounds = useRounds(),
     stats = useStats(7),
@@ -193,6 +186,7 @@ function Game({ r }: { r: Runtime }) {
     r,
     tab === "play" || tab === "leaderboard",
   );
+  const events = leaderboard.events;
   useEffect(() => {
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(id);

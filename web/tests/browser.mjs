@@ -163,6 +163,7 @@ function reset() {
     rpcRequests: [],
     sharedFailure: false,
     sharedGate: undefined,
+    unfilteredGate: undefined,
     walletFailure: false,
     walletPrimaryFail: false,
   };
@@ -723,7 +724,8 @@ async function pageFor({
         const boardLog =
           !Array.isArray(payload) &&
           payload.method === "eth_getLogs" &&
-          Array.isArray(payload.params[0]?.topics?.[0]);
+          Array.isArray(payload.params[0]?.topics?.[0]) &&
+          !payload.params[0]?.topics?.[2];
         if (boardLog) {
           state.boardRequests.push({ url: req.url(), ...payload.params[0] });
           if (state.boardDelay)
@@ -752,20 +754,27 @@ async function pageFor({
         if (
           state.sharedGate &&
           requests.some(
-            (x) => x.method === "eth_getLogs" && !x.params[0].topics?.length,
+            (x) => x.method === "eth_getLogs" && !x.params[0].topics?.[2],
           )
         )
           await state.sharedGate;
+        if (
+          state.unfilteredGate &&
+          requests.some(
+            (x) => x.method === "eth_getLogs" && !x.params[0].topics?.length,
+          )
+        )
+          await state.unfilteredGate;
         const one = (x) => {
           if (x.method === "eth_getLogs") {
             const wallet = !!x.params[0].topics?.[2];
-            const shared = !x.params[0].topics?.length;
+            const shared = !wallet;
             if (
               (shared && state.sharedFailure) ||
               (wallet &&
                 (state.walletFailure ||
                   (state.walletPrimaryFail &&
-                    req.url().startsWith(config.network.rpcUrls[0]))))
+                    req.url().startsWith(leaderboardRpcs[0]))))
             )
               return {
                 jsonrpc: "2.0",
@@ -962,6 +971,10 @@ const walletRequests = () =>
     (x) => x.method === "eth_getLogs" && x.params[0].topics?.[2],
   );
 const sharedRequests = () =>
+  state.rpcRequests.filter(
+    (x) => x.method === "eth_getLogs" && !x.params[0].topics?.[2],
+  );
+const unfilteredRequests = () =>
   state.rpcRequests.filter(
     (x) => x.method === "eth_getLogs" && !x.params[0].topics?.length,
   );
@@ -2661,6 +2674,82 @@ try {
     },
   );
   await check(
+    "My bets shares the leaderboard's completed history without an independent scan",
+    async () => {
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const { page, context } = await pageFor({
+        connected: true,
+        initialTab: "leaderboard",
+        width: 390,
+        prepare: () => {
+          refundFixture(refundWalletA);
+          state.head = deploymentBlock + 10002n;
+          state.unfilteredGate = gate;
+          addLog(
+            "BinaryBet",
+            { k: 425n, bettor: other, market: 0, side: true, amount: W },
+            1100n,
+          );
+          addLog(
+            "BinaryBet",
+            { k: 425n, bettor: teamWallet, market: 0, side: false, amount: W },
+            1101n,
+          );
+          settleHour(425n, 1102n);
+        },
+      });
+      try {
+        await page.locator(".leaderboard-table").first().waitFor();
+        await page
+          .getByText("Through block 26,239,407", { exact: false })
+          .waitFor();
+        const scans = state.boardRequests.length;
+        await page.getByRole("link", { name: "My bets", exact: true }).click();
+        await page
+          .getByRole("button", { name: "Claim 7.37 IMD", exact: true })
+          .waitFor({ timeout: 3000 });
+        assert.equal(await page.locator(".bet-hours > li").count(), 1);
+        assert.match(await page.locator(".bet-hour").innerText(), /hour 429/);
+        assert.match(
+          await page.locator(".bet-hour").innerText(),
+          /Refund ready/,
+        );
+        assert.equal(walletRequests().length, 0);
+        assert.equal(
+          unfilteredRequests().length,
+          0,
+          "No independent unfiltered history scan",
+        );
+        assert.equal(
+          state.boardRequests.length,
+          scans,
+          "Navigation reuses the completed history",
+        );
+        await noOverflow(page);
+        await page.screenshot({
+          path: resolve(out, "mybets-shared-leaderboard-390.png"),
+        });
+        await page.reload();
+        await page
+          .getByRole("button", { name: "Claim 7.37 IMD", exact: true })
+          .waitFor();
+        assert.equal(
+          state.boardRequests.length,
+          scans,
+          "Reload restores the same raw history checkpoint",
+        );
+        assert.equal(walletRequests().length, 0);
+        assert.equal(unfilteredRequests().length, 0);
+      } finally {
+        release();
+        await context.close();
+      }
+    },
+  );
+  await check(
     "My bets reuses loaded shared events without another scan and preserves refund 429",
     async () => {
       const { page, context } = await pageFor({
@@ -2882,12 +2971,8 @@ try {
         `${deploymentBlock + 5000n}-${deploymentBlock + 9999n}`,
         `${deploymentBlock + 10000n}-${state.head}`,
       ]);
-      assert.ok(
-        requests.some((x) => x.url.startsWith(config.network.rpcUrls[0])),
-      );
-      assert.ok(
-        requests.some((x) => x.url.startsWith(config.network.rpcUrls[1])),
-      );
+      assert.ok(requests.some((x) => x.url.startsWith(leaderboardRpcs[0])));
+      assert.ok(requests.some((x) => x.url.startsWith(leaderboardRpcs[1])));
       await context.close();
     },
   );

@@ -1,0 +1,10 @@
+{
+  "results": [
+    {
+      "name": "My bets shares the leaderboard's completed history without an independent scan",
+      "passed": false,
+      "error": "locator.waitFor: Timeout 3000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Claim 7.37 IMD', exact: true }) to be visible\u001b[22m\n\n    at /tmp/hh-shared-history/web/tests/browser.mjs:2686:81\n    at async check (/tmp/hh-shared-history/web/tests/browser.mjs:979:5)\n    at async file:///tmp/hh-shared-history/web/tests/browser.mjs:2663:3"
+    }
+  ],
+  "pageErrors": []
+}

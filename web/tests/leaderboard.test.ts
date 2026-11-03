@@ -7,6 +7,7 @@ import {
   getEventSelector,
   parseAbi,
   toHex,
+  type Abi,
   type AbiEvent,
   type Address,
   type Hex,
@@ -37,10 +38,21 @@ const hash = (n: bigint) => `0x${n.toString(16).padStart(64, "0")}` as Hex;
 const signal = () => new AbortController().signal;
 const fixtureEvents = [
   ...LEADERBOARD_EVENTS,
-  ...parseAbi(["event MarketVoided(uint256 indexed k, uint8 indexed market)"]),
+  ...parseAbi([
+    "event MarketVoided(uint256 indexed k, uint8 indexed market)",
+    "event Claimed(uint256 indexed k, address indexed account, uint256 amount)",
+    "event Fed(address indexed from, uint256 amount)",
+  ]),
 ];
 function event(
-  name: "BinaryBet" | "TicketBought" | "Settled" | "MarketVoided" | "TimedOut",
+  name:
+    | "BinaryBet"
+    | "TicketBought"
+    | "Settled"
+    | "MarketVoided"
+    | "TimedOut"
+    | "Claimed"
+    | "Fed",
   args: Record<string, any>,
   block: bigint,
   index = 0,
@@ -102,7 +114,7 @@ const decode = (logs: RawVolumeLog[]) =>
     );
 const totals = (logs: RawVolumeLog[]) =>
   walletVolumes(aggregateEvents(decode(logs)));
-function harness() {
+function harness(historyAbi?: Abi) {
   let head = 4_102n,
     failAt: bigint | undefined,
     reorg = false;
@@ -130,7 +142,7 @@ function harness() {
       ranges.push([from, to]);
       assert.ok(to - from + 1n <= 2_000n);
       assert.equal(p.address, game);
-      assert.equal(p.topics[0].length, 4);
+      assert.equal(p.topics[0].length, historyAbi?.length ?? 4);
       if (failAt !== undefined && from >= failAt) throw Error("Disconnected");
       return logs.filter(
         (l) => BigInt(l.blockNumber) >= from && BigInt(l.blockNumber) <= to,
@@ -150,6 +162,7 @@ function harness() {
       address: game,
       deploymentBlock: 100n,
       abi: LEADERBOARD_EVENTS,
+      historyAbi,
       decode: (l) =>
         decodeVolumeEvent(LEADERBOARD_EVENTS, l, LEADERBOARD_TICKET_PRICE),
       rpc,
@@ -780,4 +793,86 @@ test("recorded Ethereum events reproduce the three expected wallets and exclude 
     rows.some((w) => w.pending > 0n),
     false,
   );
+});
+
+test("one scanner retains bets, refunds, tickets and claims while rankings use the unchanged eligibility rules", async () => {
+  const h = harness(fixtureEvents);
+  const refund = binary(alice, 103n, 7374185066434527746n, 429n, 0, true, 1);
+  const claim = event(
+    "Claimed",
+    { k: 429n, account: alice, amount: 7374185066434527746n },
+    104n,
+  );
+  const feed = event("Fed", { from: bob, amount: W }, 105n);
+  h.logs.push(refund, claim, feed, refund); // Duplicate provider logs are retained once.
+  const scanner = h.make();
+  const first = await scanner.scan(signal());
+  assert.equal(first.rows[0].volume, 20n * W);
+  assert.equal(first.history!.length, h.logs.length - 1);
+  assert.ok(first.history!.includes(refund));
+  assert.ok(first.history!.includes(claim));
+  assert.ok(first.history!.includes(feed));
+  assert.ok(
+    first.history!.some(
+      (log) => log.topics[0] === getEventSelector(LEADERBOARD_EVENTS[1]),
+    ),
+  );
+  const reloaded = h.make();
+  assert.deepEqual(reloaded.snapshot()!.history, first.history);
+  h.ranges.length = 0;
+  h.setHead(4105n);
+  const newClaim = event(
+    "Claimed",
+    { k: 1n, account: alice, amount: W },
+    4103n,
+  );
+  h.logs.push(newClaim);
+  const updated = await reloaded.scan(signal());
+  assert.deepEqual(h.ranges, [[4103n, 4105n]]);
+  assert.equal(updated.history!.length, first.history!.length + 1);
+  assert.deepEqual(updated.rows, first.rows);
+  h.reorg();
+  const reorganized = await reloaded.scan(signal());
+  assert.deepEqual(reorganized.history, []);
+  assert.deepEqual(reorganized.rows, []);
+});
+
+test("shared history resumes interrupted ranges and rejects corrupt or aggregate-only checkpoints", async () => {
+  const h = harness(fixtureEvents);
+  h.setFailure(2100n);
+  const scanner = h.make();
+  await assert.rejects(scanner.scan(signal()), /Disconnected/);
+  assert.equal(scanner.snapshot(), undefined);
+  h.setFailure();
+  h.ranges.length = 0;
+  const resumed = h.make();
+  const result = await resumed.scan(signal());
+  assert.deepEqual(h.ranges, [
+    [2100n, 4099n],
+    [4100n, 4102n],
+  ]);
+  assert.equal(result.history!.length, h.logs.length);
+  const saved = h.memory.get(scanner.key)!;
+  for (const mutate of [
+    (d: any) => {
+      delete d.history;
+    },
+    (d: any) => {
+      d.history[0].data = "0x";
+    },
+    (d: any) => {
+      d.history[0].blockNumber = "0x0";
+    },
+    (d: any) => {
+      d.history.push(d.history[0]);
+    },
+  ]) {
+    const data = JSON.parse(saved);
+    mutate(data);
+    h.memory.set(scanner.key, JSON.stringify(data));
+    assert.equal(h.make().snapshot(), undefined);
+  }
+  h.memory.clear();
+  h.memory.set(scanner.key.replace(":game-history-v1", ""), saved);
+  assert.equal(h.make().snapshot(), undefined);
 });

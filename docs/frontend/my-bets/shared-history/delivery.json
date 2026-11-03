@@ -1,0 +1,37 @@
+{
+  "limitBytes": 8388608,
+  "measurement": "Conservative sum of complete changed/new submission files, including .imd-responses.json and this report; deleted files contribute zero.",
+  "changedFilesBytes": 2613098,
+  "staticExportBytes": 1355368,
+  "exportInventoryAssets": 25,
+  "builtSourceMatchesRepository": true,
+  "protectedBuildFilesAndDependenciesUnchanged": true,
+  "contractsAndKeeperUnchanged": true,
+  "ignoreFilesChanged": false,
+  "checks": {
+    "productionBuild": "passed",
+    "independentTypecheck": "passed",
+    "unitTests": {
+      "passed": 69,
+      "total": 69
+    },
+    "focusedMyBets": {
+      "passed": 8,
+      "total": 8
+    },
+    "completeChromium": {
+      "passed": 41,
+      "total": 41,
+      "pageErrors": []
+    },
+    "designProbe": {
+      "passed": 14,
+      "total": 16
+    },
+    "exportInventory": "passed"
+  },
+  "limitations": [
+    "WebKit could not launch because required system libraries are absent.",
+    "Physical device, native browser zoom, screen-reader and real transaction checks were not performed."
+  ]
+}

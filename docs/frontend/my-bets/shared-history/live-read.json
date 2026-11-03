@@ -1,0 +1,63 @@
+{
+  "observedAt": "2026-11-03T08:37:28.673Z",
+  "mode": "read-only Ethereum RPC",
+  "source": "https://ethereum-rpc.publicnode.com",
+  "throughBlock": "26333120",
+  "sharedEvents": 1134,
+  "historyRequests": 52,
+  "additionalHistoryRequestsForMyBets": 0,
+  "rankedWallets": 3,
+  "wallets": [
+    {
+      "account": "0xa1c19314851e7abf72b3c124476b1c7a3be2217a",
+      "readBlock": "26333122",
+      "timestamp": "1793695043",
+      "rows": [
+        {
+          "hour": "429",
+          "stakeIMD": "7.37",
+          "claimable": "7374185066434527746",
+          "bets": [
+            {
+              "status": "Refund ready",
+              "state": "refund-ready",
+              "amountIMD": "7.37"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "account": "0x15e02b8fa7fc6abcf698955587701fe51ddfe217",
+      "readBlock": "26333122",
+      "timestamp": "1793695043",
+      "rows": [
+        {
+          "hour": "478",
+          "stakeIMD": "5",
+          "claimable": "0",
+          "bets": [
+            {
+              "status": "Waiting for refund",
+              "state": "waiting-refund",
+              "amountIMD": "5",
+              "unlockAt": "1793744400"
+            }
+          ]
+        },
+        {
+          "hour": "431",
+          "stakeIMD": "1",
+          "claimable": "1000000000000000000",
+          "bets": [
+            {
+              "status": "Refund ready",
+              "state": "refund-ready",
+              "amountIMD": "1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

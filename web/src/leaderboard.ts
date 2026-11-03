@@ -246,6 +246,29 @@ export function createRpcPool(
           return data.result as T;
         } catch (e) {
           abort(signal);
+          const range =
+            method === "eth_getLogs"
+              ? (params[0] as { fromBlock: Hex; toBlock: Hex })
+              : undefined;
+          console.error(
+            "[Game events] RPC request failed",
+            {
+              step: method,
+              rpcUrl: urls[index],
+              fromBlock: range
+                ? String(BigInt(range.fromBlock))
+                : method === "eth_getBlockByNumber"
+                  ? String(BigInt(params[0] as Hex))
+                  : "latest",
+              toBlock: range
+                ? String(BigInt(range.toBlock))
+                : method === "eth_getBlockByNumber"
+                  ? String(BigInt(params[0] as Hex))
+                  : "latest",
+              attempt: round * urls.length + offset + 1,
+            },
+            e,
+          );
           errors.push(e instanceof Error ? e.message : String(e));
           options.onRetry?.();
         }
@@ -317,6 +340,7 @@ interface Checkpoint {
   lastHash?: Hex;
   complete: boolean;
   windows: Map<string, VolumeWindow>;
+  history?: RawVolumeLog[];
 }
 export interface ScanProgress {
   scanned: bigint;
@@ -329,12 +353,16 @@ export interface VolumeSnapshot {
   unranked: WalletVolume[];
   lastBlock: bigint;
   cached: boolean;
+  history?: readonly RawVolumeLog[];
 }
 export interface VolumeScannerOptions {
   chainId: number;
   address: Address;
   deploymentBlock: bigint;
   abi: Abi;
+  // Retain complete gameplay history alongside the unchanged volume aggregation.
+  // Both consumers use the very same validated, checkpointed scan.
+  historyAbi?: Abi;
   decode: (log: RawVolumeLog) => VolumeEvent;
   excludedAddresses?: readonly Address[];
   rpc: RpcCall;
@@ -348,6 +376,8 @@ export class VolumeScanner {
   cacheAvailable = true;
   constructor(private options: VolumeScannerOptions) {
     this.key = `hh-volume:${options.cacheVersion}:${options.chainId}:${options.address.toLowerCase()}:${options.deploymentBlock}`;
+    // Aggregate-only checkpoints cannot reconstruct individual bets or claims.
+    if (options.historyAbi) this.key += ":game-history-v1";
     this.checkpoint = this.empty();
     try {
       const raw = options.storage?.getItem(this.key);
@@ -362,6 +392,7 @@ export class VolumeScanner {
       lastBlock: this.options.deploymentBlock - 1n,
       complete: false,
       windows: new Map(),
+      history: this.options.historyAbi ? [] : undefined,
     };
   }
   private parse(raw: string): Checkpoint {
@@ -377,6 +408,35 @@ export class VolumeScanner {
     )
       throw Error("Invalid checkpoint");
     const windows = new Map<string, VolumeWindow>();
+    if (this.options.historyAbi) {
+      if (!Array.isArray(data.history)) throw Error("Missing game history");
+      const seen = new Set<string>();
+      for (const log of data.history) {
+        if (
+          !log ||
+          !isAddress(log.address) ||
+          log.address.toLowerCase() !== this.options.address.toLowerCase() ||
+          !hexQuantity(log.blockNumber) ||
+          !hexQuantity(log.logIndex) ||
+          !blockHash(log.blockHash) ||
+          !blockHash(log.transactionHash) ||
+          BigInt(log.blockNumber) < this.options.deploymentBlock ||
+          BigInt(log.blockNumber) > BigInt(data.lastBlock) ||
+          log.removed ||
+          !Array.isArray(log.topics)
+        )
+          throw Error("Invalid cached game log");
+        decodeEventLog({
+          abi: this.options.historyAbi,
+          data: log.data,
+          topics: log.topics,
+          strict: true,
+        });
+        const key = `${log.transactionHash}:${BigInt(log.logIndex)}`;
+        if (seen.has(key)) throw Error("Duplicate cached game log");
+        seen.add(key);
+      }
+    }
     for (const w of data.windows) {
       if (
         !w ||
@@ -422,6 +482,7 @@ export class VolumeScanner {
       lastHash: data.lastHash,
       complete: data.complete,
       windows,
+      history: this.options.historyAbi ? data.history : undefined,
     };
   }
   private save() {
@@ -434,6 +495,7 @@ export class VolumeScanner {
           lastBlock: String(c.lastBlock),
           lastHash: c.lastHash,
           complete: c.complete,
+          history: c.history,
           windows: [...c.windows].map(([hour, w]) => ({
             hour,
             settled: w.settled,
@@ -460,6 +522,7 @@ export class VolumeScanner {
         .sort((a, b) => a.address.localeCompare(b.address)),
       lastBlock: this.checkpoint.lastBlock,
       cached,
+      history: this.checkpoint.history,
     };
   }
   snapshot(): VolumeSnapshot | undefined {
@@ -505,9 +568,14 @@ export class VolumeScanner {
         target,
       });
     progress();
-    const topics = o.abi
+    const volumeTopics = o.abi
       .filter((e) => e.type === "event")
       .map((e) => getEventSelector(e));
+    const topics = o.historyAbi
+      ? o.historyAbi
+          .filter((e) => e.type === "event")
+          .map((e) => getEventSelector(e))
+      : volumeTopics;
     const readRange = async (from: bigint, to: bigint): Promise<void> => {
       const before = await header(to);
       let logs: RawVolumeLog[];
@@ -541,6 +609,7 @@ export class VolumeScanner {
         throw e;
       }
       const events: VolumeEvent[] = [],
+        history: RawVolumeLog[] = [],
         seen = new Set<string>();
       for (const log of logs) {
         if (
@@ -564,7 +633,16 @@ export class VolumeScanner {
         const key = `${log.transactionHash}:${BigInt(log.logIndex)}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        events.push(o.decode(log));
+        if (volumeTopics.includes(log.topics[0])) events.push(o.decode(log));
+        if (o.historyAbi) {
+          decodeEventLog({
+            abi: o.historyAbi,
+            data: log.data,
+            topics: log.topics as [Hex, ...Hex[]],
+            strict: true,
+          });
+          history.push(log);
+        }
       }
       // Commit only whole, validated ranges. A failed request never becomes an
       // empty range, and a reload can resume an interrupted historical scan.
@@ -582,6 +660,9 @@ export class VolumeScanner {
         lastHash: before.hash,
         complete: false,
         windows: aggregateEvents(events, this.checkpoint.windows),
+        history: this.checkpoint.history
+          ? [...this.checkpoint.history, ...history]
+          : undefined,
       };
       this.save();
       progress();
