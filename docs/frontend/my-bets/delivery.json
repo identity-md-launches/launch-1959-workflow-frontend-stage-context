@@ -1,0 +1,26 @@
+{
+  "productionExportBytes": 1354548,
+  "inventoriedAssets": 25,
+  "relativeHtmlAssetReferences": true,
+  "shareMetadata": true,
+  "inventoryHashCheck": true,
+  "pathBudgets": {
+    "dist/": {
+      "actualBytes": 1354548,
+      "budgetBytes": 2097152
+    },
+    "docs/frontend/my-bets/": {
+      "actualBytes": 3555594,
+      "budgetBytes": 4194304
+    },
+    "changed source, tests and root documentation": {
+      "actualBytes": 317565,
+      "budgetBytes": 1048576
+    }
+  },
+  "conservativeDeliverableBytes": 5227707,
+  "addedOrModifiedFileBytes": 4839496,
+  "bundleLimitBytes": 8388608,
+  "ignoreFilesChanged": false,
+  "dependencyDirectoriesAdded": false
+}

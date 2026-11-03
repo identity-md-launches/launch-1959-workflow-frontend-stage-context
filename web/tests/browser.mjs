@@ -158,6 +158,13 @@ function reset() {
     docsPending: 33n * W,
     docsHourShift: 0n,
     docsReadFailure: false,
+    now: NOW,
+    windows: new Map(),
+    rpcRequests: [],
+    sharedFailure: false,
+    sharedGate: undefined,
+    walletFailure: false,
+    walletPrimaryFail: false,
   };
   addLog(
     "BinaryBet",
@@ -238,6 +245,7 @@ function position(k) {
   return basePosition();
 }
 function windowInfo(k) {
+  if (state.windows.has(String(k))) return state.windows.get(String(k));
   return {
     index: k,
     status: k < current - 2n ? 0 : k < current ? 2 : 1,
@@ -285,7 +293,7 @@ function block() {
     size: "0x200",
     gasLimit: "0x1c9c380",
     gasUsed: "0x10000",
-    timestamp: toHex(NOW),
+    timestamp: toHex(state.now),
     transactions: [],
     uncles: [],
     baseFeePerGas: "0x3b9aca00",
@@ -479,6 +487,8 @@ function rpc(method, params) {
       const globals = {
         IMD: token,
         GENESIS,
+        TIMEOUT: 172800n,
+        balances: 0n,
         currentWindow: current + state.docsHourShift,
         earliestNotStartedWindow: next + state.docsHourShift,
         line: state.docsLine,
@@ -491,17 +501,19 @@ function rpc(method, params) {
       result =
         fn in globals
           ? globals[fn]
-          : fn === "windowInfo"
-            ? windowInfo(k)
-            : fn === "isBettingOpen"
-              ? GENESIS + k * 3600n > NOW
-              : fn === "position"
-                ? position(k)
-                : fn === "claimable"
-                  ? (state.claimable.get(String(k)) ?? 0n)
-                  : fn === "lossOf"
-                    ? 0n
-                    : undefined;
+          : fn === "windowEnd"
+            ? GENESIS + (k + 1n) * 3600n
+            : fn === "windowInfo"
+              ? windowInfo(k)
+              : fn === "isBettingOpen"
+                ? GENESIS + k * 3600n > NOW
+                : fn === "position"
+                  ? position(k)
+                  : fn === "claimable"
+                    ? (state.claimable.get(String(k)) ?? 0n)
+                    : fn === "lossOf"
+                      ? 0n
+                      : undefined;
     }
     return encodeFunctionResult({
       abi: isToken ? erc20Abi : abi,
@@ -630,7 +642,7 @@ async function pageFor({
       errors.push(`Local resource ${r.status()}: ${new URL(r.url()).pathname}`);
   });
   page.setDefaultTimeout(12000);
-  await page.clock.install({ time: new Date(Number(NOW) * 1000) });
+  await page.clock.install({ time: new Date(Number(state.now) * 1000) });
   await page.exposeFunction("hhWalletRequest", async ({ method, params }) => {
     if (["eth_accounts", "eth_requestAccounts"].includes(method))
       return [state.walletAccount];
@@ -668,6 +680,7 @@ async function pageFor({
         removeListener: () => {},
       };
       window.ethereum = p;
+      window.hhWalletEmit = (name, value) => listeners[name]?.(value);
       const announce = () =>
         dispatchEvent(
           new CustomEvent("eip6963:announceProvider", {
@@ -732,8 +745,38 @@ async function pageFor({
               },
             });
         }
-        const one = (x) =>
-          state.docsReadFailure && x.method === "eth_call"
+        const requests = Array.isArray(payload) ? payload : [payload];
+        state.rpcRequests.push(
+          ...requests.map((x) => ({ url: req.url(), ...x })),
+        );
+        if (
+          state.sharedGate &&
+          requests.some(
+            (x) => x.method === "eth_getLogs" && !x.params[0].topics?.length,
+          )
+        )
+          await state.sharedGate;
+        const one = (x) => {
+          if (x.method === "eth_getLogs") {
+            const wallet = !!x.params[0].topics?.[2];
+            const shared = !x.params[0].topics?.length;
+            if (
+              (shared && state.sharedFailure) ||
+              (wallet &&
+                (state.walletFailure ||
+                  (state.walletPrimaryFail &&
+                    req.url().startsWith(config.network.rpcUrls[0]))))
+            )
+              return {
+                jsonrpc: "2.0",
+                id: x.id,
+                error: {
+                  code: -32005,
+                  message: "Archive requests require a personal token",
+                },
+              };
+          }
+          return state.docsReadFailure && x.method === "eth_call"
             ? {
                 jsonrpc: "2.0",
                 id: x.id,
@@ -744,6 +787,7 @@ async function pageFor({
                 id: x.id,
                 result: rpc(x.method, x.params ?? []),
               };
+        };
         return route.fulfill({
           json: Array.isArray(payload) ? payload.map(one) : one(payload),
         });
@@ -855,7 +899,9 @@ async function pageFor({
         ? "How to play."
         : initialTab === "leaderboard"
           ? "Leaderboard."
-          : "Bet on the hamster.",
+          : initialTab === "my-bets"
+            ? "Your place by the wheel."
+            : "Bet on the hamster.",
     })
     .waitFor();
   if (initialTab === "play")
@@ -877,6 +923,55 @@ async function pageFor({
     await page.locator(".account-menu").waitFor();
   }
   return { page, context };
+}
+const refundWalletA = "0xa1c19314851e7abf72b3c124476b1c7a3be2217a";
+const refundWalletB = "0x15e02b8fa7fc6abcf698955587701fe51ddfe217";
+function refundFixture(wallet = refundWalletB) {
+  state.walletAccount = wallet;
+  state.now = BigInt(Date.parse("2026-11-03T08:00:00Z") / 1000);
+  state.logs = [];
+  state.claimable.clear();
+  const fixtures =
+    wallet === refundWalletA
+      ? [[429n, 7374185066434527746n, 3]]
+      : [
+          [431n, W, 3],
+          [478n, 5n * W, 1],
+        ];
+  for (const [k, stake, status] of fixtures) {
+    state.windows.set(String(k), {
+      ...windowInfo(k),
+      status,
+      over: 0n,
+      under: 0n,
+      yes: stake,
+      no: 0n,
+      tickets: 0n,
+    });
+    state.position.set(String(k), { ...basePosition(), yes: stake });
+    state.claimable.set(String(k), status === 3 ? stake : 0n);
+    addLog(
+      "BinaryBet",
+      { k, bettor: wallet, market: 1, side: true, amount: stake },
+      1001n + k,
+    );
+  }
+}
+const walletRequests = () =>
+  state.rpcRequests.filter(
+    (x) => x.method === "eth_getLogs" && x.params[0].topics?.[2],
+  );
+const sharedRequests = () =>
+  state.rpcRequests.filter(
+    (x) => x.method === "eth_getLogs" && !x.params[0].topics?.length,
+  );
+async function noOverflow(page) {
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+    false,
+  );
 }
 async function check(name, fn) {
   if (process.env.HH_TEST && !name.includes(process.env.HH_TEST)) return;
@@ -2026,6 +2121,8 @@ try {
         .filter({ hasText: "12.00 IMD pending" })
         .waitFor();
       await page.reload();
+      // Let the mount-time cached refresh finish before advancing its next timer.
+      await page.waitForLoadState("networkidle");
       await page.getByText(/Through block .*refreshes every minute/).waitFor();
       assert.equal(
         await page
@@ -2354,8 +2451,9 @@ try {
       const pool = page.locator(".hamster-stake .rewards-pool");
       await pool.getByText("USD price unavailable", { exact: true }).waitFor();
       await pool.getByRole("button", { name: "Retry rewards" }).waitFor();
-      assert.ok((await pool.innerText()).includes("2,000 IMD"));
-      assert.ok((await pool.innerText()).includes("20 IMD / day"));
+      // Price failure can settle before the independent contract reads.
+      await pool.getByText("2,000 IMD", { exact: true }).waitFor();
+      await pool.getByText("20 IMD / day", { exact: true }).waitFor();
       state.priceFailure = false;
       await pool.getByRole("button", { name: "Retry rewards" }).click();
       await pool.getByText("≈ $4,000.00", { exact: true }).waitFor();
@@ -2563,7 +2661,299 @@ try {
     },
   );
   await check(
-    "My bets discovers indexed wallet bets and claims all payable hours sequentially",
+    "My bets reuses loaded shared events without another scan and preserves refund 429",
+    async () => {
+      const { page, context } = await pageFor({
+        connected: true,
+        prepare: () => refundFixture(refundWalletA),
+      });
+      await page.locator(".ticker-items a").first().waitFor();
+      const scans = sharedRequests().length;
+      await page.getByRole("link", { name: "My bets", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Claim 7.37 IMD", exact: true })
+        .waitFor();
+      assert.equal(await page.locator(".bet-hours > li").count(), 1);
+      assert.match(await page.locator(".bet-hour").innerText(), /hour 429/);
+      assert.match(await page.locator(".bet-hour").innerText(), /7.37 IMD/);
+      assert.match(await page.locator(".bet-hour").innerText(), /Refund ready/);
+      assert.equal(walletRequests().length, 0);
+      assert.equal(sharedRequests().length, scans);
+      await page.screenshot({ path: resolve(out, "mybets-429-1440.png") });
+      await context.close();
+    },
+  );
+  await check(
+    "My bets waits for shared events, then renders without wallet logs",
+    async () => {
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const { page, context } = await pageFor({
+        connected: true,
+        initialTab: "my-bets",
+        width: 390,
+        prepare: () => {
+          refundFixture();
+          state.sharedGate = gate;
+        },
+      });
+      await page
+        .getByRole("status")
+        .filter({ hasText: "Finding your bets…" })
+        .waitFor();
+      assert.equal(walletRequests().length, 0);
+      assert.equal(
+        await page
+          .getByText("Your bets could not load.", { exact: false })
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page.getByText("A fresh start.", { exact: true }).count(),
+        0,
+      );
+      await page.screenshot({ path: resolve(out, "mybets-loading-390.png") });
+      release();
+      await page
+        .getByRole("button", { name: "Claim 1 IMD", exact: true })
+        .waitFor();
+      assert.equal(walletRequests().length, 0);
+      await context.close();
+    },
+  );
+  await check(
+    "My bets 431 and 478 render in both themes, reflow and cross the refund deadline",
+    async () => {
+      const { page, context } = await pageFor({
+        connected: true,
+        initialTab: "my-bets",
+        width: 390,
+        prepare: () => refundFixture(),
+      });
+      await page
+        .getByRole("button", { name: "Claim 1 IMD", exact: true })
+        .waitFor();
+      const hours = page.locator(".bet-hour");
+      assert.equal(await hours.count(), 2);
+      assert.match(await hours.nth(0).innerText(), /hour 478/);
+      assert.match(await hours.nth(0).innerText(), /SNOOZE yes · 5 IMD/);
+      assert.match(await hours.nth(0).innerText(), /Waiting for refund/);
+      assert.match(await hours.nth(0).innerText(), /22:20 UTC Nov 3/);
+      assert.match(await hours.nth(1).innerText(), /hour 431/);
+      assert.match(await hours.nth(1).innerText(), /Refund ready/);
+      const reviews = [];
+      for (const width of [320, 390, 800, 1440]) {
+        await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
+        for (const theme of ["day", "night"]) {
+          await page.evaluate((theme) => {
+            document.documentElement.dataset.theme = theme;
+          }, theme);
+          await noOverflow(page);
+          const audit = await new AxeBuilder({ page })
+            .include("#main")
+            .analyze();
+          assert.deepEqual(
+            audit.violations.map((v) => ({
+              id: v.id,
+              nodes: v.nodes.map((n) => n.target),
+            })),
+            [],
+          );
+          const rendered = await page.evaluate(() => {
+            const luminance = (color) => {
+              const rgb = color
+                .match(/[\d.]+/g)
+                .slice(0, 3)
+                .map(Number)
+                .map((c) => {
+                  c /= 255;
+                  return c <= 0.04045
+                    ? c / 12.92
+                    : ((c + 0.055) / 1.055) ** 2.4;
+                });
+              return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+            };
+            const states = [...document.querySelectorAll(".bet-state")].map(
+              (el) => {
+                const css = getComputedStyle(el),
+                  fg = luminance(css.color),
+                  bg = luminance(css.backgroundColor);
+                return {
+                  label: el.textContent,
+                  color: css.color,
+                  background: css.backgroundColor,
+                  ratio: (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05),
+                  fontSize: css.fontSize,
+                  fontFamily: css.fontFamily,
+                };
+              },
+            );
+            return {
+              states,
+              fonts: [...document.fonts].map((f) => ({
+                family: f.family,
+                weight: f.weight,
+                status: f.status,
+              })),
+              reducedMotion: matchMedia("(prefers-reduced-motion: reduce)")
+                .matches,
+              runningAnimations: document
+                .getAnimations()
+                .filter((a) => a.playState === "running").length,
+            };
+          });
+          assert.ok(rendered.states.every((s) => s.ratio >= 4.5));
+          reviews.push({
+            width,
+            theme,
+            violations: audit.violations.length,
+            rendered,
+          });
+          await page.screenshot({
+            path: resolve(out, `mybets-${width}-${theme}.png`),
+            fullPage: true,
+          });
+        }
+      }
+      await writeFile(
+        resolve(out, "mybets-review.json"),
+        JSON.stringify(reviews, null, 2),
+      );
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page
+        .getByRole("button", { name: "Claim 1 IMD", exact: true })
+        .focus();
+      const focus = await page.locator(":focus").evaluate((el) => ({
+        style: getComputedStyle(el).outlineStyle,
+        width: getComputedStyle(el).outlineWidth,
+      }));
+      assert.equal(focus.style, "solid");
+      assert.ok(parseFloat(focus.width) >= 2);
+      await page.screenshot({ path: resolve(out, "mybets-focus-390.png") });
+      await page.clock.setSystemTime(new Date("2026-11-03T22:19:59Z"));
+      await page.clock.runFor(1000);
+      await page
+        .getByRole("button", { name: "Claim 5 IMD", exact: true })
+        .waitFor();
+      assert.equal(
+        await page.getByText("Waiting for refund", { exact: true }).count(),
+        0,
+      );
+      assert.match(await hours.nth(0).innerText(), /Refund ready/);
+      await page.screenshot({ path: resolve(out, "mybets-deadline-390.png") });
+      assert.equal(walletRequests().length, 0);
+      await context.close();
+    },
+  );
+  await check(
+    "My bets only falls back on shared error with fixed 5000-block RPC rotation",
+    async () => {
+      const { page, context } = await pageFor({
+        connected: true,
+        initialTab: "my-bets",
+        prepare: () => {
+          refundFixture();
+          state.sharedFailure = true;
+          state.walletPrimaryFail = true;
+          state.head = deploymentBlock + 10002n;
+        },
+      });
+      await page
+        .getByRole("button", { name: "Claim 1 IMD", exact: true })
+        .waitFor();
+      const requests = walletRequests();
+      assert.ok(sharedRequests().length > 0);
+      assert.ok(requests.length >= 3);
+      const ranges = [
+        ...new Set(
+          requests.map((x) => {
+            const [filter] = x.params;
+            const from = BigInt(filter.fromBlock),
+              to = BigInt(filter.toBlock);
+            assert.ok(to - from + 1n <= 5000n, "No oversized wallet request");
+            return `${from}-${to}`;
+          }),
+        ),
+      ];
+      assert.deepEqual(ranges, [
+        `${deploymentBlock}-${deploymentBlock + 4999n}`,
+        `${deploymentBlock + 5000n}-${deploymentBlock + 9999n}`,
+        `${deploymentBlock + 10000n}-${state.head}`,
+      ]);
+      assert.ok(
+        requests.some((x) => x.url.startsWith(config.network.rpcUrls[0])),
+      );
+      assert.ok(
+        requests.some((x) => x.url.startsWith(config.network.rpcUrls[1])),
+      );
+      await context.close();
+    },
+  );
+  await check(
+    "My bets exhausted fallback shows recoverable error and Try again succeeds",
+    async () => {
+      const { page, context } = await pageFor({
+        connected: true,
+        initialTab: "my-bets",
+        width: 390,
+        prepare: () => {
+          refundFixture();
+          state.sharedFailure = true;
+          state.walletFailure = true;
+        },
+      });
+      await page
+        .getByRole("alert")
+        .filter({ hasText: "Your bets could not load" })
+        .waitFor();
+      assert.equal(
+        await page.getByText("A fresh start.", { exact: true }).count(),
+        0,
+      );
+      await page.screenshot({ path: resolve(out, "mybets-error-390.png") });
+      state.walletFailure = false;
+      await page
+        .getByRole("button", { name: "Try again", exact: true })
+        .focus();
+      await page.keyboard.press("Enter");
+      await page
+        .getByRole("button", { name: "Claim 1 IMD", exact: true })
+        .waitFor();
+      await context.close();
+    },
+  );
+  await check(
+    "My bets empty wallet and account changes cannot leak another wallet's bets",
+    async () => {
+      const { page, context } = await pageFor({
+        connected: true,
+        initialTab: "my-bets",
+        prepare: () => refundFixture(),
+      });
+      await page
+        .getByRole("button", { name: "Claim 1 IMD", exact: true })
+        .waitFor();
+      state.walletAccount = refundWalletA;
+      await page.evaluate(
+        (wallet) => window.hhWalletEmit("accountsChanged", [wallet]),
+        refundWalletA,
+      );
+      await page.getByText("A fresh start.", { exact: true }).waitFor();
+      assert.equal(await page.locator(".bet-hour").count(), 0);
+      assert.equal(walletRequests().length, 0);
+      await page
+        .getByRole("link", { name: "Make your first pick", exact: false })
+        .click();
+      await page
+        .getByRole("heading", { name: "Bet on the hamster." })
+        .waitFor();
+      await context.close();
+    },
+  );
+  await check(
+    "My bets reuses shared wallet bets and claims all payable hours sequentially",
     async () => {
       const { page, context } = await pageFor({ connected: true });
       await page.getByRole("link", { name: "My bets", exact: true }).click();
@@ -2574,7 +2964,7 @@ try {
       await page.getByText("2 hours claimed.", { exact: true }).waitFor();
       assert.deepEqual(
         state.txs.filter((t) => t.fn === "claim").map((t) => String(t.args[0])),
-        [String(current - 1n), String(current - 2n)],
+        [String(current - 2n), String(current - 1n)],
       );
       assert.ok(
         await page.getByRole("button", { name: "Claim all" }).isDisabled(),

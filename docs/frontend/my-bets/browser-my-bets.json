@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "name": "My bets reuses loaded shared events without another scan and preserves refund 429",
+      "passed": true
+    },
+    {
+      "name": "My bets waits for shared events, then renders without wallet logs",
+      "passed": true
+    },
+    {
+      "name": "My bets 431 and 478 render in both themes, reflow and cross the refund deadline",
+      "passed": true
+    },
+    {
+      "name": "My bets only falls back on shared error with fixed 5000-block RPC rotation",
+      "passed": true
+    },
+    {
+      "name": "My bets exhausted fallback shows recoverable error and Try again succeeds",
+      "passed": true
+    },
+    {
+      "name": "My bets empty wallet and account changes cannot leak another wallet's bets",
+      "passed": true
+    },
+    {
+      "name": "My bets reuses shared wallet bets and claims all payable hours sequentially",
+      "passed": true
+    }
+  ],
+  "pageErrors": []
+}

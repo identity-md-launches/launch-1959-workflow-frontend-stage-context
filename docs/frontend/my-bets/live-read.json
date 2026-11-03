@@ -1,0 +1,59 @@
+{
+  "observedAt": "2026-11-03T07:37:47.529Z",
+  "failures": [],
+  "mode": "read-only public RPC",
+  "throughBlock": "26332824",
+  "events": 1126,
+  "wallets": [
+    {
+      "account": "0xa1c19314851e7abf72b3c124476b1c7a3be2217a",
+      "rows": [
+        {
+          "hour": "429",
+          "stakeIMD": "7.37",
+          "claimable": "7374185066434527746",
+          "dueIMD": "7.37",
+          "timeoutAt": "1793568000",
+          "bets": [
+            {
+              "amount": "7.37",
+              "status": "Refund ready"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "account": "0x15e02b8fa7fc6abcf698955587701fe51ddfe217",
+      "rows": [
+        {
+          "hour": "478",
+          "stakeIMD": "5",
+          "claimable": "0",
+          "dueIMD": "0",
+          "timeoutAt": "1793744400",
+          "bets": [
+            {
+              "amount": "5",
+              "status": "Waiting for refund",
+              "unlockAt": "1793744400"
+            }
+          ]
+        },
+        {
+          "hour": "431",
+          "stakeIMD": "1",
+          "claimable": "1000000000000000000",
+          "dueIMD": "1",
+          "timeoutAt": "1793575200",
+          "bets": [
+            {
+              "amount": "1",
+              "status": "Refund ready"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

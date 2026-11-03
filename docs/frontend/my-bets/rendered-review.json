@@ -1,0 +1,394 @@
+[
+  {
+    "width": 320,
+    "theme": "day",
+    "violations": 0,
+    "rendered": {
+      "states": [
+        {
+          "label": "Waiting for refund",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(255, 224, 138)",
+          "ratio": 12.209870829453374,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        },
+        {
+          "label": "Refund ready",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(168, 230, 198)",
+          "ratio": 11.098376856834328,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "loaded"
+        }
+      ],
+      "reducedMotion": true,
+      "runningAnimations": 0
+    }
+  },
+  {
+    "width": 320,
+    "theme": "night",
+    "violations": 0,
+    "rendered": {
+      "states": [
+        {
+          "label": "Waiting for refund",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(255, 224, 138)",
+          "ratio": 12.209870829453374,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        },
+        {
+          "label": "Refund ready",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(168, 230, 198)",
+          "ratio": 11.098376856834328,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "loaded"
+        }
+      ],
+      "reducedMotion": true,
+      "runningAnimations": 0
+    }
+  },
+  {
+    "width": 390,
+    "theme": "day",
+    "violations": 0,
+    "rendered": {
+      "states": [
+        {
+          "label": "Waiting for refund",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(255, 224, 138)",
+          "ratio": 12.209870829453374,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        },
+        {
+          "label": "Refund ready",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(168, 230, 198)",
+          "ratio": 11.098376856834328,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "loaded"
+        }
+      ],
+      "reducedMotion": true,
+      "runningAnimations": 0
+    }
+  },
+  {
+    "width": 390,
+    "theme": "night",
+    "violations": 0,
+    "rendered": {
+      "states": [
+        {
+          "label": "Waiting for refund",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(255, 224, 138)",
+          "ratio": 12.209870829453374,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        },
+        {
+          "label": "Refund ready",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(168, 230, 198)",
+          "ratio": 11.098376856834328,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "loaded"
+        }
+      ],
+      "reducedMotion": true,
+      "runningAnimations": 0
+    }
+  },
+  {
+    "width": 800,
+    "theme": "day",
+    "violations": 0,
+    "rendered": {
+      "states": [
+        {
+          "label": "Waiting for refund",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(255, 224, 138)",
+          "ratio": 12.209870829453374,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        },
+        {
+          "label": "Refund ready",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(168, 230, 198)",
+          "ratio": 11.098376856834328,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "loaded"
+        }
+      ],
+      "reducedMotion": true,
+      "runningAnimations": 0
+    }
+  },
+  {
+    "width": 800,
+    "theme": "night",
+    "violations": 0,
+    "rendered": {
+      "states": [
+        {
+          "label": "Waiting for refund",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(255, 224, 138)",
+          "ratio": 12.209870829453374,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        },
+        {
+          "label": "Refund ready",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(168, 230, 198)",
+          "ratio": 11.098376856834328,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "loaded"
+        }
+      ],
+      "reducedMotion": true,
+      "runningAnimations": 0
+    }
+  },
+  {
+    "width": 1440,
+    "theme": "day",
+    "violations": 0,
+    "rendered": {
+      "states": [
+        {
+          "label": "Waiting for refund",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(255, 224, 138)",
+          "ratio": 12.209870829453374,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        },
+        {
+          "label": "Refund ready",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(168, 230, 198)",
+          "ratio": 11.098376856834328,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "loaded"
+        }
+      ],
+      "reducedMotion": true,
+      "runningAnimations": 0
+    }
+  },
+  {
+    "width": 1440,
+    "theme": "night",
+    "violations": 0,
+    "rendered": {
+      "states": [
+        {
+          "label": "Waiting for refund",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(255, 224, 138)",
+          "ratio": 12.209870829453374,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        },
+        {
+          "label": "Refund ready",
+          "color": "rgb(43, 33, 24)",
+          "background": "rgb(168, 230, 198)",
+          "ratio": 11.098376856834328,
+          "fontSize": "12px",
+          "fontFamily": "Geist, Arial, sans-serif"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Geist",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Geist",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Silkscreen",
+          "weight": "400",
+          "status": "loaded"
+        }
+      ],
+      "reducedMotion": true,
+      "runningAnimations": 0
+    }
+  }
+]

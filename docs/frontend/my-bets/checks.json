@@ -1,0 +1,66 @@
+{
+  "scope": "My Bets shared events and bounded RPC fallback",
+  "productionBuild": "passed",
+  "independentTypecheck": "passed",
+  "exportVerification": "passed",
+  "unitTests": {
+    "passed": 68,
+    "total": 68
+  },
+  "myBetsBrowser": {
+    "passed": 7,
+    "total": 7,
+    "pageErrors": []
+  },
+  "broadBrowserRuns": [
+    {
+      "passed": 39,
+      "total": 40,
+      "failure": "cached leaderboard reload timing assertion; repaired and rechecked"
+    },
+    {
+      "passed": 39,
+      "total": 40,
+      "failure": "rewards price-error assertion before contract reads completed; repaired and rechecked"
+    }
+  ],
+  "focusedRechecks": {
+    "leaderboard": {
+      "passed": 1,
+      "total": 1
+    },
+    "rewards": {
+      "passed": 1,
+      "total": 1
+    }
+  },
+  "responsiveMyBetsAudits": {
+    "passed": 8,
+    "total": 8,
+    "violations": 0,
+    "widths": [
+      320,
+      390,
+      800,
+      1440
+    ],
+    "themes": [
+      "day",
+      "night"
+    ]
+  },
+  "designProbe": {
+    "passed": 14,
+    "total": 16,
+    "retainedConventions": [
+      "active navigation pill detected as eyebrow",
+      "existing pixel button shadows/borders and amount/notice surfaces"
+    ]
+  },
+  "liveWalletExamples": "matched requested amounts and statuses before deadline",
+  "deadlineTransition": "verified with unit and production-browser controlled clock",
+  "webKit": "attempted; unavailable system libraries prevented launch",
+  "completeBroadRerunAfterFinalFixtureRepair": false,
+  "realTransactionsSent": false,
+  "published": false
+}

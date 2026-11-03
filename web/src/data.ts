@@ -1,5 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
+  createPublicClient,
+  http,
   erc20Abi,
   keccak256,
   decodeEventLog,
@@ -157,7 +160,10 @@ export interface GameEvent {
 }
 const scanHeads = new Map<string, bigint>();
 export async function loadEvents(r: Runtime, previous?: GameEvent[]) {
-  const latest = await r.client.getBlockNumber();
+  const latest = await r.client.getBlockNumber().catch((error) => {
+    logMyBetsReadError(r, "shared events: eth_blockNumber", error);
+    throw error;
+  });
   const prior = previous ?? [];
   const scanKey = `${r.chain.id}:${r.game.address.toLowerCase()}`;
   const head = previous ? scanHeads.get(scanKey) : undefined;
@@ -169,11 +175,17 @@ export async function loadEvents(r: Runtime, previous?: GameEvent[]) {
     from = BigInt(r.game.deploymentBlock);
   const output = prior.filter((e) => e.blockNumber < from);
   for (let start = from; start <= latest; start += 5000n) {
-    const logs = await r.client.getLogs({
-      address: r.game.address,
-      fromBlock: start,
-      toBlock: start + 4999n < latest ? start + 4999n : latest,
-    });
+    const end = start + 4999n < latest ? start + 4999n : latest;
+    const logs = await r.client
+      .getLogs({
+        address: r.game.address,
+        fromBlock: start,
+        toBlock: end,
+      })
+      .catch((error) => {
+        logMyBetsReadError(r, "shared events: eth_getLogs", error, start, end);
+        throw error;
+      });
     for (const log of logs) {
       try {
         const decoded = decodeEventLog({
@@ -245,68 +257,157 @@ export function usePositions(
 }
 
 // ------------------------------------------------------------ My bets
-// The connected wallet's own BinaryBet, TicketBought and Claimed logs, filtered
-// on chain by the indexed bettor/account topic (topic 2 in all three events).
-const walletScans = new Map<
-  string,
-  { head: bigint; bets: WalletBet[]; claimed: Set<string> }
->();
-async function walletLogs(
-  r: Runtime,
-  topics: unknown[],
-  from: bigint,
-  to: bigint,
-): Promise<any[]> {
-  try {
-    return (await r.client.request({
-      method: "eth_getLogs",
-      params: [
-        {
-          address: r.game.address,
-          fromBlock: toHex(from),
-          toBlock: toHex(to),
-          topics,
-        },
-      ],
-    } as any)) as any[];
-  } catch (e) {
-    // Some providers refuse wide ranges: split until the range is small.
-    if (to - from < 2000n) throw e;
-    const mid = from + (to - from) / 2n;
-    return [
-      ...(await walletLogs(r, topics, from, mid)),
-      ...(await walletLogs(r, topics, mid + 1n, to)),
-    ];
-  }
+// Reuse the complete shared events, including refunded and one-sided bets.
+// This deliberately does not use leaderboard eligibility or volume totals.
+export function walletEvents(events: GameEvent[], account: Address) {
+  const wallet = account.toLowerCase();
+  return events.filter((e) =>
+    e.eventName === "Claimed"
+      ? e.args.account?.toLowerCase() === wallet
+      : (e.eventName === "BinaryBet" || e.eventName === "TicketBought") &&
+        e.args.bettor?.toLowerCase() === wallet,
+  );
 }
+
+function logMyBetsReadError(
+  r: Runtime,
+  step: string,
+  error: unknown,
+  from?: bigint,
+  to = from,
+) {
+  // viem nests the HTTP request error under contract/action errors.
+  let cause = error as { url?: string; cause?: unknown } | undefined;
+  let rpcUrl: string | undefined;
+  const seen = new Set<unknown>();
+  while (cause && typeof cause === "object" && !seen.has(cause)) {
+    seen.add(cause);
+    rpcUrl ??= cause.url;
+    cause = cause.cause as typeof cause;
+  }
+  console.error(
+    "[My bets] Request failed",
+    {
+      step,
+      rpcUrl: rpcUrl ?? r.deployment.network.rpcUrls,
+      fromBlock: from?.toString() ?? "latest",
+      toBlock: to?.toString() ?? "latest",
+    },
+    error,
+  );
+}
+
+// Only used when the shared events query has failed. Every request is bounded
+// before sending; retry the same chunk across the configured RPCs twice.
 export async function loadWalletBets(r: Runtime, account: Address) {
-  const key = `${r.game.address.toLowerCase()}:${account.toLowerCase()}`;
-  const latest = await r.client.getBlockNumber();
-  const deployed = BigInt(r.game.deploymentBlock);
-  const prior = walletScans.get(key);
-  let from = prior ? prior.head - 12n : deployed;
-  if (from < deployed) from = deployed;
-  const bets = (prior?.bets ?? []).filter((b) => b.blockNumber < from);
-  const claimed = new Set(prior?.claimed ?? []);
+  const clients = r.deployment.network.rpcUrls.map((url) => ({
+    url,
+    client: createPublicClient({
+      chain: r.chain,
+      transport: http(url, { timeout: 10000, retryCount: 0 }),
+    }),
+  }));
+  let cursor = 0;
+  async function request<T>(
+    step: string,
+    from: bigint | undefined,
+    to: bigint | undefined,
+    run: (client: (typeof clients)[number]["client"]) => Promise<T>,
+  ): Promise<T> {
+    let failure: unknown = Error("No game RPCs are configured.");
+    for (let attempt = 0; attempt < clients.length * 2; attempt++) {
+      const { url, client } = clients[cursor++ % clients.length];
+      try {
+        return await run(client);
+      } catch (error) {
+        failure = error;
+        console.error(
+          "[My bets] Fallback request failed",
+          {
+            step,
+            rpcUrl: url,
+            fromBlock: from?.toString() ?? "latest",
+            toBlock: to?.toString() ?? "latest",
+            attempt: attempt + 1,
+          },
+          error,
+        );
+      }
+    }
+    throw failure;
+  }
+  const latest = await request(
+    "eth_blockNumber",
+    undefined,
+    undefined,
+    (client) => client.getBlockNumber({ cacheTime: 0 }),
+  );
   const selectors = ["BinaryBet", "TicketBought", "Claimed"].map(
     (eventName) =>
       encodeEventTopics({ abi: r.game.abi, eventName } as any)[0] as Hex,
   );
-  const topics = [selectors, null, pad(account.toLowerCase() as Hex)];
-  const logs = from <= latest ? await walletLogs(r, topics, from, latest) : [];
-  for (const log of logs) {
-    let d: any;
-    try {
-      d = decodeEventLog({
-        abi: r.game.abi,
-        data: log.data,
-        topics: log.topics,
-      });
-    } catch {
-      continue;
+  const topics: [Hex[], null, Hex] = [
+    selectors,
+    null,
+    pad(account.toLowerCase() as Hex),
+  ];
+  const events: GameEvent[] = [];
+  for (
+    let from = BigInt(r.game.deploymentBlock);
+    from <= latest;
+    from += 5000n
+  ) {
+    const to = from + 4999n < latest ? from + 4999n : latest;
+    const logs = await request("eth_getLogs", from, to, (client) =>
+      client.request({
+        method: "eth_getLogs",
+        params: [
+          {
+            address: r.game.address,
+            fromBlock: toHex(from),
+            toBlock: toHex(to),
+            // All three events index k first and bettor/account second.
+            topics,
+          },
+        ],
+      }),
+    );
+    for (const log of logs) {
+      try {
+        const d = decodeEventLog({
+          abi: r.game.abi,
+          data: log.data,
+          topics: log.topics,
+        });
+        events.push({
+          eventName: d.eventName!,
+          args: d.args as any,
+          transactionHash: log.transactionHash!,
+          blockNumber: BigInt(log.blockNumber!),
+          logIndex: Number(log.logIndex!),
+        });
+      } catch (error) {
+        console.error(
+          "[My bets] Fallback log decoding failed",
+          {
+            step: "decodeEventLog",
+            rpcUrl: clients[(cursor - 1) % clients.length].url,
+            fromBlock: from.toString(),
+            toBlock: to.toString(),
+          },
+          error,
+        );
+        throw error;
+      }
     }
-    const who = (d.args.bettor ?? d.args.account) as string | undefined;
-    if (who?.toLowerCase() !== account.toLowerCase()) continue;
+  }
+  return walletEvents(events, account);
+}
+
+export function betsFromEvents(events: GameEvent[]) {
+  const bets: WalletBet[] = [];
+  const claimed = new Set<string>();
+  for (const d of events) {
     if (d.eventName === "Claimed") {
       claimed.add(String(d.args.k));
       continue;
@@ -320,18 +421,37 @@ export async function loadWalletBets(r: Runtime, account: Address) {
       amount:
         d.eventName === "BinaryBet" ? BigInt(d.args.amount) : TICKET_PRICE,
       guess: d.eventName === "TicketBought" ? BigInt(d.args.guess) : undefined,
-      transactionHash: log.transactionHash,
-      blockNumber: BigInt(log.blockNumber),
-      logIndex: Number(log.logIndex),
+      transactionHash: d.transactionHash,
+      blockNumber: d.blockNumber,
+      logIndex: d.logIndex,
     });
   }
-  walletScans.set(key, { head: latest, bets, claimed });
   return { bets, claimed };
 }
-export async function loadMyBets(r: Runtime, account: Address) {
-  const { bets, claimed } = await loadWalletBets(r, account);
-  const block = await r.client.getBlock();
-  const read = reader(r);
+export async function loadMyBets(
+  r: Runtime,
+  account: Address,
+  events?: GameEvent[],
+) {
+  const { bets, claimed } = betsFromEvents(
+    events === undefined
+      ? await loadWalletBets(r, account)
+      : walletEvents(events, account),
+  );
+  const block = await r.client.getBlock().catch((error) => {
+    logMyBetsReadError(r, "getBlock for contract reads", error);
+    throw error;
+  });
+  const contractRead = reader(r);
+  const read = <T>(
+    name: string,
+    args: readonly unknown[],
+    blockNumber: bigint,
+  ) =>
+    contractRead<T>(name, args, blockNumber).catch((error) => {
+      logMyBetsReadError(r, `${name}(${args.join(", ")})`, error, blockNumber);
+      throw error;
+    });
   const ks = [...new Set(bets.map((b) => b.k.toString()))].map(BigInt);
   const [timeout, balance] = await Promise.all([
     read<bigint>("TIMEOUT", [], block.number),
@@ -365,11 +485,42 @@ export async function loadMyBets(r: Runtime, account: Address) {
     blockNumber: block.number,
   };
 }
-export const useMyBets = (r: Runtime, account: Address | undefined) =>
-  useQuery({
-    queryKey: ["my-bets", account?.toLowerCase()],
-    queryFn: () => loadMyBets(r, account!),
-    enabled: !!account,
+export type SharedEvents = Pick<
+  ReturnType<typeof useEvents>,
+  "data" | "isError"
+>;
+export function useMyBets(
+  r: Runtime,
+  account: Address | undefined,
+  events: SharedEvents,
+) {
+  // Game passes its existing query, so mounting this tab never starts a scan.
+  const ownEvents = useMemo(
+    () =>
+      account && events.data !== undefined
+        ? walletEvents(events.data, account)
+        : undefined,
+    [account, events.data],
+  );
+  const revision = ownEvents
+    ?.map((e) => `${e.blockNumber}:${e.transactionHash}:${e.logIndex}`)
+    .join(",");
+  const query = useQuery({
+    queryKey: [
+      "my-bets",
+      account?.toLowerCase(),
+      r.chain.id,
+      r.game.address,
+      revision ?? "fallback",
+    ],
+    queryFn: () => loadMyBets(r, account!, ownEvents),
+    // Pending events are not empty history and must not trigger the fallback.
+    enabled: !!account && (ownEvents !== undefined || events.isError),
     refetchInterval: 20000,
     retry: 1,
   });
+  return {
+    ...query,
+    waitingForEvents: ownEvents === undefined && !events.isError,
+  };
+}

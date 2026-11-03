@@ -28,6 +28,26 @@ node scripts/build-worker.mjs
 
 The browser script starts and closes its own bounded preview at a subpath, uses the real production bundle, and intercepts wallet/RPC/service traffic. It does not spend funds. `HH_TEST='text in a scenario name'` selects a scenario. `node scripts/share-image.mjs` regenerates the locally rendered 1200×630 social image when Playwright is available.
 
+## My Bets event-loading fix
+
+My Bets receives the existing `useEvents` query from `App.tsx`. It filters every `BinaryBet` and `TicketBought` by `bettor`, and every `Claimed` by `account`, case-insensitively. Refunded and one-sided stakes remain visible. Opening the tab after history loads starts no additional log scan; while history is pending it shows **Finding your bets…**. A successful empty history is an empty wallet, not a scan failure.
+
+Only when that query fails without usable events does `loadWalletBets` scan the wallet's three event signatures. It pins a latest block, sends inclusive, nonoverlapping ranges of at most **5,000 blocks**, and rotates the existing runtime RPC list. Each failed chunk gets two passes through that list (one retry per provider); there is no whole-history request or recursive split. An exhausted chunk fails the load instead of displaying partial history. Successful cached shared events remain usable during a failed background refresh.
+
+The existing block-pinned `position`, `windowInfo`, `claimable`, `lossOf`, `windowEnd`, `balances` and `TIMEOUT` reads, refund rules and claim transactions are preserved. Query keys include the connected account, chain, contract and wallet-event identities. Shared scan failures, fallback attempts, decode failures and per-hour read failures log the failed step, RPC URL and block range to the console. For errors without a provider URL attached, diagnostics identify the configured RPC pool and retain the original error.
+
+Read-only Ethereum checks on November 3 reproduced both requested wallets: hour 429 / 7.37 IMD / Refund ready; hour 431 / 1 IMD / Refund ready; hour 478 / 5 IMD / Waiting for refund until **Nov 3, 22:20 UTC**. The boundary transition is tested with a controlled browser clock. See [current validation and limitations](docs/frontend/my-bets/validation.md) and [live observations](docs/frontend/my-bets/live-read.json).
+
+The leaderboard implementation, contracts, keeper, wallet configuration and protected dependency files are unchanged. The only visual adjustment moves the desktop chat launcher to the viewport gutter after the design probe found it covering a refund notice. Loading and error text now announce their state through native live-region roles.
+
+Run the targeted production interaction checks from an installed `web/` after building:
+
+```sh
+IMD_PLAYWRIGHT=/path/to/playwright/index.mjs PLAYWRIGHT_BROWSERS_PATH=/path/to/browsers HH_TEST='My bets' node tests/browser.mjs
+```
+
+The source and existing lockfile are included with the rebuilt static `dist/`; install, preview and rebuild commands are above. The production build, independent typecheck and export verification passed, as did 68 unit tests and all 7 focused My Bets browser scenarios. Eight responsive day/night accessibility scans reported no violations; the design probe passed 14/16 with retained style conventions. Two broader Chromium runs each reached 39/40 because of asynchronous test assertions; those waits were corrected and their failing scenarios passed focused rechecks. The full suite was not repeated after the last test-only repair. Actual evidence, the six-domain review and the unavailable WebKit/Safari coverage are recorded in the linked validation report. Earlier validation sections below describe their historical revisions.
+
 ## Live contract and transactions
 
 - HamsterHour v2: [`0xe33ab493249a2df0d8c4a71ac54f46d1f7778367`](https://etherscan.io/address/0xe33ab493249a2df0d8c4a71ac54f46d1f7778367), Ethereum mainnet, chain ID 1.
@@ -43,7 +63,7 @@ EIP-6963 browser discovery, wallet-browser links for MetaMask/Coinbase/Rabby/Pha
 
 ## What the game shows
 
-The line and four binary pools come from `windowInfo(k)`. OVER/UNDER are one market, SNOOZE yes/no another. Bets close at the hour's start; equality is UNDER. Under 100 passes refunds OVER/UNDER. A one-sided pool refunds; otherwise estimates include the new stake and 9% fees. A 5 IMD ticket wins within ±0.5% of the settled result; winners split 80% and 20% carries. Prize amounts are labelled unfixed until chronological finalization. Feed donations split 90% jackpot / 10% tip jar. My bets uses wallet-indexed events, live positions and `claimable`, including later jackpot claims. No fictional activity or market amounts are seeded into production.
+The line and four binary pools come from `windowInfo(k)`. OVER/UNDER are one market, SNOOZE yes/no another. Bets close at the hour's start; equality is UNDER. Under 100 passes refunds OVER/UNDER. A one-sided pool refunds; otherwise estimates include the new stake and 9% fees. A 5 IMD ticket wins within ±0.5% of the settled result; winners split 80% and 20% carries. Prize amounts are labelled unfixed until chronological finalization. Feed donations split 90% jackpot / 10% tip jar. My bets filters the shared game events in memory and uses live positions and `claimable`, including later jackpot claims. No fictional activity or market amounts are seeded into production.
 
 Live wheel video, hardware status, settlement telemetry and signed chat retain the original `/live`, `/status`, `/rounds`, `/chat` worker endpoints. Chat signs the existing plain text protocol and never sends a transaction. Telemetry is informational: stale/missing readings remain unknown. The mascot and automatic night theme follow fresh speed, independently of the camera. Six seeds show exact ten-minute telemetry when available, including the current interval's live count against an exact preceding baseline. A missing interval stays unknown; the odometer labels approximate baselines. Only the IMD oracle settles results.
 

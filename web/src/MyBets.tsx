@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useConnection } from "wagmi";
 import type { Runtime } from "./config";
-import { reader, useMyBets } from "./data";
+import { reader, useMyBets, type SharedEvents } from "./data";
 import { imd, span, type GameWindow } from "./model";
 
 const dayLabel = (seconds: bigint) =>
@@ -27,11 +27,19 @@ import { blip } from "./sound";
 const payable = (x: WindowRow) =>
   x.due > 0n && (x.claimable > 0n || x.needsTimeout);
 
-export function MyBets({ r, now }: { r: Runtime; now: number }) {
+export function MyBets({
+  r,
+  now,
+  events,
+}: {
+  r: Runtime;
+  now: number;
+  events: SharedEvents;
+}) {
   const { address } = useConnection(),
     wallet = useWalletControl(),
     tx = useTransaction(),
-    bets = useMyBets(r, address);
+    bets = useMyBets(r, address, events);
   const [note, setNote] = useState(""),
     [flash, setFlash] = useState(false);
   const celebrated = useRef("");
@@ -112,13 +120,21 @@ export function MyBets({ r, now }: { r: Runtime; now: number }) {
           <p>Connect your wallet to see your bets and claim your IMD.</p>
           <button onClick={wallet.open}>Connect wallet ↗</button>
         </Empty>
+      ) : bets.waitingForEvents ? (
+        <Empty>
+          <p role="status">Finding your bets…</p>
+        </Empty>
       ) : bets.isError ? (
         <Empty>
-          <p>Your bets could not load. No balances have been changed.</p>
+          <p role="alert">
+            Your bets could not load. No balances have been changed.
+          </p>
           <button onClick={() => void bets.refetch()}>Try again</button>
         </Empty>
       ) : !rows ? (
-        <Empty>Finding your bets on Ethereum…</Empty>
+        <Empty>
+          <p role="status">Finding your bets…</p>
+        </Empty>
       ) : !rows.length ? (
         <Empty>
           <h3>A fresh start.</h3>

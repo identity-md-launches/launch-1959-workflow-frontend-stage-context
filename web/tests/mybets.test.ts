@@ -249,3 +249,28 @@ test("EXACT tickets: pending, won, no win and timed-out refund", () => {
   assert.equal(timed[0].bets[0].label, "Refund ready");
   assert.equal(timed[0].due, 5n * W);
 });
+
+test("requested hours 431 and 478 refund before, at and after Nov 3 22:20 UTC", () => {
+  const deadline = BigInt(Date.parse("2026-11-03T22:20:00Z") / 1000);
+  assert.equal(end(478n) + TIMEOUT, deadline);
+  const own = [bet(431n, 1, true, W), bet(478n, 1, true, 5n * W)];
+  const snapshots = [
+    read(431n, win(431n, 3, { yes: W }), pos({ yes: W }), W),
+    read(478n, win(478n, 1, { yes: 5n * W }), pos({ yes: 5n * W })),
+  ];
+  const before = classify(own, snapshots, deadline - 1n);
+  assert.equal(before[0].k, 478n);
+  assert.equal(before[0].staked, 5n * W);
+  assert.equal(before[0].bets[0].label, "Waiting for refund");
+  assert.equal(utcLabel(before[0].bets[0].unlockAt!), "22:20 UTC Nov 3");
+  assert.equal(before[0].due, 0n);
+  assert.equal(before[1].k, 431n);
+  assert.equal(before[1].staked, W);
+  assert.equal(before[1].bets[0].label, "Refund ready");
+  for (const now of [deadline, deadline + 1n]) {
+    const after = classify(own, snapshots, now);
+    assert.equal(after[0].bets[0].label, "Refund ready");
+    assert.equal(after[0].needsTimeout, true);
+    assert.equal(after[0].due, 5n * W);
+  }
+});
